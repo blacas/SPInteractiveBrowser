@@ -1,0 +1,403 @@
+import React, { useState, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  ArrowLeft, 
+  ArrowRight, 
+  RotateCcw, 
+  Home, 
+  Plus, 
+  X, 
+  Shield,
+  AlertTriangle
+} from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import SearchBar from './SearchBar';
+
+interface Tab {
+  id: string;
+  title: string;
+  url: string;
+  isLoading: boolean;
+}
+
+const BrowserWindow: React.FC = () => {
+  const { user } = useAuth();
+  const [tabs, setTabs] = useState<Tab[]>([
+    { id: '1', title: 'New Tab', url: 'https://www.google.com', isLoading: false }
+  ]);
+  const [activeTab, setActiveTab] = useState('1');
+  const [urlInput, setUrlInput] = useState('https://www.google.com');
+  const webviewRefs = useRef<{ [key: string]: HTMLElement | null }>({});
+
+  // Access level configurations
+  const getAccessLevelConfig = () => {
+    const level = user?.accessLevel || 1;
+    switch (level) {
+      case 3:
+        return {
+          name: 'Full Access',
+          allowedDomains: ['*'], // All domains
+          variant: 'default' as const
+        };
+      case 2:
+        return {
+          name: 'Manager',
+          allowedDomains: [
+            'sharepoint.com',
+            'office.com',
+            'microsoft.com',
+            'wikipedia.org',
+            'github.com',
+            'stackoverflow.com'
+          ],
+          variant: 'secondary' as const
+        };
+      default:
+        return {
+          name: 'Restricted',
+          allowedDomains: ['sharepoint.com', 'office.com'],
+          variant: 'outline' as const
+        };
+    }
+  };
+
+  const isUrlAllowed = (url: string): boolean => {
+    const config = getAccessLevelConfig();
+    if (config.allowedDomains.includes('*')) return true;
+    
+    try {
+      // Ensure URL has protocol
+      let fullUrl = url;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        fullUrl = 'https://' + url;
+      }
+      
+      const urlObj = new URL(fullUrl);
+      const domain = urlObj.hostname.replace('www.', '');
+      
+      console.log('Checking URL:', fullUrl);
+      console.log('Extracted domain:', domain);
+      console.log('Allowed domains:', config.allowedDomains);
+      
+      const isAllowed = config.allowedDomains.some(allowed => {
+        const match = domain === allowed || domain.endsWith('.' + allowed);
+        console.log(`Checking ${domain} against ${allowed}: ${match}`);
+        return match;
+      });
+      
+      console.log('Final result:', isAllowed);
+      return isAllowed;
+    } catch (error) {
+      console.error('URL parsing error:', error);
+      return false;
+    }
+  };
+
+  const getHomeUrl = (): string => {
+    const level = user?.accessLevel || 1;
+    switch (level) {
+      case 3: return 'https://www.google.com';
+      case 2: return 'https://github.com';
+      default: return 'https://www.office.com';
+    }
+  };
+
+  const handleUrlSubmit = () => {
+    if (!isUrlAllowed(urlInput)) {
+      alert(`Access denied. Your access level (${getAccessLevelConfig().name}) does not permit accessing this URL.`);
+      return;
+    }
+
+    const webview = webviewRefs.current[activeTab] as HTMLElement & { 
+      src: string;
+    };
+    
+    if (webview) {
+      // Update tab state
+      setTabs(tabs.map(tab => 
+        tab.id === activeTab 
+          ? { ...tab, url: urlInput, isLoading: true, title: 'Loading...' }
+          : tab
+      ));
+      
+      // Navigate webview
+      webview.src = urlInput;
+    }
+  };
+
+  const handleUrlChange = (value: string) => {
+    setUrlInput(value);
+  };
+
+  const goBack = () => {
+    const webview = webviewRefs.current[activeTab] as HTMLElement & { 
+      canGoBack(): boolean;
+      goBack(): void;
+    };
+    if (webview && webview.canGoBack()) {
+      webview.goBack();
+    }
+  };
+
+  const goForward = () => {
+    const webview = webviewRefs.current[activeTab] as HTMLElement & { 
+      canGoForward(): boolean;
+      goForward(): void;
+    };
+    if (webview && webview.canGoForward()) {
+      webview.goForward();
+    }
+  };
+
+  const reload = () => {
+    const webview = webviewRefs.current[activeTab] as HTMLElement & { 
+      reload(): void;
+    };
+    if (webview) {
+      webview.reload();
+    }
+  };
+
+  const goHome = () => {
+    const homeUrl = getHomeUrl();
+    setUrlInput(homeUrl);
+    const webview = webviewRefs.current[activeTab] as HTMLElement & { 
+      src: string;
+    };
+    if (webview) {
+      setTabs(tabs.map(tab => 
+        tab.id === activeTab 
+          ? { ...tab, url: homeUrl, isLoading: true, title: 'Loading...' }
+          : tab
+      ));
+      webview.src = homeUrl;
+    }
+  };
+
+  const createNewTab = () => {
+    const newTabId = Date.now().toString();
+    const homeUrl = getHomeUrl();
+    const newTab: Tab = {
+      id: newTabId,
+      title: 'New Tab',
+      url: homeUrl,
+      isLoading: false
+    };
+    
+    setTabs([...tabs, newTab]);
+    setActiveTab(newTabId);
+    setUrlInput(homeUrl);
+  };
+
+  const closeTab = (tabId: string) => {
+    if (tabs.length <= 1) return;
+    
+    const newTabs = tabs.filter(tab => tab.id !== tabId);
+    setTabs(newTabs);
+    
+    if (activeTab === tabId) {
+      setActiveTab(newTabs[0].id);
+      setUrlInput(newTabs[0].url);
+    }
+  };
+
+  // Webview event handlers
+  const setupWebviewEvents = (webview: HTMLElement, tabId: string) => {
+    type WebviewEvent = Event & { url: string; title?: string };
+    
+    webview.addEventListener('did-start-loading', () => {
+      setTabs(tabs => tabs.map(tab => 
+        tab.id === tabId ? { ...tab, isLoading: true } : tab
+      ));
+    });
+
+    webview.addEventListener('did-stop-loading', () => {
+      setTabs(tabs => tabs.map(tab => 
+        tab.id === tabId ? { ...tab, isLoading: false } : tab
+      ));
+    });
+
+    webview.addEventListener('page-title-updated', (event: Event) => {
+      const webviewEvent = event as WebviewEvent;
+      setTabs(tabs => tabs.map(tab => 
+        tab.id === tabId ? { ...tab, title: webviewEvent.title || 'Untitled' } : tab
+      ));
+    });
+
+    webview.addEventListener('did-navigate', (event: Event) => {
+      const webviewEvent = event as WebviewEvent;
+      if (tabId === activeTab) {
+        setUrlInput(webviewEvent.url);
+      }
+      setTabs(tabs => tabs.map(tab => 
+        tab.id === tabId ? { ...tab, url: webviewEvent.url } : tab
+      ));
+    });
+
+    webview.addEventListener('did-navigate-in-page', (event: Event) => {
+      const webviewEvent = event as WebviewEvent;
+      if (tabId === activeTab) {
+        setUrlInput(webviewEvent.url);
+      }
+      setTabs(tabs => tabs.map(tab => 
+        tab.id === tabId ? { ...tab, url: webviewEvent.url } : tab
+      ));
+    });
+  };
+
+  const config = getAccessLevelConfig();
+
+  return (
+    <div className="flex flex-col h-full bg-white">
+      {/* Browser Controls */}
+      <div className="flex items-center gap-3 p-3 border-b bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg">
+        <div className="flex items-center gap-0.5 bg-slate-700/50 rounded-lg p-1">
+          <Button 
+            variant="ghost" 
+            onClick={goBack}
+            className="h-8 w-8 p-0 text-slate-300 hover:text-white hover:bg-slate-600 transition-all duration-200 rounded-md"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={goForward}
+            className="h-8 w-8 p-0 text-slate-300 hover:text-white hover:bg-slate-600 transition-all duration-200 rounded-md"
+          >
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={reload}
+            className="h-8 w-8 p-0 text-slate-300 hover:text-white hover:bg-slate-600 transition-all duration-200 rounded-md"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={goHome}
+            className="h-8 w-8 p-0 text-slate-300 hover:text-white hover:bg-slate-600 transition-all duration-200 rounded-md"
+          >
+            <Home className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <SearchBar
+          value={urlInput}
+          onChange={handleUrlChange}
+          onSubmit={handleUrlSubmit}
+          placeholder="Enter URL or search..."
+        />
+
+        <div className="flex items-center gap-2">
+          <Badge 
+            variant={config.variant}
+            className="px-3 py-1.5 text-xs font-medium bg-slate-700 text-slate-200 border-slate-600 hover:bg-slate-600 transition-colors h-8 flex items-center"
+          >
+            {config.name}
+          </Badge>
+          {!isUrlAllowed(urlInput) && (
+            <Badge variant="destructive" className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white border-red-500 animate-pulse h-8 text-xs font-medium">
+              <Shield className="h-3 w-3" />
+              Blocked
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <div className="flex items-center border-b bg-gradient-to-r from-slate-100 to-slate-200 shadow-sm">
+          <TabsList className="h-12 bg-transparent border-0 gap-1 p-1">
+            {tabs.map((tab) => (
+              <div key={tab.id} className="flex items-center">
+                <TabsTrigger 
+                  value={tab.id} 
+                  className="flex items-center gap-2 px-4 py-2 rounded-t-lg border-b-2 border-transparent text-slate-600 hover:text-slate-800 hover:bg-white/70 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:border-blue-500 data-[state=active]:shadow-sm transition-all duration-200"
+                >
+                  <span className="max-w-32 truncate font-medium">
+                    {tab.isLoading ? (
+                      <span className="flex items-center gap-2">
+                        <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        Loading...
+                      </span>
+                    ) : tab.title}
+                  </span>
+                  {tabs.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 w-5 p-0 hover:bg-red-100 hover:text-red-600 rounded-full transition-all duration-200"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        closeTab(tab.id);
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </TabsTrigger>
+              </div>
+            ))}
+          </TabsList>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={createNewTab} 
+            className="ml-3 mr-2 h-8 w-8 p-0 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 hover:text-slate-800 transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Tab Content */}
+        <div className="flex-1 relative">
+          {tabs.map((tab) => (
+            <TabsContent key={tab.id} value={tab.id} className="h-full m-0 data-[state=active]:flex">
+              {isUrlAllowed(tab.url) ? (
+                <webview
+                  ref={(ref: HTMLElement | null) => {
+                    if (ref) {
+                      webviewRefs.current[tab.id] = ref;
+                      setupWebviewEvents(ref, tab.id);
+                    }
+                  }}
+                  src={tab.url}
+                  style={{ 
+                    width: '100%', 
+                    height: '100%',
+                    border: 'none'
+                  }}
+                  allowpopups
+                  useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center bg-gray-50">
+                  <div className="text-center max-w-md">
+                    <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                    <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Restricted</h2>
+                    <p className="text-gray-600 mb-4">
+                      Your access level ({config.name}) does not permit accessing this URL.
+                    </p>
+                    <div className="text-sm text-gray-500">
+                      <p className="mb-2">Allowed domains for your level:</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        {config.allowedDomains.map((domain, index) => (
+                          <li key={index}>{domain}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          ))}
+        </div>
+      </Tabs>
+    </div>
+  );
+};
+
+export default BrowserWindow; 

@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Reset for development server container */
+html {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -114,7 +120,47 @@
   * {
     @apply border-border outline-ring/50;
   }
+  
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 100%;
+    width: 100%;
+    overflow-x: hidden;
+  }
+  
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+  }
+  
+  #root {
+    height: 100vh;
+    width: 100vw;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Ensure no default margins on any containers */
+  * {
+    box-sizing: border-box;
+  }
+  
+  /* Force text cursor visibility in search inputs */
+  .search-input {
+    caret-color: #1e293b !important;
+    color: #1e293b !important;
+  }
+  
+  .search-input:focus {
+    caret-color: #1e293b !important;
+    outline: none !important;
+  }
+  
+  /* Ensure input field has proper text rendering */
+  input[type="text"], input[type="url"] {
+    -webkit-appearance: none;
+    appearance: none;
+    caret-color: #1e293b !important;
   }
 }
