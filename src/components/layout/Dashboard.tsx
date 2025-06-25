@@ -27,7 +27,7 @@ interface User {
 
 interface DashboardProps {
   user: User;
-  vpnStatus: "connected" | "connecting" | "disconnected";
+  vpnStatus: "connected" | "connecting" | "disconnected" | "failed";
   onLogout: () => void;
   onAccessLevelChange?: (level: 1 | 2 | 3) => void;
   children: React.ReactNode;
@@ -67,6 +67,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case "connecting":
         return <AlertCircle className="h-4 w-4 text-yellow-500 animate-pulse" />;
+      case "failed":
+        return <AlertCircle className="h-4 w-4 text-red-500 animate-bounce" />;
       case "disconnected":
         return <AlertCircle className="h-4 w-4 text-red-500" />;
     }
@@ -78,6 +80,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         return "Connected (Australia)";
       case "connecting":
         return "Connecting...";
+      case "failed":
+        return "Connection Failed";
       case "disconnected":
         return "Disconnected";
     }

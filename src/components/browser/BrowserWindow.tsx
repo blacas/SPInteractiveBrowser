@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,9 +10,13 @@ import {
   Plus, 
   X, 
   Shield,
-  AlertTriangle
+  AlertTriangle,
+  Lock,
+  Globe
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useVPN } from '@/hooks/useVPN';
+import { injectSharePointCredentials } from '@/services/vaultService';
 import SearchBar from './SearchBar';
 
 interface Tab {
@@ -24,12 +28,22 @@ interface Tab {
 
 const BrowserWindow: React.FC = () => {
   const { user } = useAuth();
+  const { vpnStatus, allowBrowsing, connection } = useVPN();
   const [tabs, setTabs] = useState<Tab[]>([
-    { id: '1', title: 'New Tab', url: 'https://www.google.com', isLoading: false }
+    { id: '1', title: 'New Tab', url: getDefaultUrl(user?.accessLevel || 1), isLoading: false }
   ]);
   const [activeTab, setActiveTab] = useState('1');
-  const [urlInput, setUrlInput] = useState('https://www.google.com');
+  const [urlInput, setUrlInput] = useState(getDefaultUrl(user?.accessLevel || 1));
   const webviewRefs = useRef<{ [key: string]: HTMLElement | null }>({});
+
+  // Get default URL based on access level (SharePoint-focused)
+  function getDefaultUrl(accessLevel: number): string {
+    switch (accessLevel) {
+      case 3: return 'https://www.office.com'; // Full access starts at Office
+      case 2: return 'https://www.office.com'; // Manager level
+      default: return 'https://www.office.com'; // All levels start with SharePoint/Office
+    }
+  }
 
   // Access level configurations
   const getAccessLevelConfig = () => {
@@ -105,6 +119,12 @@ const BrowserWindow: React.FC = () => {
   };
 
   const handleUrlSubmit = () => {
+    // Block navigation if VPN is not connected (fail-closed behavior)
+    if (!allowBrowsing) {
+      alert(`VPN connection required. Browser access is blocked until Australian VPN connection is established. Status: ${vpnStatus}`);
+      return;
+    }
+
     if (!isUrlAllowed(urlInput)) {
       alert(`Access denied. Your access level (${getAccessLevelConfig().name}) does not permit accessing this URL.`);
       return;
@@ -204,6 +224,39 @@ const BrowserWindow: React.FC = () => {
   };
 
   // Webview event handlers
+  // Auto-inject SharePoint credentials when navigating to SharePoint
+  useEffect(() => {
+    const webview = webviewRefs.current[activeTab];
+    if (webview) {
+      const handleNavigation = async (event: Event & { url?: string }) => {
+        const url = event.url || webview.getAttribute('src') || '';
+        
+        // Check if navigating to SharePoint/Office365
+        if (url.includes('sharepoint.com') || url.includes('login.microsoftonline.com') || url.includes('office.com')) {
+          console.log('SharePoint detected - preparing credential injection');
+          
+          // Wait for page load, then inject credentials
+          setTimeout(async () => {
+            try {
+              await injectSharePointCredentials(webview);
+              console.log('SharePoint credentials injected successfully');
+            } catch (error) {
+              console.error('Failed to inject SharePoint credentials:', error);
+            }
+          }, 2000);
+        }
+      };
+
+      webview.addEventListener('did-navigate', handleNavigation);
+      webview.addEventListener('did-navigate-in-page', handleNavigation);
+      
+      return () => {
+        webview.removeEventListener('did-navigate', handleNavigation);
+        webview.removeEventListener('did-navigate-in-page', handleNavigation);
+      };
+    }
+  }, [activeTab]);
+
   const setupWebviewEvents = (webview: HTMLElement, tabId: string) => {
     type WebviewEvent = Event & { url: string; title?: string };
     
@@ -292,15 +345,41 @@ const BrowserWindow: React.FC = () => {
         />
 
         <div className="flex items-center gap-2">
+          {/* VPN Status Indicator */}
+          <Badge 
+            variant={vpnStatus === 'connected' ? 'default' : vpnStatus === 'connecting' ? 'secondary' : 'destructive'}
+            className={`px-3 py-1.5 text-xs font-medium h-8 flex items-center gap-1.5 ${
+              vpnStatus === 'connected' ? 'bg-green-600 text-white border-green-500' : 
+              vpnStatus === 'connecting' ? 'bg-yellow-600 text-white border-yellow-500 animate-pulse' :
+              'bg-red-600 text-white border-red-500 animate-pulse'
+            }`}
+          >
+            <Globe className="h-3 w-3" />
+            VPN: {connection.location}
+            {vpnStatus === 'connected' && connection.ipAddress && ` (${connection.ipAddress})`}
+          </Badge>
+
+          {/* Access Level Badge */}
           <Badge 
             variant={config.variant}
             className="px-3 py-1.5 text-xs font-medium bg-slate-700 text-slate-200 border-slate-600 hover:bg-slate-600 transition-colors h-8 flex items-center"
           >
+            <Shield className="h-3 w-3 mr-1" />
             {config.name}
           </Badge>
+
+          {/* SharePoint Vault Auth Indicator */}
+          {(urlInput.includes('sharepoint.com') || urlInput.includes('office.com') || urlInput.includes('login.microsoftonline.com')) && (
+            <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white border-blue-500 h-8 text-xs font-medium">
+              <Lock className="h-3 w-3" />
+              Vault Auth
+            </Badge>
+          )}
+
+          {/* URL Blocked Indicator */}
           {!isUrlAllowed(urlInput) && (
             <Badge variant="destructive" className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white border-red-500 animate-pulse h-8 text-xs font-medium">
-              <Shield className="h-3 w-3" />
+              <AlertTriangle className="h-3 w-3" />
               Blocked
             </Badge>
           )}

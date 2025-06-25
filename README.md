@@ -1,174 +1,293 @@
 # 🔒 Secure Remote Browser Platform
 
-A secure, role-based desktop application that provides controlled access to SharePoint documents through a sandboxed browser environment with automatic VPN protection.
+A secure, VPN-routed desktop application built with Electron and React for accessing SharePoint documents through a controlled browser environment.
 
-<div align="center">
+## 📋 Overview
 
-![Electron](https://img.shields.io/badge/Electron-191970?style=for-the-badge&logo=Electron&logoColor=white)
-![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
-![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
-![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)
-![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
+This application provides secure remote access to SharePoint-hosted documents with the following key features:
 
-</div>
+- **🌐 Australian VPN Routing**: All browser traffic routed through Australian VPN endpoints
+- **🔑 Vault-Managed Credentials**: Shared SharePoint credentials securely managed via vault services
+- **📄 View-Only File Access**: Documents viewed in-browser only, never downloaded locally
+- **🛡️ Role-Based Access Control**: Three access levels with different browsing permissions
+- **⚡ Fail-Closed Security**: Browser access blocked if VPN connection fails
 
-## 🎯 Overview
+## 🏗️ Architecture
 
-This application provides enterprise-grade secure access to SharePoint-hosted documents for employees, contractors, and third parties. All browsing activity is automatically routed through an Australian VPN tunnel, with role-based access controls and secure credential management.
+### Core Components
 
-### ✨ Key Features
+- **Electron Main Process**: Security enforcement, VPN integration, vault communication
+- **React Frontend**: User interface, browser controls, authentication
+- **Webview Security**: Sandboxed browsing with credential injection
+- **Vault Integration**: Secure credential storage and rotation
+- **VPN Management**: Australian endpoint connection and monitoring
 
-- 🔐 **Role-Based Access Control** - Three-tier permission system
-- 🌍 **Automatic VPN Protection** - All traffic routed through Australian servers
-- 🔑 **Secure Credential Injection** - Vault-managed SharePoint authentication
-- 📄 **Sandboxed PDF Viewing** - Documents rendered securely within the browser
-- 🛡️ **Context Isolation** - Full Electron security hardening
-- 👥 **Multi-User Support** - Individual authentication with personalized access
+### Access Levels
 
-## 🧩 Access Levels
+| Level | Description | Allowed Domains | SharePoint Access |
+|-------|-------------|-----------------|-------------------|
+| **1** | Restricted | SharePoint, Office365 only | ✅ View-only |
+| **2** | Manager | SharePoint + Whitelisted domains | ✅ View-only |
+| **3** | Full Access | All domains (VPN-routed) | ✅ View-only |
 
-| Level | Description | Browser Access |
-|-------|-------------|----------------|
-| **Level 1** | SharePoint Only | 🔒 Restricted to SharePoint domains only |
-| **Level 2** | Controlled Browsing | 🔒 SharePoint + whitelisted external domains |
-| **Level 3** | Full Access | 🌐 Unrestricted browsing (VPN-secured) |
-
-> All levels maintain SharePoint access with secure PDF viewing capabilities
-
-## 🛠️ Tech Stack
-
-### Desktop Application
-- **Frontend**: React 18 + TypeScript + Vite
-- **Desktop Framework**: Electron with context isolation
-- **Styling**: Tailwind CSS + ShadCN UI components
-- **Security**: VPN integration + Vault credential management
-- **PDF Rendering**: PDF.js for secure document viewing
-
-### Admin Panel (Separate Project)
-- **Framework**: Next.js 14 (App Router)
-- **Backend**: Supabase (PostgreSQL + Auth + RLS)
-- **UI**: ShadCN UI + Tailwind CSS
-
-## 🚀 Quick Start
+## 🚀 Getting Started
 
 ### Prerequisites
 
 - Node.js 18+ 
-- npm or yarn
-- Git
+- Australian VPN service account (NordLayer/ExpressVPN/WireGuard)
+- Vault service (HashiCorp Vault/AWS Secrets Manager/Azure KeyVault)
+- SharePoint tenant access
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd secure-remote-browser
-   ```
+```bash
+# Clone the repository
+git clone <repository-url>
+cd secure-remote-browser
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+# Install dependencies
+npm install
 
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Configure your VPN and Vault settings
-   ```
-
-4. **Start development server**
-   ```bash
-   npm run dev
-   ```
-
-5. **Build for production**
-   ```bash
-   npm run build
-   npm run electron:build
-   ```
-
-## 📁 Project Structure
-
-```
-secure-remote-browser/
-├── electron/              # Electron main process
-│   ├── main.ts            # Main process entry
-│   └── preload.ts         # Preload scripts
-├── src/                   # React application
-│   ├── components/        # UI components
-│   ├── pages/            # Application pages
-│   ├── hooks/            # Custom React hooks
-│   └── utils/            # Utility functions
-├── public/               # Static assets
-└── docs/                 # Documentation
-    └── masterplan.md     # Detailed project specification
+# Set up environment variables
+cp .env.example .env
 ```
 
-## 🔒 Security Features
+### Environment Configuration
 
-- **Sandboxed Environment**: Full context isolation prevents unauthorized access
-- **VPN-First Architecture**: All network traffic automatically secured
-- **Credential Vault Integration**: SharePoint credentials never stored locally
-- **Role-Based Restrictions**: URL filtering based on user access level
-- **Production Hardening**: DevTools disabled, native integrations controlled
+Create a `.env` file with the following variables:
 
-## 🧑‍💻 Development
+```env
+# VPN Configuration
+VPN_PROVIDER=nordlayer              # nordlayer | expressvpn | wireguard
+VPN_ENDPOINT=au-sydney-01.vpn.com   # Australian VPN endpoint
+VPN_API_KEY=your-vpn-api-key       # VPN service API key
 
-### Available Scripts
+# Vault Configuration  
+VAULT_PROVIDER=hashicorp            # hashicorp | aws-secrets | azure-keyvault
+VAULT_ADDR=https://vault.company.com # Vault service URL
+VAULT_ROLE_ID=your-role-id          # Vault authentication
+VAULT_SECRET_ID=your-secret-id      # Vault authentication
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run electron:dev` - Start Electron in development
-- `npm run electron:build` - Build Electron application
-- `npm run preview` - Preview production build
+# SharePoint Configuration
+SHAREPOINT_TENANT=company.sharepoint.com
+SHAREPOINT_LIBRARY=/sites/documents/Shared Documents
 
-### Development Guidelines
+# Application Settings
+NODE_ENV=development
+LOG_LEVEL=info
+```
 
-1. Follow TypeScript strict mode
-2. Use ShadCN UI components for consistency
-3. Implement proper error boundaries
-4. Test security features thoroughly
-5. Document API integrations
-
-## 🎨 UI Components
-
-This project uses [ShadCN UI](https://ui.shadcn.com/) for consistent, accessible components:
+### Running the Application
 
 ```bash
-# Add new components
-npx shadcn@latest add button
-npx shadcn@latest add card
-npx shadcn@latest add dialog
+# Development mode
+npm run dev
+
+# Build for production
+npm run build
+
+# Run production build
+npm start
 ```
 
-## 🤝 Contributing
+## 🔧 Configuration
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### VPN Provider Setup
 
-## 📋 Roadmap
+#### Option 1: NordLayer (Recommended for Enterprise)
+```typescript
+// Provides enterprise-grade security with Australian endpoints
+vpn: {
+  provider: 'nordlayer',
+  australianEndpoints: [
+    'au-sydney-01.nordlayer.com',
+    'au-melbourne-01.nordlayer.com'
+  ],
+  features: ['enterprise-grade', 'api-integration', 'fail-safe']
+}
+```
 
-- [x] MVP Electron browser with SharePoint access
-- [x] Basic role-based access control
-- [ ] VPN integration and auto-connect
-- [ ] Admin Panel development (separate project)
-- [ ] Enhanced security hardening
-- [ ] Audit logging and monitoring
-- [ ] Mobile companion app
+#### Option 2: ExpressVPN (Reliable Alternative)
+```typescript
+vpn: {
+  provider: 'expressvpn', 
+  australianEndpoints: [
+    'australia-sydney.expressvpn.com',
+    'australia-melbourne.expressvpn.com'
+  ],
+  features: ['high-speed', 'reliable', 'automation-friendly']
+}
+```
 
-## ⚖️ License
+#### Option 3: WireGuard + Australian VPS (Cost-Effective)
+```typescript
+vpn: {
+  provider: 'wireguard',
+  australianEndpoints: ['au-syd-wg.yourdomain.com'],
+  features: ['full-control', 'cost-effective', 'high-performance']
+}
+```
 
-This project is proprietary software. All rights reserved.
+### Vault Provider Setup
 
-## 📞 Support
+#### HashiCorp Vault (Recommended)
+```bash
+# Enable AppRole authentication
+vault auth enable approle
 
-For questions or support, please contact the development team or create an issue in the repository.
+# Create policy for SharePoint secrets
+vault policy write sharepoint-policy - <<EOF
+path "secret/data/sharepoint" {
+  capabilities = ["read"]
+}
+path "secret/data/sharepoint-config" {
+  capabilities = ["read"]  
+}
+EOF
+
+# Create role
+vault write auth/approle/role/secure-browser \
+    token_policies="sharepoint-policy" \
+    token_ttl=1h \
+    token_max_ttl=4h
+```
+
+#### Store SharePoint Credentials
+```bash
+# Store shared SharePoint credentials
+vault kv put secret/sharepoint \
+    username="sharepoint-service@company.com" \
+    password="secure-password-from-vault"
+
+# Store SharePoint configuration
+vault kv put secret/sharepoint-config \
+    tenantUrl="https://company.sharepoint.com" \
+    libraryPath="/sites/documents/Shared Documents" \
+    allowedFileTypes="pdf,docx,xlsx,pptx"
+```
+
+## 🛡️ Security Features
+
+### Browser Security
+- ✅ **Context Isolation**: Webview runs in isolated context
+- ✅ **No Local Downloads**: Files cannot be saved to local machine
+- ✅ **HTTPS Enforcement**: HTTP requests blocked (except localhost)
+- ✅ **Header Security**: Security headers injected automatically
+- ✅ **DevTools Disabled**: Production builds disable developer tools
+
+### VPN Security
+- ✅ **Fail-Closed**: Browser blocked if VPN disconnects
+- ✅ **Australian Exit Points**: All traffic originates from Australia
+- ✅ **Connection Monitoring**: Real-time VPN status tracking
+- ✅ **Auto-Reconnection**: Automatic retry on connection failure
+
+### Credential Security  
+- ✅ **Vault Management**: Credentials stored securely in vault
+- ✅ **Auto-Injection**: SharePoint login automated via vault
+- ✅ **Rotation Support**: Credential rotation without app restart
+- ✅ **No Local Storage**: Credentials never stored locally
+
+## 🔄 Usage Workflow
+
+1. **App Launch**: User opens Secure Remote Browser
+2. **Authentication**: User logs in with personal credentials  
+3. **VPN Connection**: Australian VPN automatically established
+4. **Vault Access**: SharePoint credentials retrieved from vault
+5. **Browser Access**: Controlled browsing based on access level
+6. **SharePoint Auto-Login**: Vault credentials auto-injected
+7. **Document Viewing**: PDFs and documents viewed in-browser only
+
+## 📊 Monitoring & Logging
+
+### VPN Status Monitoring
+```typescript
+// Real-time VPN status in UI
+vpnStatus: "connected" | "connecting" | "disconnected" | "failed"
+
+// Australian IP verification
+connection: {
+  endpoint: "au-sydney-01.vpn.com",
+  location: "Sydney, Australia", 
+  ipAddress: "203.219.252.100",
+  latency: 45
+}
+```
+
+### Security Logging
+```typescript
+// Navigation attempts logged
+navigationAttempt: {
+  url: "https://example.com",
+  timestamp: new Date(),
+  allowed: false,
+  accessLevel: 1,
+  vpnActive: true
+}
+```
+
+## 🎯 Development Roadmap
+
+### Phase 1: MVP (Current)
+- [x] Basic browser with access controls
+- [x] VPN integration framework  
+- [x] Vault service architecture
+- [x] SharePoint credential injection
+- [ ] Real VPN provider integration
+- [ ] Production vault deployment
+
+### Phase 2: Admin Panel
+- [ ] Next.js + Supabase admin application
+- [ ] User management interface
+- [ ] Role assignment controls  
+- [ ] System monitoring dashboard
+
+### Phase 3: Enhanced Security
+- [ ] Certificate pinning
+- [ ] Advanced audit logging
+- [ ] Real-time threat detection
+- [ ] Compliance reporting
+
+## 🔍 Troubleshooting
+
+### VPN Connection Issues
+```bash
+# Check VPN status
+curl -X GET "${VPN_API_ENDPOINT}/status" \
+  -H "Authorization: Bearer ${VPN_API_KEY}"
+
+# Test Australian IP
+curl https://ipapi.co/json
+```
+
+### Vault Access Issues  
+```bash
+# Test vault connectivity
+vault status
+
+# Verify credentials
+vault kv get secret/sharepoint
+```
+
+### SharePoint Access Issues
+- Verify tenant URL in configuration
+- Check shared credentials in vault
+- Confirm library permissions
+- Test SharePoint URL manually
+
+## 📞 Support & Configuration
+
+For VPN and Vault provider recommendations based on your infrastructure:
+
+- **Enterprise Setup**: HashiCorp Vault + NordLayer
+- **AWS Native**: AWS Secrets Manager + ExpressVPN  
+- **Cost-Effective**: Custom Vault + WireGuard
+- **Azure Native**: Azure KeyVault + ExpressVPN
+
+## 📄 License
+
+[Your License Here]
 
 ---
 
-<div align="center">
-Built with ❤️ for secure enterprise document access
-</div>
+**🔒 Security Notice**: This application is designed for secure document access. All traffic is routed through Australian VPN endpoints, and documents are never downloaded to local machines. Ensure proper vault and VPN configuration before production deployment.

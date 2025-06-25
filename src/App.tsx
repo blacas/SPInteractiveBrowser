@@ -3,11 +3,31 @@ import { Dashboard } from "@/components/layout/Dashboard";
 import BrowserWindow from "@/components/browser/BrowserWindow";
 import { useAuth } from "@/hooks/useAuth";
 import { useVPN } from "@/hooks/useVPN";
+import { vaultService } from "@/services/vaultService";
+import { useEffect, useState } from "react";
 import "./App.css";
 
 function App() {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
   const { vpnStatus } = useVPN();
+  const [vaultInitialized, setVaultInitialized] = useState(false);
+  const [vaultError, setVaultError] = useState<string | null>(null);
+
+  // Initialize vault service on app start
+  useEffect(() => {
+    const initializeVault = async () => {
+      try {
+        await vaultService.initialize();
+        setVaultInitialized(true);
+        console.log('✅ Vault service initialized successfully');
+      } catch (error) {
+        setVaultError(error instanceof Error ? error.message : 'Vault initialization failed');
+        console.error('❌ Vault initialization failed:', error);
+      }
+    };
+
+    initializeVault();
+  }, []);
 
 
 
@@ -23,13 +43,24 @@ function App() {
     }
   };
 
-  // Show loading screen while checking auth status
-  if (isLoading) {
+  // Show loading screen while checking auth status or initializing vault
+  if (isLoading || !vaultInitialized) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-900">
         <div className="text-center space-y-4">
           <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto" />
-          <p className="text-white">Initializing Secure Browser...</p>
+          <p className="text-white">
+            {isLoading ? 'Initializing Secure Browser...' : 'Connecting to Vault Service...'}
+          </p>
+          {vaultError && (
+            <div className="mt-4 p-4 bg-red-900/50 border border-red-700 rounded-lg">
+              <p className="text-red-300 text-sm">⚠️ Vault Service Error:</p>
+              <p className="text-red-200 text-xs mt-1">{vaultError}</p>
+              <p className="text-red-400 text-xs mt-2">
+                SharePoint credentials may not be available. Please check vault configuration.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
