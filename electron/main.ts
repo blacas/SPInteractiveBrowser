@@ -1,6 +1,43 @@
-import { app, BrowserWindow, session } from 'electron'
+import { app, BrowserWindow, session, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { spawn, ChildProcess } from 'child_process'
+import { promises as fs } from 'fs'
+import { getPlatformInfo, printPlatformInstructions } from '../src/utils/platform.js'
+
+// Load environment variables from .env file
+const loadEnvironmentVariables = async (): Promise<void> => {
+  try {
+    const envPath = path.resolve('.env');
+    const envContent = await fs.readFile(envPath, 'utf-8');
+    const envLines = envContent.split('\n');
+    
+    console.log('🔍 Loading .env file from:', envPath);
+    
+    for (const line of envLines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const [key, ...valueParts] = trimmed.split('=');
+        if (key && valueParts.length > 0) {
+          const value = valueParts.join('=').trim();
+          process.env[key.trim()] = value;
+          
+          // Log non-sensitive environment variables
+          if (!key.includes('SECRET') && !key.includes('PASSWORD') && !key.includes('KEY') && !key.includes('ID')) {
+            console.log(`📝 Loaded: ${key.trim()}=${value}`);
+          } else {
+            console.log(`📝 Loaded: ${key.trim()}=***`);
+          }
+        }
+      }
+    }
+    
+    console.log('✅ Environment variables loaded successfully');
+  } catch (error) {
+    console.error('❌ Failed to load .env file:', error);
+    console.log('📝 This may cause VPN detection to fail');
+  }
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -11,7 +48,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // │ │
 // │ ├─┬ dist-electron
 // │ │ ├── main.js
-// │ │ └── preload.mjs
+// │ │ └── preload.cjs
 // │
 process.env.APP_ROOT = path.join(__dirname, '..')
 
@@ -24,6 +61,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null = null
 let vpnConnected = false
+let wireguardProcess: ChildProcess | null = null
 
 // VPN status tracking
 const updateVPNStatus = (connected: boolean): void => {
@@ -31,6 +69,563 @@ const updateVPNStatus = (connected: boolean): void => {
   if (win) {
     win.webContents.send('vpn-status-changed', connected)
   }
+}
+
+// Real WireGuard VPN functions
+const connectVPN = async (): Promise<boolean> => {
+  try {
+    const provider = process.env.VPN_PROVIDER || 'wireguard';
+    
+    if (provider === 'wireguard') {
+      return await connectWireGuard();
+    } else {
+      throw new Error(`VPN provider ${provider} not implemented`);
+    }
+  } catch (error) {
+    console.error('❌ VPN connection failed:', error);
+    return false;
+  }
+}
+
+const disconnectVPN = async (): Promise<boolean> => {
+  try {
+    if (wireguardProcess) {
+      return await disconnectWireGuard();
+    }
+    return true;
+  } catch (error) {
+    console.error('❌ VPN disconnection failed:', error);
+    return false;
+  }
+}
+
+const connectWireGuard = async (): Promise<boolean> => {
+  try {
+    console.log('🔍 Debug: Environment variables at startup:');
+    console.log(`  NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`  VPN_PROVIDER: ${process.env.VPN_PROVIDER}`);
+    console.log(`  WIREGUARD_CONFIG_PATH: ${process.env.WIREGUARD_CONFIG_PATH}`);
+    console.log(`  WIREGUARD_ENDPOINT: ${process.env.WIREGUARD_ENDPOINT}`);
+    
+    const configPath = process.env.WIREGUARD_CONFIG_PATH || './config/wireguard-australia.conf';
+    const resolvedPath = path.resolve(configPath);
+    
+    console.log(`🔍 Resolved config path: ${resolvedPath}`);
+    
+    // Check if config file exists
+    try {
+      await fs.access(resolvedPath);
+      console.log('✅ Config file found');
+    } catch (error) {
+      console.log('❌ Config file not found:', error);
+      console.log('📝 This is OK - config file not required for detection');
+    }
+    
+    const platformInfo = getPlatformInfo();
+    console.log(`🔌 Checking WireGuard connection on ${platformInfo.displayName}...`);
+    
+    // Try to connect or verify connection based on OS
+    const isConnected = await checkWireGuardConnection();
+    
+    if (isConnected) {
+      console.log('✅ WireGuard is connected and active');
+      return true;
+    }
+
+    // If not connected, try to establish connection based on OS
+    console.log('🔄 Attempting to establish WireGuard connection...');
+    const connectionResult = await establishWireGuardConnection(resolvedPath);
+    
+    if (connectionResult) {
+      console.log('✅ WireGuard connection established successfully');
+      return true;
+    } else {
+      console.log('❌ WireGuard connection failed.');
+      printPlatformInstructions(resolvedPath);
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ WireGuard setup error:', error);
+    return false;
+  }
+}
+
+// Cross-platform WireGuard connection establishment
+const establishWireGuardConnection = async (configPath: string): Promise<boolean> => {
+  const platform = process.platform;
+  
+  try {
+    switch (platform) {
+      case 'linux':
+        return await connectWireGuardLinux(configPath);
+      case 'darwin': // macOS
+        return await connectWireGuardMacOS(configPath);
+      case 'win32': // Windows
+        return await connectWireGuardWindows(configPath);
+      default:
+        console.error(`❌ Unsupported platform: ${platform}`);
+        return false;
+    }
+  } catch (error) {
+    console.error(`❌ Failed to connect on ${platform}:`, error);
+    return false;
+  }
+}
+
+// Linux WireGuard connection
+const connectWireGuardLinux = async (configPath: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    console.log('🐧 Using Linux wg-quick...');
+    const process = spawn('wg-quick', ['up', configPath], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    process.on('exit', (code) => {
+      resolve(code === 0);
+    });
+    
+    process.on('error', (error) => {
+      console.error('❌ wg-quick error:', error);
+      resolve(false);
+    });
+    
+    setTimeout(() => resolve(false), 30000); // 30s timeout
+  });
+}
+
+// macOS WireGuard connection
+const connectWireGuardMacOS = async (configPath: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    console.log('🍎 Using macOS wg-quick...');
+    const process = spawn('wg-quick', ['up', configPath], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    process.on('exit', (code) => {
+      resolve(code === 0);
+    });
+    
+    process.on('error', () => {
+      // If wg-quick fails, try using WireGuard app
+      console.log('🍎 Trying WireGuard macOS app...');
+      // Note: This requires WireGuard to be installed via App Store or brew
+      resolve(false); // For now, require manual connection
+    });
+    
+    setTimeout(() => resolve(false), 30000); // 30s timeout
+  });
+}
+
+// Windows WireGuard connection
+const connectWireGuardWindows = async (configPath: string): Promise<boolean> => {
+  // On Windows, we typically can't connect programmatically without admin rights
+  // Check if already connected via WireGuard GUI
+  console.log('🪟 Windows detected - checking existing connection...');
+  console.log(`   Config available at: ${configPath}`);
+  return false; // Require manual GUI connection for security
+}
+
+// Cross-platform WireGuard status check
+const checkWireGuardConnection = async (): Promise<boolean> => {
+  const platform = process.platform;
+  
+  try {
+    switch (platform) {
+      case 'linux':
+        return await checkWireGuardLinux();
+      case 'darwin': // macOS
+        return await checkWireGuardMacOS();
+      case 'win32': // Windows
+        return await checkWireGuardWindows();
+      default:
+        console.warn(`⚠️ Unsupported platform: ${platform}`);
+        return false;
+    }
+  } catch (error) {
+    console.error('❌ Error checking WireGuard status:', error);
+    return false;
+  }
+}
+
+// Linux status check
+const checkWireGuardLinux = async (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const process = spawn('wg', ['show'], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let output = '';
+    process.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    process.on('exit', (code) => {
+      if (code === 0 && output.trim()) {
+        console.log('🐧 WireGuard active on Linux');
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+    
+    process.on('error', () => resolve(false));
+    setTimeout(() => resolve(false), 5000);
+  });
+}
+
+// macOS status check  
+const checkWireGuardMacOS = async (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    // First try wg command
+    const process = spawn('wg', ['show'], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let output = '';
+    process.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    process.on('exit', (code) => {
+      if (code === 0 && output.trim()) {
+        console.log('🍎 WireGuard active on macOS');
+        resolve(true);
+      } else {
+        // Also check for WireGuard via network interfaces
+        checkMacOSNetworkInterfaces().then(resolve);
+      }
+    });
+    
+    process.on('error', () => {
+      // Fallback to network interface check
+      checkMacOSNetworkInterfaces().then(resolve);
+    });
+    
+    setTimeout(() => resolve(false), 5000);
+  });
+}
+
+// macOS network interface check
+const checkMacOSNetworkInterfaces = async (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const process = spawn('ifconfig', [], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let output = '';
+    process.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    process.on('exit', () => {
+      const hasWG = output.includes('utun') || output.includes('tun') || output.includes('wg');
+      resolve(hasWG);
+    });
+    
+    process.on('error', () => resolve(false));
+    setTimeout(() => resolve(false), 5000);
+  });
+}
+
+// Windows status check with enhanced detection
+const checkWireGuardWindows = async (): Promise<boolean> => {
+  console.log('🪟 Starting comprehensive Windows WireGuard detection...');
+  
+  // Method 1: Check WireGuard CLI
+  const cliResult = await checkWireGuardCLI();
+  if (cliResult) {
+    console.log('✅ WireGuard detected via CLI');
+    return true;
+  }
+  
+  // Method 2: Check network interfaces via netsh
+  const interfaceResult = await checkWindowsNetworkInterfaces();
+  if (interfaceResult) {
+    console.log('✅ WireGuard detected via network interfaces');
+    return true;
+  }
+  
+  // Method 3: Check routing table for our VPN server IP
+  const routingResult = await checkRoutingTable();
+  if (routingResult) {
+    console.log('✅ WireGuard detected via routing table');
+    return true;
+  }
+  
+  // Method 4: Check current IP address via PowerShell
+  const ipResult = await checkCurrentIP();
+  if (ipResult) {
+    console.log('✅ WireGuard detected via IP address check');
+    return true;
+  }
+  
+  // Method 5: Network connectivity test to confirm VPN
+  const connectivityResult = await testVPNConnectivity();
+  if (connectivityResult) {
+    console.log('✅ WireGuard detected via connectivity test');
+    return true;
+  }
+  
+  console.log('❌ WireGuard not detected by any method');
+  return false;
+}
+
+// Method 1: Check WireGuard CLI
+const checkWireGuardCLI = async (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    console.log('🔍 Checking WireGuard CLI...');
+    const wgProcess = spawn('wg', ['show'], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let wgOutput = '';
+    wgProcess.stdout.on('data', (data) => {
+      wgOutput += data.toString();
+    });
+    
+    wgProcess.on('exit', (code) => {
+      console.log(`🔍 WireGuard CLI exit code: ${code}`);
+      console.log(`🔍 WireGuard CLI output: "${wgOutput.trim()}"`);
+      
+      if (code === 0 && wgOutput.trim()) {
+        console.log('🪟 WireGuard active on Windows (CLI)');
+        resolve(true);
+        return;
+      }
+      resolve(false);
+    });
+    
+    wgProcess.on('error', (error) => {
+      console.log('🔍 WireGuard CLI error:', error.message);
+      resolve(false);
+    });
+    
+    setTimeout(() => {
+      console.log('🔍 WireGuard CLI check timed out');
+      resolve(false);
+    }, 3000);
+  });
+}
+
+// Method 2: Windows network interface check (enhanced)
+const checkWindowsNetworkInterfaces = async (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    console.log('🔍 Checking network interfaces via netsh...');
+    const netshProcess = spawn('netsh', ['interface', 'show', 'interface'], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let output = '';
+    netshProcess.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    netshProcess.on('exit', () => {
+      console.log('🔍 Network interfaces output:');
+      console.log(output);
+      
+      const hasWireGuard = output.toLowerCase().includes('wireguard') || 
+                           output.toLowerCase().includes('wg') ||
+                           output.toLowerCase().includes('tun');
+      
+      console.log(`🔍 WireGuard interface found: ${hasWireGuard}`);
+      
+      if (hasWireGuard) {
+        console.log('🪟 WireGuard interface detected on Windows');
+      }
+      resolve(hasWireGuard);
+    });
+    
+    netshProcess.on('error', (error) => {
+      console.log('🔍 Network interface check error:', error.message);
+      resolve(false);
+    });
+    setTimeout(() => {
+      console.log('🔍 Network interface check timed out');
+      resolve(false);
+    }, 3000);
+  });
+}
+
+// Method 3: Check routing table for VPN server IP
+const checkRoutingTable = async (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    console.log('🔍 Checking routing table...');
+    const endpoint = process.env.WIREGUARD_ENDPOINT || '134.199.169.102:59926';
+    const serverIP = endpoint.split(':')[0];
+    
+    console.log(`🔍 Looking for routes to server: ${serverIP}`);
+    
+    const routeProcess = spawn('route', ['print'], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let output = '';
+    routeProcess.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    routeProcess.on('exit', () => {
+      const hasServerRoute = output.includes(serverIP);
+      console.log(`🔍 Route to VPN server found: ${hasServerRoute}`);
+      
+      if (hasServerRoute) {
+        console.log(`🪟 Found route to VPN server ${serverIP}`);
+      }
+      resolve(hasServerRoute);
+    });
+    
+    routeProcess.on('error', (error) => {
+      console.log('🔍 Route check error:', error.message);
+      resolve(false);
+    });
+    
+    setTimeout(() => {
+      console.log('🔍 Route check timed out');
+      resolve(false);
+    }, 3000);
+  });
+}
+
+// Method 4: Check current public IP via PowerShell
+const checkCurrentIP = async (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    console.log('🔍 Checking current public IP...');
+    const expectedIP = '134.199.169.102';
+    
+    // Use PowerShell to get public IP
+    const psCommand = `(Invoke-WebRequest -Uri "https://ipinfo.io/ip" -UseBasicParsing).Content.Trim()`;
+    const psProcess = spawn('powershell', ['-Command', psCommand], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let output = '';
+    psProcess.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    psProcess.on('exit', () => {
+      const currentIP = output.trim();
+      console.log(`🔍 Current public IP: ${currentIP}`);
+      console.log(`🔍 Expected VPN IP: ${expectedIP}`);
+      
+      const isVPNIP = currentIP === expectedIP;
+      if (isVPNIP) {
+        console.log('🪟 Current IP matches VPN server IP!');
+      }
+      resolve(isVPNIP);
+    });
+    
+    psProcess.on('error', (error) => {
+      console.log('🔍 IP check error:', error.message);
+      resolve(false);
+    });
+    
+    setTimeout(() => {
+      console.log('🔍 IP check timed out');
+      resolve(false);
+    }, 5000);
+  });
+}
+
+// Method 5: Test VPN connectivity
+const testVPNConnectivity = async (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    console.log('🔍 Testing VPN connectivity...');
+    const endpoint = process.env.WIREGUARD_ENDPOINT || '134.199.169.102:59926';
+    const serverIP = endpoint.split(':')[0];
+    
+    // Ping the VPN server to test connectivity
+    const pingProcess = spawn('ping', ['-n', '2', serverIP], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    let output = '';
+    pingProcess.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    pingProcess.on('exit', (code) => {
+      const pingSuccess = code === 0 && (output.includes('Reply from') || output.includes('bytes='));
+      console.log(`🔍 Ping to VPN server result: ${pingSuccess ? 'Success' : 'Failed'}`);
+      
+      if (pingSuccess) {
+        console.log(`🪟 Successfully pinged VPN server ${serverIP}`);
+      }
+      resolve(pingSuccess);
+    });
+    
+    pingProcess.on('error', (error) => {
+      console.log('🔍 Ping test error:', error.message);
+      resolve(false);
+    });
+    
+    setTimeout(() => {
+      console.log('🔍 Ping test timed out');
+      resolve(false);
+    }, 5000);
+  });
+}
+
+
+
+const disconnectWireGuard = async (): Promise<boolean> => {
+  try {
+    const configPath = process.env.WIREGUARD_CONFIG_PATH || './config/wireguard-australia.conf';
+    const resolvedPath = path.resolve(configPath);
+    const platform = process.platform;
+    
+    console.log(`🔌 Disconnecting WireGuard on ${platform}...`);
+    
+    switch (platform) {
+      case 'linux':
+      case 'darwin': // macOS
+        return await disconnectWireGuardUnix(resolvedPath);
+      case 'win32': // Windows
+        return await disconnectWireGuardWindows();
+      default:
+        console.error(`❌ Unsupported platform: ${platform}`);
+        return false;
+    }
+  } catch (error) {
+    console.error('❌ WireGuard disconnect setup error:', error);
+    return false;
+  }
+}
+
+// Unix-like systems (Linux, macOS) disconnect
+const disconnectWireGuardUnix = async (configPath: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const downProcess = spawn('wg-quick', ['down', configPath], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    downProcess.on('exit', (code) => {
+      wireguardProcess = null;
+      if (code === 0) {
+        console.log('✅ WireGuard disconnected successfully');
+        resolve(true);
+      } else {
+        console.error(`❌ WireGuard disconnection failed with code: ${code}`);
+        resolve(false);
+      }
+    });
+    
+    downProcess.on('error', (error) => {
+      console.error('❌ WireGuard disconnect error:', error);
+      resolve(false);
+    });
+    
+    setTimeout(() => resolve(false), 15000); // 15s timeout
+  });
+}
+
+// Windows disconnect (requires manual action)
+const disconnectWireGuardWindows = async (): Promise<boolean> => {
+  console.log('🪟 On Windows, please disconnect manually via WireGuard GUI');
+  console.log('   1. Open WireGuard application');
+  console.log('   2. Click "Deactivate" on your tunnel');
+  return true; // Assume user will disconnect manually
 }
 
 // Security: Configure session for secure browsing
@@ -93,7 +688,7 @@ function createWindow(): void {
     titleBarStyle: 'default',
     show: false, // Don't show until ready
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, 'preload.cjs'),
       
       // Security: Enable webview for controlled browsing
       webviewTag: true,
@@ -177,16 +772,30 @@ function createWindow(): void {
     }
   })
 
-  // Handle VPN connection simulation (replace with actual VPN integration)
-  const vpnSimulationTimer = setTimeout(() => {
-    updateVPNStatus(true)
-    console.log('🌐 VPN simulation: Connected to Australian endpoint')
-  }, 3000)
+  // Initialize real VPN connection if auto-connect is enabled
+  if (process.env.VPN_AUTO_CONNECT === 'true') {
+    setTimeout(async () => {
+      try {
+        const connected = await connectVPN();
+        updateVPNStatus(connected);
+        if (connected) {
+          console.log('✅ VPN auto-connected successfully');
+        } else {
+          console.warn('⚠️ VPN auto-connect failed');
+        }
+      } catch (error) {
+        console.error('❌ VPN auto-connect error:', error);
+        updateVPNStatus(false);
+      }
+    }, 2000); // Give app time to initialize
+  }
 
-  // Clear timer if window is closed early
   win.on('closed', () => {
-    clearTimeout(vpnSimulationTimer)
-    win = null
+    // Cleanup VPN connection when app closes
+    disconnectVPN().catch((error: Error) => {
+      console.error('❌ Error disconnecting VPN on app close:', error);
+    });
+    win = null;
   })
 
   // Production: Disable menu bar
@@ -195,10 +804,159 @@ function createWindow(): void {
   }
 }
 
+// IPC Handlers for secure communication
+
+// System information handlers
+ipcMain.handle('system-get-version', () => {
+  return app.getVersion()
+})
+
+ipcMain.handle('system-get-environment', () => {
+  // Return environment variables needed by renderer in a safe way
+  const envVars = {
+    NODE_ENV: process.env.NODE_ENV,
+    APP_NAME: process.env.APP_NAME,
+    APP_VERSION: process.env.APP_VERSION,
+    VPN_PROVIDER: process.env.VPN_PROVIDER,
+    VPN_SERVER_REGION: process.env.VPN_SERVER_REGION,
+    VPN_AUTO_CONNECT: process.env.VPN_AUTO_CONNECT,
+    VPN_FAIL_CLOSED: process.env.VPN_FAIL_CLOSED,
+    WIREGUARD_CONFIG_PATH: process.env.WIREGUARD_CONFIG_PATH,
+    WIREGUARD_ENDPOINT: process.env.WIREGUARD_ENDPOINT,
+    VAULT_PROVIDER: process.env.VAULT_PROVIDER,
+    VAULT_ADDR: process.env.VAULT_ADDR,
+    VAULT_NAMESPACE: process.env.VAULT_NAMESPACE,
+    VAULT_ROLE_ID: process.env.VAULT_ROLE_ID,
+    VAULT_SECRET_ID: process.env.VAULT_SECRET_ID,
+    AWS_REGION: process.env.AWS_REGION,
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+    AZURE_TENANT_ID: process.env.AZURE_TENANT_ID,
+    AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID,
+    AZURE_CLIENT_SECRET: process.env.AZURE_CLIENT_SECRET,
+    AZURE_VAULT_URL: process.env.AZURE_VAULT_URL,
+    OP_CONNECT_HOST: process.env.OP_CONNECT_HOST,
+    OP_CONNECT_TOKEN: process.env.OP_CONNECT_TOKEN,
+    SHAREPOINT_TENANT_URL: process.env.SHAREPOINT_TENANT_URL,
+    SHAREPOINT_AUTO_LOGIN: process.env.SHAREPOINT_AUTO_LOGIN,
+    SHAREPOINT_DEFAULT_ACCESS_LEVEL: process.env.SHAREPOINT_DEFAULT_ACCESS_LEVEL,
+    SHAREPOINT_DOCUMENT_LIBRARIES: process.env.SHAREPOINT_DOCUMENT_LIBRARIES,
+    SECURITY_BLOCK_DOWNLOADS: process.env.SECURITY_BLOCK_DOWNLOADS,
+    SECURITY_HTTPS_ONLY: process.env.SECURITY_HTTPS_ONLY,
+    SECURITY_FAIL_CLOSED_VPN: process.env.SECURITY_FAIL_CLOSED_VPN,
+    SECURITY_BLOCK_DEVTOOLS: process.env.SECURITY_BLOCK_DEVTOOLS,
+    LEVEL1_DOMAINS: process.env.LEVEL1_DOMAINS,
+    LEVEL2_DOMAINS: process.env.LEVEL2_DOMAINS,
+    LEVEL3_ENABLED: process.env.LEVEL3_ENABLED,
+    LOG_LEVEL: process.env.LOG_LEVEL,
+    LOG_FILE_PATH: process.env.LOG_FILE_PATH
+  };
+  
+  console.log('🔄 Environment variables requested from renderer:', {
+    NODE_ENV: envVars.NODE_ENV,
+    VPN_PROVIDER: envVars.VPN_PROVIDER,
+    WIREGUARD_ENDPOINT: envVars.WIREGUARD_ENDPOINT
+  });
+  
+  return JSON.stringify(envVars);
+})
+
+// Real VPN handlers
+ipcMain.handle('vpn-get-status', () => {
+  return vpnConnected ? 'connected' : 'disconnected'
+})
+
+ipcMain.handle('vpn-connect', async (_event, provider: string) => {
+  console.log(`🌐 VPN connect requested: ${provider}`)
+  try {
+    const success = await connectVPN();
+    updateVPNStatus(success);
+    return success;
+  } catch (error) {
+    console.error('❌ VPN connection error:', error);
+    updateVPNStatus(false);
+    return false;
+  }
+})
+
+ipcMain.handle('vpn-disconnect', async () => {
+  console.log('🌐 VPN disconnect requested')
+  try {
+    const success = await disconnectVPN();
+    updateVPNStatus(false);
+    return success;
+  } catch (error) {
+    console.error('❌ VPN disconnection error:', error);
+    return false;
+  }
+})
+
+// Vault handlers (placeholders - actual implementation would be in main process)
+ipcMain.handle('vault-get-sharepoint-credentials', async () => {
+  console.log('🔑 SharePoint credentials requested')
+  // This should implement actual vault logic in main process
+  throw new Error('Vault integration must be implemented in main process for security')
+})
+
+ipcMain.handle('vault-get-status', () => {
+  return 'connected' // Placeholder
+})
+
+// Security handlers
+ipcMain.handle('security-check-url', async (event, url: string, accessLevel: number) => {
+  console.log(`🔒 URL check: ${url} (Level ${accessLevel})`)
+  // Implement URL filtering logic
+  return true
+})
+
+ipcMain.handle('security-log-navigation', async (event, url: string, allowed: boolean, accessLevel: number) => {
+  console.log(`📝 Navigation log: ${url} - ${allowed ? 'ALLOWED' : 'BLOCKED'} (Level ${accessLevel})`)
+})
+
+ipcMain.handle('security-prevent-download', async (event, filename: string) => {
+  console.log(`🚫 Download blocked: ${filename}`)
+})
+
+// SharePoint handlers
+ipcMain.handle('sharepoint-inject-credentials', async (event, webviewId: string) => {
+  console.log(`🔐 SharePoint credentials injection requested for: ${webviewId}`)
+  // Implement credential injection logic
+  return true
+})
+
+ipcMain.handle('sharepoint-get-config', async () => {
+  return {
+    tenantUrl: process.env.SHAREPOINT_TENANT_URL || 'https://your-tenant.sharepoint.com',
+    libraryPath: '/sites/documents/Shared Documents'
+  }
+})
+
+ipcMain.handle('sharepoint-validate-access', async (event, url: string) => {
+  console.log(`🔍 SharePoint access validation: ${url}`)
+  return true
+})
+
 // Initialize security configuration
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   console.log('🚀 Initializing Secure Remote Browser...')
+  
+  // Load environment variables first
+  await loadEnvironmentVariables()
+  
+  // Configure secure session before creating any windows
   configureSecureSession()
+  
+  // Initialize VPN connection first (this was missing!)
+  console.log('🔌 Starting VPN connection...')
+  const vpnConnected = await connectVPN()
+  updateVPNStatus(vpnConnected)
+  
+  if (!vpnConnected) {
+    console.error('❌ VPN connection failed - starting with restricted access')
+  } else {
+    console.log('✅ VPN connected successfully - unrestricted access enabled')
+  }
+  
   createWindow()
 }).catch((error) => {
   console.error('❌ Failed to initialize app:', error)

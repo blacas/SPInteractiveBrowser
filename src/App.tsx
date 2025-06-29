@@ -1,35 +1,216 @@
+import { useVPN } from "@/hooks/useVPN";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect, useState } from "react";
+import { vaultService } from "@/services/vaultService";
+import { vpnService } from "@/services/vpnService";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Dashboard } from "@/components/layout/Dashboard";
+import LoadingScreen from "@/components/ui/loading-screen";
+import ErrorBoundary from "@/components/ui/error-boundary";
+
+import ErrorDisplay, { ErrorInfo, VPNStatus, EnvironmentStatus } from "@/components/ui/error-display";
+import { EnvironmentValidator } from "@/config/environment";
 import BrowserWindow from "@/components/browser/BrowserWindow";
-import { useAuth } from "@/hooks/useAuth";
-import { useVPN } from "@/hooks/useVPN";
-import { vaultService } from "@/services/vaultService";
-import { useEffect, useState } from "react";
 import "./App.css";
 
 function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+}
+
+function AppContent() {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
   const { vpnStatus } = useVPN();
-  const [vaultInitialized, setVaultInitialized] = useState(false);
+  const [initStage, setInitStage] = useState<'auth' | 'vault' | 'vpn' | 'ready'>('auth');
+  const [errors, setErrors] = useState<ErrorInfo[]>([]);
+  const [vpnStatusInfo, setVpnStatusInfo] = useState<VPNStatus | null>(null);
+  const [envStatusInfo, setEnvStatusInfo] = useState<EnvironmentStatus | null>(null);
   const [vaultError, setVaultError] = useState<string | null>(null);
+  const [initProgress, setInitProgress] = useState(0);
 
-  // Initialize vault service on app start
+  // Initialize services in sequence
   useEffect(() => {
-    const initializeVault = async () => {
+    const initializeServices = async () => {
       try {
-        await vaultService.initialize();
-        setVaultInitialized(true);
-        console.log('✅ Vault service initialized successfully');
+        // Stage 1: Environment validation
+        setInitStage('auth');
+        setInitProgress(10);
+        
+        // Validate environment configuration first
+        let envConfig: Record<string, string | undefined> = {};
+        
+        try {
+          const envConfigStr = await window.secureBrowser?.system.getEnvironment();
+          if (envConfigStr) {
+            envConfig = JSON.parse(envConfigStr);
+            console.log('🔍 Environment config loaded:', {
+              NODE_ENV: envConfig.NODE_ENV,
+              VPN_PROVIDER: envConfig.VPN_PROVIDER,
+              WIREGUARD_ENDPOINT: envConfig.WIREGUARD_ENDPOINT ? 'Set ✅' : 'Missing ❌'
+            });
+            
+            const validation = EnvironmentValidator.validateEnvironment(envConfig);
+            
+            setEnvStatusInfo({
+              loaded: true,
+              valid: validation.isValid,
+              errors: validation.errors,
+              warnings: validation.warnings,
+              config: {
+                nodeEnv: envConfig.NODE_ENV,
+                vpnProvider: envConfig.VPN_PROVIDER,
+                wireguardEndpoint: envConfig.WIREGUARD_ENDPOINT,
+                wireguardConfigPath: envConfig.WIREGUARD_CONFIG_PATH
+              }
+            });
+            
+            if (!validation.isValid) {
+              setErrors([{
+                type: 'environment',
+                title: 'Environment Configuration Invalid',
+                message: 'Configuration contains placeholder values or missing required settings',
+                details: validation.errors,
+                critical: true,
+                action: 'Update your .env file with correct values'
+              }]);
+              return;
+            }
+            
+            if (validation.warnings.length > 0) {
+              console.warn('⚠️ Environment warnings:', validation.warnings);
+            }
+          } else {
+            throw new Error('No environment configuration received');
+          }
+        } catch (error) {
+          setEnvStatusInfo({
+            loaded: false,
+            valid: false,
+            errors: ['Unable to load environment configuration'],
+            warnings: [],
+            config: undefined
+          });
+          
+          setErrors([{
+            type: 'config',
+            title: 'Configuration Loading Failed',
+            message: 'Unable to load environment configuration',
+            details: [
+              'Check if .env file exists in project root',
+              'Ensure NODE_ENV=development (not production)',
+              'Verify all required environment variables are set',
+              error instanceof Error ? error.message : 'Unknown error'
+            ],
+            critical: true,
+            action: 'Check .env file and restart application'
+          }]);
+          return;
+        }
+        
+        // Wait for auth to be ready
+        if (isLoading) return;
+        
+        setInitProgress(25);
+        
+        // Stage 2: Vault initialization  
+        setInitStage('vault');
+        setInitProgress(50);
+        
+        try {
+          await vaultService.initialize();
+          console.log('✅ Vault service initialized successfully');
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Vault initialization failed';
+          setVaultError(errorMessage);
+          console.error('❌ Vault initialization failed:', error);
+          
+          // Only set as critical error if vault is required
+          // For now, allow continuation without vault
+        }
+        
+        // Stage 3: VPN initialization
+        setInitStage('vpn');
+        setInitProgress(75);
+        
+        // Real VPN connection with proper error handling
+        try {
+          const vpnConnected = await vpnService.connect();
+          
+          setVpnStatusInfo({
+            connected: vpnConnected,
+            provider: envConfig?.VPN_PROVIDER || 'wireguard',
+            endpoint: envConfig?.WIREGUARD_ENDPOINT,
+            location: 'Australia',
+            lastCheck: new Date()
+          });
+          
+          if (!vpnConnected) {
+            setErrors([{
+              type: 'vpn',
+              title: 'VPN Connection Failed',
+              message: 'Failed to establish VPN connection to Australian servers',
+              details: [
+                'VPN connection is required for security compliance',
+                'All browsing must be routed through Australian servers',
+                'Check your WireGuard configuration and server status',
+                'Ensure WireGuard GUI is running and tunnel is active'
+              ],
+              critical: true,
+              action: 'Connect WireGuard and retry'
+            }]);
+            return;
+          }
+          console.log('✅ VPN connected successfully');
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'VPN connection failed';
+          
+          setVpnStatusInfo({
+            connected: false,
+            provider: envConfig?.VPN_PROVIDER || 'wireguard',
+            endpoint: envConfig?.WIREGUARD_ENDPOINT,
+            location: 'Australia',
+            lastCheck: new Date()
+          });
+          
+          setErrors([{
+            type: 'vpn',
+            title: 'VPN Connection Error',
+            message: errorMessage,
+            details: [
+              'VPN connection failed during startup',
+              'Check your network connection',
+              'Verify WireGuard configuration file',
+              'Ensure your Australian VPS server is running',
+              'Make sure WireGuard GUI is installed and running'
+            ],
+            critical: true,
+            action: 'Fix VPN configuration and retry'
+          }]);
+          return;
+        }
+        
+        // Stage 4: Ready
+        setInitStage('ready');
+        setInitProgress(100);
+        
       } catch (error) {
-        setVaultError(error instanceof Error ? error.message : 'Vault initialization failed');
-        console.error('❌ Vault initialization failed:', error);
+        console.error('❌ Service initialization failed:', error);
+        setErrors([{
+          type: 'config',
+          title: 'Application Initialization Failed',
+          message: 'Application initialization failed',
+          details: [error instanceof Error ? error.message : 'Unknown error occurred'],
+          critical: true,
+          action: 'Check configuration and restart application'
+        }]);
       }
     };
 
-    initializeVault();
-  }, []);
-
-
+    initializeServices();
+  }, [isLoading]);
 
   const handleAccessLevelChange = (newLevel: 1 | 2 | 3) => {
     if (user) {
@@ -43,26 +224,52 @@ function App() {
     }
   };
 
-  // Show loading screen while checking auth status or initializing vault
-  if (isLoading || !vaultInitialized) {
+  // Show error screen if initialization failed
+  if (errors.length > 0) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-900">
-        <div className="text-center space-y-4">
-          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto" />
-          <p className="text-white">
-            {isLoading ? 'Initializing Secure Browser...' : 'Connecting to Vault Service...'}
-          </p>
-          {vaultError && (
-            <div className="mt-4 p-4 bg-red-900/50 border border-red-700 rounded-lg">
-              <p className="text-red-300 text-sm">⚠️ Vault Service Error:</p>
-              <p className="text-red-200 text-xs mt-1">{vaultError}</p>
-              <p className="text-red-400 text-xs mt-2">
-                SharePoint credentials may not be available. Please check vault configuration.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      <ErrorDisplay
+        errors={errors}
+        vpnStatus={vpnStatusInfo || undefined}
+        environmentStatus={envStatusInfo || undefined}
+        onRetry={() => {
+          setErrors([]);
+          setInitStage('auth');
+          setInitProgress(0);
+          // Trigger re-initialization
+          window.location.reload();
+        }}
+        onOpenSettings={() => {
+          console.log('Opening settings...');
+          // TODO: Implement settings modal
+        }}
+      />
+    );
+  }
+
+  // Show loading screen during initialization
+  if (isLoading || initStage !== 'ready') {
+    const currentMessage = (() => {
+      switch (initStage) {
+        case 'auth':
+          return 'Validating configuration and starting secure browser environment...';
+        case 'vault':
+          return vaultError ? 'Vault connection failed - continuing with reduced functionality' : 'Connecting to secure credential vault...';
+        case 'vpn':
+          return 'Establishing secure VPN tunnel to Australia...';
+        case 'ready':
+          return 'All systems ready! Launching secure browser...';
+        default:
+          return 'Initializing...';
+      }
+    })();
+
+    return (
+      <LoadingScreen
+        stage={initStage}
+        message={currentMessage}
+        error={vaultError}
+        progress={initProgress}
+      />
     );
   }
 

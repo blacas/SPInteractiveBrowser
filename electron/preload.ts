@@ -64,7 +64,7 @@ contextBridge.exposeInMainWorld('secureBrowser', {
   system: {
     getVersion: () => ipcRenderer.invoke('system-get-version'),
     getEnvironment: () => ipcRenderer.invoke('system-get-environment'),
-    isProduction: () => process.env.NODE_ENV === 'production'
+    isProduction: () => false // Will be determined by main process
   }
 })
 
@@ -73,14 +73,12 @@ delete (window as unknown as { module?: unknown }).module
 delete (window as unknown as { exports?: unknown }).exports
 delete (window as unknown as { require?: unknown }).require
 
-// Enhanced security - prevent access to node internals (in development only)
-if (process.env.NODE_ENV === 'production') {
-  try {
-    Object.freeze(console)
-    Object.freeze(process)
-  } catch (error) {
-    // Ignore freezing errors in some environments
-  }
+// Enhanced security - prevent access to node internals
+try {
+  // Note: process object is not available in renderer with context isolation
+  Object.freeze(console)
+} catch (error) {
+  // Ignore freezing errors in some environments
 }
 
 // Log security initialization

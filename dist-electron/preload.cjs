@@ -54,11 +54,16 @@ electron.contextBridge.exposeInMainWorld("secureBrowser", {
     getVersion: () => electron.ipcRenderer.invoke("system-get-version"),
     getEnvironment: () => electron.ipcRenderer.invoke("system-get-environment"),
     isProduction: () => false
+    // Will be determined by main process
   }
 });
 delete window.module;
 delete window.exports;
 delete window.require;
+try {
+  Object.freeze(console);
+} catch (error) {
+}
 console.log("🔒 Secure Browser Preload: Context isolation enabled");
 console.log("🌐 VPN-routed traffic: Ready for Australian endpoint");
 console.log("🔑 Vault integration: SharePoint credentials secure");
