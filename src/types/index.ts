@@ -26,7 +26,7 @@ export interface VaultCredentials {
   sharepointUsername: string;
   sharepointPassword: string;
   lastUpdated: Date;
-  vaultProvider: 'hashicorp' | 'aws-secrets' | '1password' | 'azure-keyvault';
+  vaultProvider: 'hashicorp' | 'aws-secrets' | '1password' | 'azure-keyvault' | '1password-cli';
 }
 
 export interface SharePointConfig {

@@ -5,25 +5,27 @@ const fetchImpl = globalThis.fetch;
 
 // Environment configuration interface
 interface VaultConfig {
-  provider: 'hashicorp' | 'aws-secrets' | '1password' | 'azure-keyvault';
+  provider: 'hashicorp' | 'aws-secrets' | '1password' | '1password-cli' | 'azure-keyvault';
   endpoint: string;
   credentials: Record<string, string>;
 }
 
 // Vault service for managing shared SharePoint credentials
 export class VaultService {
-  private vaultProvider: 'hashicorp' | 'aws-secrets' | '1password' | 'azure-keyvault';
+  private vaultProvider: 'hashicorp' | 'aws-secrets' | '1password' | '1password-cli' | 'azure-keyvault';
   private vaultEndpoint: string;
   private accessToken: string | null = null;
   private initialized: boolean = false;
   private config: VaultConfig | null = null;
 
-  constructor(provider: 'hashicorp' | 'aws-secrets' | '1password' | 'azure-keyvault' = 'hashicorp') {
+  constructor(provider: 'hashicorp' | 'aws-secrets' | '1password' | '1password-cli' | 'azure-keyvault' = 'hashicorp') {
     this.vaultProvider = provider;
     this.vaultEndpoint = '';
   }
 
   // Get environment configuration from Electron main process
+  // Future use - environment config loading
+  // @ts-expect-error - Future implementation
   private async getEnvironmentConfig(): Promise<VaultConfig> {
     if (this.config) {
       return this.config;
@@ -49,10 +51,12 @@ export class VaultService {
           AZURE_VAULT_URL?: string;
           OP_CONNECT_HOST?: string;
           OP_CONNECT_TOKEN?: string;
+          OP_SERVICE_ACCOUNT_TOKEN?: string;
+          OP_SHAREPOINT_ITEM_ID?: string;
         };
 
         this.config = {
-          provider: (config.VAULT_PROVIDER as 'hashicorp' | 'aws-secrets' | '1password' | 'azure-keyvault') || this.vaultProvider,
+          provider: (config.VAULT_PROVIDER as 'hashicorp' | 'aws-secrets' | '1password' | '1password-cli' | 'azure-keyvault') || this.vaultProvider,
           endpoint: this.getVaultEndpoint(config),
           credentials: {
             roleId: config.VAULT_ROLE_ID || '',
@@ -65,7 +69,9 @@ export class VaultService {
             azureClientSecret: config.AZURE_CLIENT_SECRET || '',
             azureVaultUrl: config.AZURE_VAULT_URL || '',
             opConnectHost: config.OP_CONNECT_HOST || '',
-            opConnectToken: config.OP_CONNECT_TOKEN || ''
+            opConnectToken: config.OP_CONNECT_TOKEN || '',
+            opServiceAccountToken: config.OP_SERVICE_ACCOUNT_TOKEN || '',
+            opSharePointItemId: config.OP_SHAREPOINT_ITEM_ID || ''
           }
         };
 
@@ -87,6 +93,8 @@ export class VaultService {
         return config.AWS_REGION || 'us-east-1';
       case '1password':
         return config.OP_CONNECT_HOST || '';
+      case '1password-cli':
+        return 'https://my.1password.com/api/v1';
       case 'azure-keyvault':
         return config.AZURE_VAULT_URL || '';
       default:
@@ -208,6 +216,8 @@ export class VaultService {
   }
 
   // Vault-specific implementations
+  // Future use - HashiCorp Vault integration
+  // @ts-expect-error - Future implementation
   private async initializeHashiCorpVault(): Promise<void> {
     if (!this.config) {
       throw new Error('Vault configuration not loaded');
@@ -246,6 +256,8 @@ export class VaultService {
     }
   }
 
+  // Future use - AWS Secrets Manager integration
+  // @ts-expect-error - Future implementation
   private async initializeAWSSecrets(): Promise<void> {
     if (!this.config) {
       throw new Error('Vault configuration not loaded');
@@ -265,6 +277,8 @@ export class VaultService {
     throw new Error('AWS Secrets Manager integration not fully implemented. Please implement AWS SDK integration.');
   }
 
+  // Future use - 1Password Connect integration
+  // @ts-expect-error - Future implementation
   private async initialize1Password(): Promise<void> {
     if (!this.config) {
       throw new Error('Vault configuration not loaded');
@@ -296,6 +310,8 @@ export class VaultService {
     }
   }
 
+  // Future use - Azure Key Vault integration
+  // @ts-expect-error - Future implementation
   private async initializeAzureKeyVault(): Promise<void> {
     if (!this.config) {
       throw new Error('Vault configuration not loaded');
@@ -318,6 +334,8 @@ export class VaultService {
   }
 
   // Retrieve secrets from vault (implementation depends on provider)
+  // Future use - Generic secret retrieval
+  // @ts-expect-error - Future implementation
   private async retrieveSecrets(secretPath: string): Promise<Record<string, unknown>> {
     switch (this.vaultProvider) {
       case 'hashicorp':
@@ -325,6 +343,8 @@ export class VaultService {
       case 'aws-secrets':
         return await this.getAWSSecret(secretPath);
       case '1password':
+        return await this.get1PasswordSecret(secretPath);
+      case '1password-cli':
         return await this.get1PasswordSecret(secretPath);
       case 'azure-keyvault':
         return await this.getAzureSecret(secretPath);
@@ -364,16 +384,25 @@ export class VaultService {
   }
 
   private async get1PasswordSecret(itemId: string): Promise<Record<string, unknown>> {
-    if (!this.accessToken) {
-      throw new Error('1Password Connect not authenticated');
+    if (!this.config) {
+      throw new Error('Vault configuration not loaded');
+    }
+
+    // Use either Connect token or Service Account token
+    const authToken = this.vaultProvider === '1password-cli' 
+      ? this.config.credentials.opServiceAccountToken 
+      : this.accessToken;
+
+    if (!authToken) {
+      throw new Error('1Password authentication not configured');
     }
 
     try {
       // Get item by ID or title
-      const response = await this.makeVaultRequest(`/v1/items/${itemId}`, {
+      const response = await this.makeVaultRequest(`/items/${itemId}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.accessToken}`
+          'Authorization': `Bearer ${authToken}`
         }
       });
 

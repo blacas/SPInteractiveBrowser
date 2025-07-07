@@ -43,6 +43,8 @@ export interface EnvironmentConfig {
 }
 
 export class EnvironmentValidator {
+  // Future use - environment validation
+  // @ts-expect-error - Future implementation
   private static requiredVars = [
     'VPN_PROVIDER',
     'VPN_SERVER_REGION', 
@@ -50,12 +52,16 @@ export class EnvironmentValidator {
     'SHAREPOINT_TENANT_URL'
   ];
 
+  // Future use - VPN validation
+  // @ts-expect-error - Future implementation
   private static vpnRequiredVars = {
     wireguard: ['WIREGUARD_CONFIG_PATH', 'WIREGUARD_ENDPOINT'],
     nordlayer: ['NORDLAYER_API_KEY', 'NORDLAYER_SERVER_ID'],
     expressvpn: ['EXPRESSVPN_API_KEY', 'EXPRESSVPN_LOCATION_ID']
   };
 
+  // Future use - Vault validation
+  // @ts-expect-error - Future implementation
   private static vaultRequiredVars = {
     hashicorp: ['VAULT_ADDR', 'VAULT_ROLE_ID', 'VAULT_SECRET_ID'],
     'aws-secrets': ['AWS_REGION', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'],

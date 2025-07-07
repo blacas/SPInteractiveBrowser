@@ -972,26 +972,26 @@ ipcMain.handle('vpn-disconnect', async () => {
   }
 })
 
-// 1Password Connect API integration
+// 1Password Service Account API integration (direct)
 const get1PasswordSecret = async (itemId: string): Promise<Record<string, unknown>> => {
-  const connectHost = process.env.OP_CONNECT_HOST;
-  const connectToken = process.env.OP_CONNECT_TOKEN;
+  const serviceAccountToken = process.env.OP_SERVICE_ACCOUNT_TOKEN;
   
-  if (!connectHost || !connectToken) {
-    throw new Error('1Password Connect not configured. Set OP_CONNECT_HOST and OP_CONNECT_TOKEN environment variables.');
+  if (!serviceAccountToken) {
+    throw new Error('1Password Service Account not configured. Set OP_SERVICE_ACCOUNT_TOKEN environment variable.');
   }
 
   try {
-    const response = await fetch(`${connectHost}/v1/items/${itemId}`, {
+    // Use 1Password Service Account API directly
+    const response = await fetch(`https://my.1password.com/api/v1/items/${itemId}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${connectToken}`,
+        'Authorization': `Bearer ${serviceAccountToken}`,
         'Content-Type': 'application/json'
       }
     });
 
     if (!response.ok) {
-      throw new Error(`1Password Connect API error: ${response.status} ${response.statusText}`);
+      throw new Error(`1Password Service Account API error: ${response.status} ${response.statusText}`);
     }
 
     const item = await response.json();
@@ -1056,8 +1056,8 @@ ipcMain.handle('vault-get-sharepoint-credentials', async () => {
     }
     
     // Production vault implementation
-    if (vaultProvider === '1password') {
-      console.log('🔐 Using 1Password Connect for credentials');
+    if (vaultProvider === '1password' || vaultProvider === '1password-cli') {
+      console.log('🔐 Using 1Password Service Account for credentials');
       const itemId = process.env.OP_SHAREPOINT_ITEM_ID || 'SharePoint Service Account';
       const secrets = await get1PasswordSecret(itemId);
       
@@ -1108,29 +1108,34 @@ ipcMain.handle('vault-get-status', async () => {
   const vaultProvider = process.env.VAULT_PROVIDER || 'hashicorp';
   
   try {
-    if (vaultProvider === '1password') {
-      // Check 1Password Connect health
-      const connectHost = process.env.OP_CONNECT_HOST;
-      const connectToken = process.env.OP_CONNECT_TOKEN;
+    if (vaultProvider === '1password' || vaultProvider === '1password-cli') {
+      // Check 1Password Service Account access
+      const serviceAccountToken = process.env.OP_SERVICE_ACCOUNT_TOKEN;
+      const itemId = process.env.OP_SHAREPOINT_ITEM_ID;
       
-      if (!connectHost || !connectToken) {
-        return 'error: 1Password Connect not configured';
+      if (!serviceAccountToken) {
+        return 'error: 1Password Service Account not configured';
       }
       
-      const response = await fetch(`${connectHost}/v1/health`, {
+      if (!itemId) {
+        return 'error: SharePoint Item ID not configured';
+      }
+      
+      // Test access by trying to fetch the SharePoint item
+      const response = await fetch(`https://my.1password.com/api/v1/items/${itemId}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${connectToken}`,
+          'Authorization': `Bearer ${serviceAccountToken}`,
           'Content-Type': 'application/json'
         }
       });
       
       if (response.ok) {
-        console.log('✅ 1Password Connect health check passed');
+        console.log('✅ 1Password Service Account access verified');
         return 'connected';
       } else {
-        console.error('❌ 1Password Connect health check failed:', response.status);
-        return 'error: 1Password Connect health check failed';
+        console.error('❌ 1Password Service Account access failed:', response.status);
+        return 'error: Cannot access SharePoint credentials in 1Password';
       }
     } else {
       // Other vault providers would implement their health checks here
@@ -1143,17 +1148,17 @@ ipcMain.handle('vault-get-status', async () => {
 })
 
 // Security handlers
-ipcMain.handle('security-check-url', async (event, url: string, accessLevel: number) => {
+ipcMain.handle('security-check-url', async (_event, url: string, accessLevel: number) => {
   console.log(`🔒 URL check: ${url} (Level ${accessLevel})`)
   // Implement URL filtering logic
   return true
 })
 
-ipcMain.handle('security-log-navigation', async (event, url: string, allowed: boolean, accessLevel: number) => {
+ipcMain.handle('security-log-navigation', async (_event, url: string, allowed: boolean, accessLevel: number) => {
   console.log(`📝 Navigation log: ${url} - ${allowed ? 'ALLOWED' : 'BLOCKED'} (Level ${accessLevel})`)
 })
 
-ipcMain.handle('security-prevent-download', async (event, filename: string) => {
+ipcMain.handle('security-prevent-download', async (_event, filename: string) => {
   console.log(`🚫 Download blocked: ${filename}`)
 })
 
@@ -1207,7 +1212,7 @@ ipcMain.handle('extension-install-1password', async () => {
 });
 
 // SharePoint handlers
-ipcMain.handle('sharepoint-inject-credentials', async (event, webviewId: string) => {
+ipcMain.handle('sharepoint-inject-credentials', async (_event, webviewId: string) => {
   console.log(`🔐 SharePoint credentials injection requested for: ${webviewId}`)
   // Implement credential injection logic
   return true
@@ -1220,7 +1225,7 @@ ipcMain.handle('sharepoint-get-config', async () => {
   }
 })
 
-ipcMain.handle('sharepoint-validate-access', async (event, url: string) => {
+ipcMain.handle('sharepoint-validate-access', async (_event, url: string) => {
   console.log(`🔍 SharePoint access validation: ${url}`)
   return true
 })
@@ -1284,7 +1289,7 @@ app.on('activate', () => {
 })
 
 // Security: Prevent navigation to external websites in main window
-app.on('web-contents-created', (event, contents) => {
+app.on('web-contents-created', (_event, contents) => {
   contents.on('will-navigate', (event, navigationUrl) => {
     try {
       const parsedUrl = new URL(navigationUrl)

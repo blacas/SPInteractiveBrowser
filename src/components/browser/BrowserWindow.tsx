@@ -18,6 +18,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useVPN } from '@/hooks/useVPN';
 import { injectSharePointCredentials } from '@/services/vaultService';
 import SearchBar from './SearchBar';
+import VPNConnectionError from '@/components/ui/vpn-connection-error';
 
 interface Tab {
   id: string;
@@ -28,7 +29,7 @@ interface Tab {
 
 const BrowserWindow: React.FC = () => {
   const { user } = useAuth();
-  const { vpnStatus, allowBrowsing, connection } = useVPN();
+  const { vpnStatus, allowBrowsing, connection, connectVPN, checkVPNStatus, isConnecting, isCheckingStatus, lastError } = useVPN();
   const [tabs, setTabs] = useState<Tab[]>([
     { id: '1', title: 'New Tab', url: getDefaultUrl(user?.accessLevel || 1), isLoading: false }
   ]);
@@ -304,8 +305,8 @@ const BrowserWindow: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Browser Controls */}
-      <div className="flex items-center gap-3 p-3 border-b bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg">
+      {/* Browser Controls - Fixed/Sticky */}
+      <div className="flex items-center gap-3 p-3 border-b bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg flex-shrink-0">
         <div className="flex items-center gap-0.5 bg-slate-700/50 rounded-lg p-1">
           <Button 
             variant="ghost" 
@@ -386,9 +387,9 @@ const BrowserWindow: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - Fixed/Sticky */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <div className="flex items-center border-b bg-gradient-to-r from-slate-100 to-slate-200 shadow-sm">
+        <div className="flex items-center border-b bg-gradient-to-r from-slate-100 to-slate-200 shadow-sm flex-shrink-0">
           <TabsList className="h-12 bg-transparent border-0 gap-1 p-1">
             {tabs.map((tab) => (
               <div key={tab.id} className="flex items-center">
@@ -431,28 +432,21 @@ const BrowserWindow: React.FC = () => {
           </Button>
         </div>
 
-        {/* Tab Content */}
-        <div className="flex-1 relative">
+        {/* Tab Content - Scrollable Area */}
+        <div className="flex-1 relative overflow-hidden">
           {tabs.map((tab) => (
-            <TabsContent key={tab.id} value={tab.id} className="h-full m-0 data-[state=active]:flex">
-              {isUrlAllowed(tab.url) ? (
-                <webview
-                  ref={(ref: HTMLElement | null) => {
-                    if (ref) {
-                      webviewRefs.current[tab.id] = ref;
-                      setupWebviewEvents(ref, tab.id);
-                    }
-                  }}
-                  src={tab.url}
-                  style={{ 
-                    width: '100%', 
-                    height: '100%',
-                    border: 'none'
-                  }}
-                  allowpopups={true}
-                  useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            <TabsContent key={tab.id} value={tab.id} className="h-full m-0 data-[state=active]:flex data-[state=active]:flex-col overflow-y-auto">
+              {!allowBrowsing ? (
+                /* Show VPN Connection Error when VPN is not connected */
+                <VPNConnectionError
+                  onRetry={connectVPN}
+                  onCheckStatus={checkVPNStatus}
+                  isRetrying={isConnecting}
+                  isChecking={isCheckingStatus}
+                  errorDetails={lastError || `WireGuard endpoint: ${connection.endpoint}`}
                 />
-              ) : (
+              ) : !isUrlAllowed(tab.url) ? (
+                /* Show URL restriction error for blocked domains */
                 <div className="flex-1 flex items-center justify-center bg-gray-50">
                   <div className="text-center max-w-md">
                     <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
@@ -470,6 +464,24 @@ const BrowserWindow: React.FC = () => {
                     </div>
                   </div>
                 </div>
+              ) : (
+                /* Show webview when VPN is connected and URL is allowed */
+                <webview
+                  ref={(ref: HTMLElement | null) => {
+                    if (ref) {
+                      webviewRefs.current[tab.id] = ref;
+                      setupWebviewEvents(ref, tab.id);
+                    }
+                  }}
+                  src={tab.url}
+                  style={{ 
+                    width: '100%', 
+                    height: '100%',
+                    border: 'none'
+                  }}
+                  allowpopups={true}
+                  useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                />
               )}
             </TabsContent>
           ))}

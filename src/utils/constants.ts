@@ -27,7 +27,8 @@ export const ACCESS_LEVEL_CONFIGS: Record<1 | 2 | 3, AccessLevelConfig> = {
       "Access limited to company SharePoint sites",
       "No external browsing allowed",
       "PDF viewing within SharePoint only"
-    ]
+    ],
+    sharepointAccess: true
   },
   2: {
     level: 2,
@@ -39,7 +40,8 @@ export const ACCESS_LEVEL_CONFIGS: Record<1 | 2 | 3, AccessLevelConfig> = {
       "SharePoint access enabled",
       "Limited external site access",
       "Pre-approved domains only"
-    ]
+    ],
+    sharepointAccess: true
   },
   3: {
     level: 3,
@@ -51,7 +53,8 @@ export const ACCESS_LEVEL_CONFIGS: Record<1 | 2 | 3, AccessLevelConfig> = {
       "Full internet access",
       "All traffic VPN-protected",
       "Enhanced monitoring active"
-    ]
+    ],
+    sharepointAccess: true
   }
 };
 

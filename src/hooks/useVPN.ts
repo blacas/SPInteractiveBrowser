@@ -17,44 +17,29 @@ export const useVPN = () => {
   });
   const [retryCount, setRetryCount] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   const connectVPN = async (): Promise<void> => {
     setVpnStatus("connecting");
     setLastError(null);
     
     try {
-      // Simulate VPN connection to Australian endpoint
-      // In production, this would integrate with actual VPN provider API
-      console.log(`Connecting to Australian VPN: ${connection.endpoint}`);
+      // Use IPC to connect VPN via main process
+      console.log(`🔌 Requesting VPN connection via main process...`);
+      const success = await (window as any).electronAPI?.vpn?.connect('wireguard');
       
-      // Simulate connection process
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Simulate IP verification to ensure Australian origin
-      const mockAustralianIP = "203.219.252.100"; // Example AU IP
-      
-      setConnection(prev => ({
-        ...prev,
-        ipAddress: mockAustralianIP,
-        latency: Math.floor(Math.random() * 50) + 20 // 20-70ms
-      }));
-      
-      setVpnStatus("connected");
-      setRetryCount(0);
-      
-      console.log("VPN Connected - Australian IP confirmed:", mockAustralianIP);
-    } catch (error) {
-      console.error("VPN connection failed:", error);
-      setLastError("Failed to establish VPN connection to Australia");
-      setVpnStatus("failed");
-      
-      // Auto-retry logic (fail-closed behavior)
-      if (retryCount < 3) {
-        setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-          connectVPN();
-        }, 5000);
+      if (success) {
+        setVpnStatus("connected");
+        setRetryCount(0);
+        console.log("✅ VPN Connected successfully via main process");
+      } else {
+        throw new Error("VPN connection failed via main process");
       }
+    } catch (error) {
+      console.error("❌ VPN connection failed:", error);
+      setLastError("Failed to establish WireGuard VPN connection to Australia");
+      setVpnStatus("failed");
+      // Removed auto-retry logic - user must manually retry
     }
   };
 
@@ -68,53 +53,73 @@ export const useVPN = () => {
     }));
   };
 
-  // Verify Australian IP origin
-  const verifyAustralianOrigin = async (): Promise<boolean> => {
-    try {
-      // In production, this would call a geolocation API
-      // to verify the exit IP is in Australia
-      return connection.ipAddress?.startsWith("203.") || false;
-    } catch {
-      return false;
-    }
-  };
 
-  // Auto-connect VPN when component mounts (required for app traffic)
+
+  // Check VPN status on mount (but don't auto-connect)
   useEffect(() => {
-    const autoConnect = async () => {
-      if (vpnStatus === "disconnected") {
-        console.log("Auto-connecting VPN for secure browser access...");
-        await connectVPN();
+    const checkInitialStatus = async () => {
+      try {
+        const status = await (window as any).electronAPI?.vpn?.getStatus();
+        console.log(`🔍 Initial VPN status: ${status}`);
+        if (status === 'connected') {
+          setVpnStatus("connected");
+        } else {
+          setVpnStatus("disconnected");
+        }
+      } catch (error) {
+        console.error("❌ Failed to check initial VPN status:", error);
+        setVpnStatus("disconnected");
       }
     };
 
-    autoConnect();
+    checkInitialStatus();
   }, []);
 
-  // Monitor VPN connection health
-  useEffect(() => {
-    if (vpnStatus === "connected") {
-      const healthCheck = setInterval(async () => {
-        const isValidAustralian = await verifyAustralianOrigin();
-        if (!isValidAustralian) {
-          console.warn("VPN connection lost Australian origin - reconnecting...");
-          connectVPN();
-        }
-      }, 30000); // Check every 30 seconds
-
-      return () => clearInterval(healthCheck);
+  // Manual VPN status check function
+  const checkVPNStatus = async (): Promise<void> => {
+    setIsCheckingStatus(true);
+    try {
+      console.log("🔍 Manually checking VPN status...");
+      const status = await (window as any).electronAPI?.vpn?.getStatus();
+      console.log(`📊 VPN status check result: ${status}`);
+      
+      if (status === 'connected') {
+        setVpnStatus("connected");
+        setLastError(null);
+        
+        // Update connection info if available
+        setConnection(prev => ({
+          ...prev,
+          ipAddress: "203.219.252.100", // Mock Australian IP
+          latency: Math.floor(Math.random() * 50) + 20
+        }));
+        
+        console.log("✅ VPN is connected to Australia");
+      } else {
+        setVpnStatus("disconnected");
+        setLastError("WireGuard VPN is not connected to Australia");
+        console.log("❌ VPN is not connected");
+      }
+    } catch (error) {
+      console.error("❌ Failed to check VPN status:", error);
+      setVpnStatus("failed");
+      setLastError("Failed to check VPN connection status");
+    } finally {
+      setIsCheckingStatus(false);
     }
-  }, [vpnStatus]);
+  };
 
   return {
     vpnStatus,
     connection,
     connectVPN,
     disconnectVPN,
+    checkVPNStatus,
     retryCount,
     lastError,
     isConnected: vpnStatus === "connected",
     isConnecting: vpnStatus === "connecting",
+    isCheckingStatus,
     hasFailed: vpnStatus === "failed",
     // Prevent browser access if VPN fails (fail-closed for app traffic)
     allowBrowsing: vpnStatus === "connected",

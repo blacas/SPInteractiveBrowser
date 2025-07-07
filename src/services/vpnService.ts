@@ -1,6 +1,3 @@
-import { spawn, ChildProcess } from 'child_process';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { getPlatformInfo } from '../utils/platform';
 
 export interface VPNStatus {
@@ -24,7 +21,6 @@ export interface VPNConfig {
 
 export class VPNService {
   private config: VPNConfig | null = null;
-  private wireguardProcess: ChildProcess | null = null;
   private statusCheckInterval: NodeJS.Timeout | null = null;
   private connectionCallbacks: ((status: VPNStatus) => void)[] = [];
 

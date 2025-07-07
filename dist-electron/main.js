@@ -1,8 +1,9 @@
-import { ipcMain, app, BrowserWindow, session } from "electron";
+import { ipcMain, app, session, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { spawn } from "child_process";
 import { promises } from "fs";
+import { homedir } from "os";
 const detectPlatform = () => {
   if (typeof window !== "undefined") {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -571,8 +572,59 @@ const disconnectWireGuardWindows = async () => {
 };
 const configureSecureSession = () => {
   const defaultSession = session.defaultSession;
+  const enable1PasswordExtension = async () => {
+    try {
+      const extensionPath = await find1PasswordExtension();
+      if (extensionPath) {
+        await defaultSession.loadExtension(extensionPath);
+        console.log("✅ 1Password extension loaded successfully");
+      } else {
+        console.log("📝 1Password extension not found - users can install it manually");
+      }
+    } catch (error) {
+      console.warn("⚠️ Could not load 1Password extension:", error);
+      console.log("📝 Users can install 1Password extension manually from their browser");
+    }
+  };
+  const find1PasswordExtension = async () => {
+    const possiblePaths = [
+      // Chrome/Chromium paths
+      path.join(homedir(), "AppData", "Local", "Google", "Chrome", "User Data", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
+      path.join(homedir(), "Library", "Application Support", "Google", "Chrome", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
+      path.join(homedir(), ".config", "google-chrome", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
+      // Edge paths
+      path.join(homedir(), "AppData", "Local", "Microsoft", "Edge", "User Data", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
+      path.join(homedir(), "Library", "Application Support", "Microsoft Edge", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
+      // Firefox paths (1Password uses different ID)
+      path.join(homedir(), "AppData", "Roaming", "Mozilla", "Firefox", "Profiles"),
+      path.join(homedir(), "Library", "Application Support", "Firefox", "Profiles"),
+      path.join(homedir(), ".mozilla", "firefox")
+    ];
+    for (const basePath of possiblePaths) {
+      try {
+        if (await promises.access(basePath).then(() => true).catch(() => false)) {
+          const entries = await promises.readdir(basePath);
+          const versionFolders = entries.filter((entry) => /^\d+\.\d+\.\d+/.test(entry));
+          if (versionFolders.length > 0) {
+            const latestVersion = versionFolders.sort((a, b) => b.localeCompare(a))[0];
+            const extensionPath = path.join(basePath, latestVersion);
+            const manifestPath = path.join(extensionPath, "manifest.json");
+            if (await promises.access(manifestPath).then(() => true).catch(() => false)) {
+              return extensionPath;
+            }
+          }
+        }
+      } catch (error) {
+      }
+    }
+    return null;
+  };
   defaultSession.webRequest.onBeforeRequest((details, callback) => {
     const url = details.url.toLowerCase();
+    if (url.startsWith("chrome-extension://") || url.startsWith("moz-extension://") || url.startsWith("extension://")) {
+      callback({ cancel: false });
+      return;
+    }
     if (url.startsWith("http://") && !url.includes("localhost") && !url.includes("127.0.0.1")) {
       console.log("🚫 Blocking insecure HTTP request:", details.url);
       callback({ cancel: true });
@@ -589,12 +641,13 @@ const configureSecureSession = () => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        "X-Frame-Options": ["DENY"],
+        "X-Frame-Options": ["SAMEORIGIN"],
+        // Changed from DENY to allow 1Password
         "X-Content-Type-Options": ["nosniff"],
         "Referrer-Policy": ["strict-origin-when-cross-origin"],
         "Permissions-Policy": ["camera=(), microphone=(), geolocation=()"],
         "Content-Security-Policy": [
-          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https:; connect-src 'self' https: wss: data:; img-src 'self' https: data: blob:; font-src 'self' https: data:; media-src 'self' https: data:; frame-src 'self' https:; child-src 'self' https:;"
+          "default-src 'self' chrome-extension: moz-extension: extension:; script-src 'self' 'unsafe-inline' 'unsafe-eval' chrome-extension: moz-extension: extension:; style-src 'self' 'unsafe-inline' https: chrome-extension: moz-extension: extension:; connect-src 'self' https: wss: data: chrome-extension: moz-extension: extension:; img-src 'self' https: data: blob: chrome-extension: moz-extension: extension:; font-src 'self' https: data: chrome-extension: moz-extension: extension:; media-src 'self' https: data: chrome-extension: moz-extension: extension:; frame-src 'self' https: chrome-extension: moz-extension: extension:; child-src 'self' https: chrome-extension: moz-extension: extension:;"
         ]
       }
     });
@@ -607,6 +660,7 @@ const configureSecureSession = () => {
       }
     });
   });
+  setTimeout(enable1PasswordExtension, 1e3);
 };
 function createWindow() {
   win = new BrowserWindow({
@@ -780,9 +834,64 @@ ipcMain.handle("vpn-disconnect", async () => {
     return false;
   }
 });
+const get1PasswordSecret = async (itemId) => {
+  const serviceAccountToken = process.env.OP_SERVICE_ACCOUNT_TOKEN;
+  if (!serviceAccountToken) {
+    throw new Error("1Password Service Account not configured. Set OP_SERVICE_ACCOUNT_TOKEN environment variable.");
+  }
+  try {
+    const response = await fetch(`https://my.1password.com/api/v1/items/${itemId}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${serviceAccountToken}`,
+        "Content-Type": "application/json"
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`1Password Service Account API error: ${response.status} ${response.statusText}`);
+    }
+    const item = await response.json();
+    const secrets = {};
+    if (item.fields) {
+      for (const field of item.fields) {
+        if (field.label && field.value) {
+          switch (field.label.toLowerCase()) {
+            case "username":
+            case "email":
+              secrets.username = field.value;
+              break;
+            case "password":
+              secrets.password = field.value;
+              break;
+            case "tenant_url":
+            case "url":
+            case "website":
+              secrets.tenant_url = field.value;
+              break;
+            case "level1_domains":
+              secrets.level1_domains = field.value;
+              break;
+            case "level2_domains":
+              secrets.level2_domains = field.value;
+              break;
+            case "level3_enabled":
+              secrets.level3_enabled = field.value === "true";
+              break;
+            default:
+              secrets[field.label.toLowerCase().replace(/\s+/g, "_")] = field.value;
+          }
+        }
+      }
+    }
+    return secrets;
+  } catch (error) {
+    throw new Error(`Failed to retrieve 1Password secret: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
 ipcMain.handle("vault-get-sharepoint-credentials", async () => {
   console.log("🔑 SharePoint credentials requested from main process");
   try {
+    const vaultProvider = process.env.VAULT_PROVIDER || "hashicorp";
     if (process.env.NODE_ENV === "development") {
       console.log("🔧 Development mode: returning mock vault credentials");
       return {
@@ -791,11 +900,24 @@ ipcMain.handle("vault-get-sharepoint-credentials", async () => {
         lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
       };
     }
-    return {
-      username: "vault-user@yourcompany.sharepoint.com",
-      password: "vault-retrieved-password",
-      lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
-    };
+    if (vaultProvider === "1password" || vaultProvider === "1password-cli") {
+      console.log("🔐 Using 1Password Service Account for credentials");
+      const itemId = process.env.OP_SHAREPOINT_ITEM_ID || "SharePoint Service Account";
+      const secrets = await get1PasswordSecret(itemId);
+      return {
+        username: secrets.username,
+        password: secrets.password,
+        tenant_url: secrets.tenant_url,
+        lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
+      };
+    } else {
+      console.log(`⚠️ Vault provider ${vaultProvider} not fully implemented`);
+      return {
+        username: "vault-user@yourcompany.sharepoint.com",
+        password: "vault-retrieved-password",
+        lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
+      };
+    }
   } catch (error) {
     console.error("❌ Vault credentials retrieval failed:", error);
     throw new Error(`Vault credentials unavailable: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -814,23 +936,97 @@ ipcMain.handle("vault-rotate-credentials", async () => {
     return false;
   }
 });
-ipcMain.handle("vault-get-status", () => {
+ipcMain.handle("vault-get-status", async () => {
   if (process.env.NODE_ENV === "development") {
     return "connected-dev";
   }
-  return "connected";
+  const vaultProvider = process.env.VAULT_PROVIDER || "hashicorp";
+  try {
+    if (vaultProvider === "1password" || vaultProvider === "1password-cli") {
+      const serviceAccountToken = process.env.OP_SERVICE_ACCOUNT_TOKEN;
+      const itemId = process.env.OP_SHAREPOINT_ITEM_ID;
+      if (!serviceAccountToken) {
+        return "error: 1Password Service Account not configured";
+      }
+      if (!itemId) {
+        return "error: SharePoint Item ID not configured";
+      }
+      const response = await fetch(`https://my.1password.com/api/v1/items/${itemId}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${serviceAccountToken}`,
+          "Content-Type": "application/json"
+        }
+      });
+      if (response.ok) {
+        console.log("✅ 1Password Service Account access verified");
+        return "connected";
+      } else {
+        console.error("❌ 1Password Service Account access failed:", response.status);
+        return "error: Cannot access SharePoint credentials in 1Password";
+      }
+    } else {
+      return "connected";
+    }
+  } catch (error) {
+    console.error("❌ Vault status check failed:", error);
+    return `error: ${error instanceof Error ? error.message : "Unknown error"}`;
+  }
 });
-ipcMain.handle("security-check-url", async (event, url, accessLevel) => {
+ipcMain.handle("security-check-url", async (_event, url, accessLevel) => {
   console.log(`🔒 URL check: ${url} (Level ${accessLevel})`);
   return true;
 });
-ipcMain.handle("security-log-navigation", async (event, url, allowed, accessLevel) => {
+ipcMain.handle("security-log-navigation", async (_event, url, allowed, accessLevel) => {
   console.log(`📝 Navigation log: ${url} - ${allowed ? "ALLOWED" : "BLOCKED"} (Level ${accessLevel})`);
 });
-ipcMain.handle("security-prevent-download", async (event, filename) => {
+ipcMain.handle("security-prevent-download", async (_event, filename) => {
   console.log(`🚫 Download blocked: ${filename}`);
 });
-ipcMain.handle("sharepoint-inject-credentials", async (event, webviewId) => {
+ipcMain.handle("extension-get-1password-status", async () => {
+  try {
+    const extensions = session.defaultSession.getAllExtensions();
+    const onePasswordExtension = extensions.find(
+      (ext) => ext.name.toLowerCase().includes("1password") || ext.id === "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
+    );
+    if (onePasswordExtension) {
+      return {
+        installed: true,
+        version: onePasswordExtension.version,
+        name: onePasswordExtension.name,
+        id: onePasswordExtension.id
+      };
+    } else {
+      return {
+        installed: false,
+        downloadUrl: "https://chromewebstore.google.com/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa",
+        instructions: "Please install the 1Password extension for the best experience"
+      };
+    }
+  } catch (error) {
+    console.error("❌ Error checking 1Password extension status:", error);
+    return {
+      installed: false,
+      error: "Could not check extension status"
+    };
+  }
+});
+ipcMain.handle("extension-install-1password", async () => {
+  console.log("🔧 1Password extension installation requested");
+  return {
+    success: false,
+    message: "Please install 1Password extension manually",
+    steps: [
+      "1. Open Chrome or Edge browser",
+      "2. Go to chrome://extensions/ or edge://extensions/",
+      "3. Enable Developer mode",
+      "4. Install 1Password extension from the web store",
+      "5. Restart the Secure Remote Browser"
+    ],
+    webStoreUrl: "https://chromewebstore.google.com/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa"
+  };
+});
+ipcMain.handle("sharepoint-inject-credentials", async (_event, webviewId) => {
   console.log(`🔐 SharePoint credentials injection requested for: ${webviewId}`);
   return true;
 });
@@ -840,7 +1036,7 @@ ipcMain.handle("sharepoint-get-config", async () => {
     libraryPath: "/sites/documents/Shared Documents"
   };
 });
-ipcMain.handle("sharepoint-validate-access", async (event, url) => {
+ipcMain.handle("sharepoint-validate-access", async (_event, url) => {
   console.log(`🔍 SharePoint access validation: ${url}`);
   return true;
 });
@@ -884,8 +1080,8 @@ app.on("activate", () => {
     createWindow();
   }
 });
-app.on("web-contents-created", (event, contents) => {
-  contents.on("will-navigate", (event2, navigationUrl) => {
+app.on("web-contents-created", (_event, contents) => {
+  contents.on("will-navigate", (event, navigationUrl) => {
     try {
       const parsedUrl = new URL(navigationUrl);
       const allowedOrigins = [
@@ -898,11 +1094,11 @@ app.on("web-contents-created", (event, contents) => {
       );
       if (!isAllowed) {
         console.log("🚫 Blocking web contents navigation to:", navigationUrl);
-        event2.preventDefault();
+        event.preventDefault();
       }
     } catch (error) {
       console.warn("⚠️ Failed to parse navigation URL:", navigationUrl, error);
-      event2.preventDefault();
+      event.preventDefault();
     }
   });
 });

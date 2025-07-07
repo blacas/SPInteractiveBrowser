@@ -55,6 +55,11 @@ electron.contextBridge.exposeInMainWorld("secureBrowser", {
     getEnvironment: () => electron.ipcRenderer.invoke("system-get-environment"),
     isProduction: () => false
     // Will be determined by main process
+  },
+  // Extension Management
+  extensions: {
+    get1PasswordStatus: () => electron.ipcRenderer.invoke("extension-get-1password-status"),
+    install1Password: () => electron.ipcRenderer.invoke("extension-install-1password")
   }
 });
 delete window.module;
