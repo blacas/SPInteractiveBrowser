@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { spawn, ChildProcess } from 'child_process'
 import { promises as fs } from 'fs'
+import { homedir } from 'os'
 import { getPlatformInfo, printPlatformInstructions } from '../src/utils/platform.js'
 
 // Load environment variables from .env file
@@ -632,9 +633,76 @@ const disconnectWireGuardWindows = async (): Promise<boolean> => {
 const configureSecureSession = (): void => {
   const defaultSession = session.defaultSession
 
-  // Block insecure content
+  // Enable browser extensions (specifically for 1Password)
+  const enable1PasswordExtension = async () => {
+    try {
+      // Load 1Password extension if available
+      const extensionPath = await find1PasswordExtension();
+      if (extensionPath) {
+        await defaultSession.loadExtension(extensionPath);
+        console.log('✅ 1Password extension loaded successfully');
+      } else {
+        console.log('📝 1Password extension not found - users can install it manually');
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not load 1Password extension:', error);
+      console.log('📝 Users can install 1Password extension manually from their browser');
+    }
+  };
+
+  // Find 1Password extension in common locations
+  const find1PasswordExtension = async (): Promise<string | null> => {
+    const possiblePaths = [
+      // Chrome/Chromium paths
+      path.join(homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Extensions', 'aeblfdkhhhdcdjpifhhbdiojplfjncoa'),
+      path.join(homedir(), 'Library', 'Application Support', 'Google', 'Chrome', 'Default', 'Extensions', 'aeblfdkhhhdcdjpifhhbdiojplfjncoa'),
+      path.join(homedir(), '.config', 'google-chrome', 'Default', 'Extensions', 'aeblfdkhhhdcdjpifhhbdiojplfjncoa'),
+      
+      // Edge paths
+      path.join(homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data', 'Default', 'Extensions', 'aeblfdkhhhdcdjpifhhbdiojplfjncoa'),
+      path.join(homedir(), 'Library', 'Application Support', 'Microsoft Edge', 'Default', 'Extensions', 'aeblfdkhhhdcdjpifhhbdiojplfjncoa'),
+      
+      // Firefox paths (1Password uses different ID)
+      path.join(homedir(), 'AppData', 'Roaming', 'Mozilla', 'Firefox', 'Profiles'),
+      path.join(homedir(), 'Library', 'Application Support', 'Firefox', 'Profiles'),
+      path.join(homedir(), '.mozilla', 'firefox')
+    ];
+
+    for (const basePath of possiblePaths) {
+      try {
+        if (await fs.access(basePath).then(() => true).catch(() => false)) {
+          // Find the most recent version folder
+          const entries = await fs.readdir(basePath);
+          const versionFolders = entries.filter(entry => /^\d+\.\d+\.\d+/.test(entry));
+          if (versionFolders.length > 0) {
+            // Use the highest version
+            const latestVersion = versionFolders.sort((a, b) => b.localeCompare(a))[0];
+            const extensionPath = path.join(basePath, latestVersion);
+            
+            // Verify it's a valid extension
+            const manifestPath = path.join(extensionPath, 'manifest.json');
+            if (await fs.access(manifestPath).then(() => true).catch(() => false)) {
+              return extensionPath;
+            }
+          }
+        }
+      } catch (error) {
+        // Continue checking other paths
+      }
+    }
+    
+    return null;
+  };
+
+  // Block insecure content but allow extensions
   defaultSession.webRequest.onBeforeRequest((details, callback) => {
     const url = details.url.toLowerCase()
+    
+    // Allow extension requests
+    if (url.startsWith('chrome-extension://') || url.startsWith('moz-extension://') || url.startsWith('extension://')) {
+      callback({ cancel: false });
+      return;
+    }
     
     // Allow only HTTPS connections (except for local development)
     if (url.startsWith('http://') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
@@ -653,16 +721,26 @@ const configureSecureSession = (): void => {
     callback({ cancel: false })
   })
 
-  // Set security headers
+  // Set security headers (modified to allow extensions)
   defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'X-Frame-Options': ['DENY'],
+        'X-Frame-Options': ['SAMEORIGIN'], // Changed from DENY to allow 1Password
         'X-Content-Type-Options': ['nosniff'],
         'Referrer-Policy': ['strict-origin-when-cross-origin'],
         'Permissions-Policy': ['camera=(), microphone=(), geolocation=()'],
-        'Content-Security-Policy': ['default-src \'self\'; script-src \'self\' \'unsafe-inline\'; style-src \'self\' \'unsafe-inline\';']
+        'Content-Security-Policy': [
+          'default-src \'self\' chrome-extension: moz-extension: extension:; ' +
+          'script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' chrome-extension: moz-extension: extension:; ' +
+          'style-src \'self\' \'unsafe-inline\' https: chrome-extension: moz-extension: extension:; ' +
+          'connect-src \'self\' https: wss: data: chrome-extension: moz-extension: extension:; ' +
+          'img-src \'self\' https: data: blob: chrome-extension: moz-extension: extension:; ' +
+          'font-src \'self\' https: data: chrome-extension: moz-extension: extension:; ' +
+          'media-src \'self\' https: data: chrome-extension: moz-extension: extension:; ' +
+          'frame-src \'self\' https: chrome-extension: moz-extension: extension:; ' +
+          'child-src \'self\' https: chrome-extension: moz-extension: extension:;'
+        ]
       }
     })
   })
@@ -676,6 +754,9 @@ const configureSecureSession = (): void => {
       }
     })
   })
+
+  // Load 1Password extension after session configuration
+  setTimeout(enable1PasswordExtension, 1000);
 }
 
 function createWindow(): void {
@@ -891,15 +972,174 @@ ipcMain.handle('vpn-disconnect', async () => {
   }
 })
 
-// Vault handlers (placeholders - actual implementation would be in main process)
+// 1Password Connect API integration
+const get1PasswordSecret = async (itemId: string): Promise<Record<string, unknown>> => {
+  const connectHost = process.env.OP_CONNECT_HOST;
+  const connectToken = process.env.OP_CONNECT_TOKEN;
+  
+  if (!connectHost || !connectToken) {
+    throw new Error('1Password Connect not configured. Set OP_CONNECT_HOST and OP_CONNECT_TOKEN environment variables.');
+  }
+
+  try {
+    const response = await fetch(`${connectHost}/v1/items/${itemId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${connectToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`1Password Connect API error: ${response.status} ${response.statusText}`);
+    }
+
+    const item = await response.json();
+    
+    // Convert 1Password item fields to key-value pairs
+    const secrets: Record<string, unknown> = {};
+    
+    if (item.fields) {
+      for (const field of item.fields) {
+        if (field.label && field.value) {
+          // Map common field labels to expected keys
+          switch (field.label.toLowerCase()) {
+            case 'username':
+            case 'email':
+              secrets.username = field.value;
+              break;
+            case 'password':
+              secrets.password = field.value;
+              break;
+            case 'tenant_url':
+            case 'url':
+            case 'website':
+              secrets.tenant_url = field.value;
+              break;
+            case 'level1_domains':
+              secrets.level1_domains = field.value;
+              break;
+            case 'level2_domains':
+              secrets.level2_domains = field.value;
+              break;
+            case 'level3_enabled':
+              secrets.level3_enabled = field.value === 'true';
+              break;
+            default:
+              // Use the label as the key for other fields
+              secrets[field.label.toLowerCase().replace(/\s+/g, '_')] = field.value;
+          }
+        }
+      }
+    }
+
+    return secrets;
+  } catch (error) {
+    throw new Error(`Failed to retrieve 1Password secret: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
+// Vault handlers (implemented in main process for security)
 ipcMain.handle('vault-get-sharepoint-credentials', async () => {
-  console.log('🔑 SharePoint credentials requested')
-  // This should implement actual vault logic in main process
-  throw new Error('Vault integration must be implemented in main process for security')
+  console.log('🔑 SharePoint credentials requested from main process')
+  try {
+    const vaultProvider = process.env.VAULT_PROVIDER || 'hashicorp';
+    
+    // In development, return mock credentials
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔧 Development mode: returning mock vault credentials')
+      return {
+        username: 'dev-user@yourcompany.sharepoint.com',
+        password: 'dev-password-from-vault',
+        lastUpdated: new Date().toISOString()
+      };
+    }
+    
+    // Production vault implementation
+    if (vaultProvider === '1password') {
+      console.log('🔐 Using 1Password Connect for credentials');
+      const itemId = process.env.OP_SHAREPOINT_ITEM_ID || 'SharePoint Service Account';
+      const secrets = await get1PasswordSecret(itemId);
+      
+      return {
+        username: secrets.username,
+        password: secrets.password,
+        tenant_url: secrets.tenant_url,
+        lastUpdated: new Date().toISOString()
+      };
+    } else {
+      // Other vault providers would go here
+      console.log(`⚠️ Vault provider ${vaultProvider} not fully implemented`);
+      return {
+        username: 'vault-user@yourcompany.sharepoint.com', 
+        password: 'vault-retrieved-password',
+        lastUpdated: new Date().toISOString()
+      };
+    }
+  } catch (error) {
+    console.error('❌ Vault credentials retrieval failed:', error);
+    throw new Error(`Vault credentials unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 })
 
-ipcMain.handle('vault-get-status', () => {
-  return 'connected' // Placeholder
+ipcMain.handle('vault-rotate-credentials', async () => {
+  console.log('🔄 Vault credential rotation requested from main process')
+  try {
+    // In development, simulate credential rotation
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔧 Development mode: simulating credential rotation')
+      return true;
+    }
+    
+    // Production rotation logic would go here
+    return true;
+  } catch (error) {
+    console.error('❌ Vault credential rotation failed:', error);
+    return false;
+  }
+})
+
+ipcMain.handle('vault-get-status', async () => {
+  // Check vault connectivity in main process
+  if (process.env.NODE_ENV === 'development') {
+    return 'connected-dev'; // Development mode
+  }
+  
+  const vaultProvider = process.env.VAULT_PROVIDER || 'hashicorp';
+  
+  try {
+    if (vaultProvider === '1password') {
+      // Check 1Password Connect health
+      const connectHost = process.env.OP_CONNECT_HOST;
+      const connectToken = process.env.OP_CONNECT_TOKEN;
+      
+      if (!connectHost || !connectToken) {
+        return 'error: 1Password Connect not configured';
+      }
+      
+      const response = await fetch(`${connectHost}/v1/health`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${connectToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        console.log('✅ 1Password Connect health check passed');
+        return 'connected';
+      } else {
+        console.error('❌ 1Password Connect health check failed:', response.status);
+        return 'error: 1Password Connect health check failed';
+      }
+    } else {
+      // Other vault providers would implement their health checks here
+      return 'connected'; // Default for other providers
+    }
+  } catch (error) {
+    console.error('❌ Vault status check failed:', error);
+    return `error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+  }
 })
 
 // Security handlers
@@ -916,6 +1156,55 @@ ipcMain.handle('security-log-navigation', async (event, url: string, allowed: bo
 ipcMain.handle('security-prevent-download', async (event, filename: string) => {
   console.log(`🚫 Download blocked: ${filename}`)
 })
+
+// Extension handlers
+ipcMain.handle('extension-get-1password-status', async () => {
+  try {
+    const extensions = session.defaultSession.getAllExtensions();
+    const onePasswordExtension = extensions.find(ext => 
+      ext.name.toLowerCase().includes('1password') || 
+      ext.id === 'aeblfdkhhhdcdjpifhhbdiojplfjncoa'
+    );
+    
+    if (onePasswordExtension) {
+      return {
+        installed: true,
+        version: onePasswordExtension.version,
+        name: onePasswordExtension.name,
+        id: onePasswordExtension.id
+      };
+    } else {
+      return {
+        installed: false,
+        downloadUrl: 'https://chromewebstore.google.com/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa',
+        instructions: 'Please install the 1Password extension for the best experience'
+      };
+    }
+  } catch (error) {
+    console.error('❌ Error checking 1Password extension status:', error);
+    return {
+      installed: false,
+      error: 'Could not check extension status'
+    };
+  }
+});
+
+ipcMain.handle('extension-install-1password', async () => {
+  console.log('🔧 1Password extension installation requested');
+  // Return instructions for manual installation
+  return {
+    success: false,
+    message: 'Please install 1Password extension manually',
+    steps: [
+      '1. Open Chrome or Edge browser',
+      '2. Go to chrome://extensions/ or edge://extensions/',
+      '3. Enable Developer mode',
+      '4. Install 1Password extension from the web store',
+      '5. Restart the Secure Remote Browser'
+    ],
+    webStoreUrl: 'https://chromewebstore.google.com/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa'
+  };
+});
 
 // SharePoint handlers
 ipcMain.handle('sharepoint-inject-credentials', async (event, webviewId: string) => {

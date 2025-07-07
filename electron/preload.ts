@@ -65,6 +65,12 @@ contextBridge.exposeInMainWorld('secureBrowser', {
     getVersion: () => ipcRenderer.invoke('system-get-version'),
     getEnvironment: () => ipcRenderer.invoke('system-get-environment'),
     isProduction: () => false // Will be determined by main process
+  },
+
+  // Extension Management
+  extensions: {
+    get1PasswordStatus: () => ipcRenderer.invoke('extension-get-1password-status'),
+    install1Password: () => ipcRenderer.invoke('extension-install-1password')
   }
 })
 
@@ -115,6 +121,23 @@ export interface SecureBrowserAPI {
     getVersion: () => Promise<string>;
     getEnvironment: () => Promise<string>;
     isProduction: () => boolean;
+  };
+  extensions: {
+    get1PasswordStatus: () => Promise<{
+      installed: boolean;
+      version?: string;
+      name?: string;
+      id?: string;
+      downloadUrl?: string;
+      instructions?: string;
+      error?: string;
+    }>;
+    install1Password: () => Promise<{
+      success: boolean;
+      message: string;
+      steps: string[];
+      webStoreUrl: string;
+    }>;
   };
 }
 
