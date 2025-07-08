@@ -284,10 +284,6 @@ For VPN and Vault provider recommendations based on your infrastructure:
 - **Cost-Effective**: Custom Vault + WireGuard
 - **Azure Native**: Azure KeyVault + ExpressVPN
 
-## 📄 License
-
-[Your License Here]
-
 ---
 
 **🔒 Security Notice**: This application is designed for secure document access. All traffic is routed through Australian VPN endpoints, and documents are never downloaded to local machines. Ensure proper vault and VPN configuration before production deployment.
