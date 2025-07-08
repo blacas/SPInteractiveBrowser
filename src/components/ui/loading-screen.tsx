@@ -44,23 +44,23 @@ const StatusItem: React.FC<StatusItemProps> = ({ icon, label, status, message })
   };
 
   return (
-    <div className="flex items-center space-x-3 p-3 rounded-lg bg-slate-700/50">
-      <div className="flex-shrink-0">
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
+    <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-slate-700/50">
+      <div className="flex items-center space-x-2">
+        <div className="flex-shrink-0">
+          {icon}
+        </div>
         <div className="flex items-center space-x-2">
           <p className={`text-sm font-medium ${getStatusColor()}`}>
             {label}
           </p>
           {getStatusIcon()}
         </div>
-        {message && (
-          <p className="text-xs text-slate-400 mt-1 truncate">
-            {message}
-          </p>
-        )}
       </div>
+      {message && (
+        <p className="text-xs text-slate-400 text-center">
+          {message}
+        </p>
+      )}
     </div>
   );
 };
@@ -98,8 +98,9 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full bg-slate-800 border-slate-700">
+    <div className="min-h-screen bg-slate-900 w-full overflow-auto">
+      <div className="w-full p-4">
+        <Card className="max-w-md mx-auto bg-slate-800 border-slate-700">
         <div className="p-8 text-center space-y-6">
           {/* Header */}
           <div>
@@ -193,7 +194,8 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
             </p>
           </div>
         </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 };

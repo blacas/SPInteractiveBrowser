@@ -1,6 +1,7 @@
-import React from 'react';
-import { AlertTriangle, Shield, RefreshCw, Globe, Wifi } from 'lucide-react';
-import { Button } from './button';
+import React, { useEffect } from "react";
+import { AlertTriangle, Shield, RefreshCw, Globe, Wifi, CheckCircle } from "lucide-react";
+import { Button } from "./button";
+import { toast } from "sonner";
 
 interface VPNConnectionErrorProps {
   onRetry: () => void;
@@ -10,154 +11,226 @@ interface VPNConnectionErrorProps {
   errorDetails?: string;
 }
 
-const VPNConnectionError: React.FC<VPNConnectionErrorProps> = ({ 
-  onRetry, 
+const VPNConnectionError: React.FC<VPNConnectionErrorProps> = ({
+  onRetry,
   onCheckStatus,
-  isRetrying = false, 
+  isRetrying = false,
   isChecking = false,
-  errorDetails 
+  errorDetails,
 }) => {
+  // Only log the error, don't show toast notifications automatically
+  useEffect(() => {
+    const message = "🚫 VPN Connection Required - Secure browsing blocked until VPN is connected";
+    console.log("🔴 VPN Connection Error:", message);
+    // Removed automatic toast - only show when user manually triggered
+  }, []);
+
+  // Only log error details, don't show toast notifications automatically  
+  useEffect(() => {
+    if (errorDetails) {
+      const message = `🔧 Connection Details: ${errorDetails}`;
+      console.log("🔴 VPN Error Details:", message);
+      // Removed automatic toast - only show when user manually triggered
+    }
+  }, [errorDetails]);
+
+  // Show completion toasts for retry and status check operations
+  useEffect(() => {
+    if (isRetrying) {
+      const message = "🔄 VPN connection attempt in progress...";
+      console.log("🔵 VPN Status:", message);
+    }
+  }, [isRetrying]);
+
+  useEffect(() => {
+    if (isChecking) {
+      const message = "🔍 VPN status check in progress...";
+      console.log("🔵 VPN Status:", message);
+    }
+  }, [isChecking]);
+
+  const handleRetry = () => {
+    const message = "🔄 Attempting to connect to Australian VPN...";
+    console.log("🔵 VPN Retry:", message);
+    toast.loading("Connecting to Australian VPN...", {
+      description: "Establishing secure WireGuard connection",
+      duration: 3000,
+    });
+    onRetry();
+  };
+
+  const handleCheckStatus = () => {
+    const message = "🔍 Checking VPN connection status...";
+    console.log("🔵 VPN Status Check:", message);
+    toast.info("Checking VPN Status", {
+      description: "Verifying connection without attempting to reconnect",
+      duration: 2000,
+    });
+    onCheckStatus();
+  };
+
   return (
-    <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="p-8 py-16">
-        <div className="max-w-2xl mx-auto text-center w-full">
-        {/* Icon */}
-        <div className="relative mb-8">
-          <div className="w-32 h-32 mx-auto rounded-full bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-2xl">
-            <Shield className="w-16 h-16 text-white" />
-          </div>
-          <div className="absolute -top-2 -right-2 w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center shadow-lg">
-            <AlertTriangle className="w-6 h-6 text-white" />
-          </div>
-        </div>
-
-        {/* Main Message */}
-        <h1 className="text-4xl font-bold text-slate-800 mb-4">
-          VPN Connection Required
-        </h1>
+    <div className="w-full h-full bg-white min-h-screen overflow-auto">
+      <div className="w-full px-4 py-6">
         
-        <p className="text-xl text-slate-600 mb-6 leading-relaxed">
-          Secure browsing requires an active WireGuard VPN connection to Australia
-        </p>
-
-        {/* Details Box */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-slate-200">
-          <div className="flex items-start gap-4 text-left">
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-              <Globe className="w-6 h-6 text-blue-600" />
+        {/* Critical Issues Header */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
             </div>
+            <h1 className="text-2xl font-bold text-red-600">Critical Issues</h1>
+          </div>
+        </div>
+
+        {/* Main Content Card */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+          
+          {/* Warning Header */}
+          <div className="border-l-4 border-red-500 bg-red-50 p-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-semibold text-red-800 mb-2">
+                  VPN Connection Failed
+                </h2>
+                <p className="text-red-700 text-base leading-relaxed">
+                  Failed to establish VPN connection to Australian servers
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Requirements List */}
+          <div className="p-6 border-b border-gray-100">
+            <ul className="space-y-3">
+              <li className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-red-500 mt-2 flex-shrink-0" />
+                <span className="text-gray-700 font-medium">
+                  VPN connection is required for security compliance
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-red-500 mt-2 flex-shrink-0" />
+                <span className="text-gray-700 font-medium">
+                  All browsing must be routed through Australian servers
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-red-500 mt-2 flex-shrink-0" />
+                <span className="text-gray-700 font-medium">
+                  Check your WireGuard configuration and server status
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-red-500 mt-2 flex-shrink-0" />
+                <span className="text-gray-700 font-medium">
+                  Ensure WireGuard GUI is running and tunnel is active
+                </span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Error Details (if any) */}
+          {errorDetails && (
+            <div className="p-6 border-b border-gray-100">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Wifi className="w-5 h-5 text-gray-600" />
+                  <span className="font-medium text-gray-800">
+                    Connection Details
+                  </span>
+                </div>
+                <p className="text-gray-700 text-sm font-mono bg-white p-3 rounded border">
+                  {errorDetails}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Action Required Section */}
+          <div className="p-6">
+            <div className="bg-blue-50 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <Shield className="w-5 h-5 text-blue-600" />
+                <span className="font-semibold text-blue-800">
+                  Action needed: Connect WireGuard and retry
+                </span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button
+                onClick={handleRetry}
+                disabled={isRetrying}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-3 text-base"
+              >
+                {isRetrying ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Retry Connection
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-5 h-5" />
+                    Retry Connection
+                  </>
+                )}
+              </Button>
+
+              <Button
+                onClick={handleCheckStatus}
+                disabled={isChecking}
+                variant="outline"
+                className="border-gray-300 text-gray-700 hover:bg-gray-50 px-8 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-3 text-base"
+              >
+                {isChecking ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Checking Status...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    Open Settings
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Help Text */}
+            <div className="mt-6 text-center">
+              <p className="text-gray-500 text-sm leading-relaxed max-w-2xl mx-auto">
+                Make sure your WireGuard client is running and connected to the Australian server before retrying. 
+                Check your network connection and VPN configuration if the issue persists.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Instructions */}
+        <div className="mt-4 bg-gray-50 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Globe className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
-              <h3 className="font-semibold text-slate-800 mb-2">Why is this required?</h3>
-              <ul className="text-slate-600 space-y-2 text-sm">
-                <li className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
-                  Your organization requires all browsing to route through Australian servers
-                </li>
-                <li className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
-                  This ensures compliance with data sovereignty requirements
-                </li>
-                <li className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
-                  All traffic is encrypted and secured through the VPN tunnel
-                </li>
-              </ul>
+              <h3 className="font-medium text-gray-800 mb-2">
+                Quick Setup Guide
+              </h3>
+              <ol className="text-gray-600 text-sm space-y-1 list-decimal list-inside">
+                <li>Open WireGuard application</li>
+                <li>Import or activate your Australian server configuration</li>
+                <li>Verify the tunnel shows as "Active" with data transfer</li>
+                <li>Click "Retry Connection" above to continue</li>
+              </ol>
             </div>
           </div>
-        </div>
-
-        {/* Error Details (if any) */}
-        {errorDetails && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-2 mb-2">
-              <Wifi className="w-5 h-5 text-red-600" />
-              <span className="font-medium text-red-800">Connection Details</span>
-            </div>
-            <p className="text-red-700 text-sm font-mono bg-red-100 p-2 rounded">
-              {errorDetails}
-            </p>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Button
-            onClick={onCheckStatus}
-            disabled={isChecking}
-            className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
-          >
-            {isChecking ? (
-              <>
-                <RefreshCw className="w-5 h-5 animate-spin" />
-                Checking...
-              </>
-            ) : (
-              <>
-                <Shield className="w-5 h-5" />
-                Check Connection
-              </>
-            )}
-          </Button>
-
-          <Button
-            onClick={onRetry}
-            disabled={isRetrying}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
-          >
-            {isRetrying ? (
-              <>
-                <RefreshCw className="w-5 h-5 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-5 h-5" />
-                Retry Connection
-              </>
-            )}
-          </Button>
-
-          <Button
-            variant="outline"
-            className="px-8 py-3 rounded-lg font-medium border-slate-300 text-slate-700 hover:bg-slate-50 transition-all duration-200"
-            onClick={() => {
-              // Open help documentation
-              window.open('/docs/wireguard-setup.md', '_blank');
-            }}
-          >
-            Setup Guide
-          </Button>
-        </div>
-
-        {/* Additional Help */}
-        <div className="mt-8 pt-6 border-t border-slate-200">
-          <p className="text-slate-500 text-sm mb-2">
-            Need assistance with VPN setup?
-          </p>
-          <div className="flex flex-wrap justify-center gap-4 text-sm">
-            <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">
-              Contact IT Support
-            </a>
-            <span className="text-slate-300">•</span>
-            <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">
-              WireGuard Documentation
-            </a>
-            <span className="text-slate-300">•</span>
-            <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">
-              Troubleshooting Guide
-            </a>
-          </div>
-        </div>
-
-        {/* Status Indicator */}
-        <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
-          <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-          Waiting for VPN connection to Australia
-        </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default VPNConnectionError; 
+export default VPNConnectionError;

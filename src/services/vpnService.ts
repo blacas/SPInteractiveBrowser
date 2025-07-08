@@ -109,6 +109,11 @@ export class VPNService {
     }
   }
 
+  async isConnected(): Promise<boolean> {
+    const status = await this.getStatus();
+    return status.connected;
+  }
+
   onStatusChange(callback: (status: VPNStatus) => void): void {
     this.connectionCallbacks.push(callback);
   }

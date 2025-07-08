@@ -53,8 +53,8 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   const warnings = errors.filter(error => !error.critical);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full space-y-6">
+    <div className="min-h-screen bg-gray-50 w-full overflow-auto">
+      <div className="w-full p-4 space-y-6">
         {/* Header */}
         <div className="text-center">
           <div className="flex justify-center mb-4">

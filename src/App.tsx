@@ -7,6 +7,7 @@ import { LoginForm } from "@/components/auth/LoginForm";
 import { Dashboard } from "@/components/layout/Dashboard";
 import LoadingScreen from "@/components/ui/loading-screen";
 import ErrorBoundary from "@/components/ui/error-boundary";
+import { Toaster } from "@/components/ui/sonner";
 
 import ErrorDisplay, { ErrorInfo, VPNStatus, EnvironmentStatus } from "@/components/ui/error-display";
 import { EnvironmentValidator } from "@/config/environment";
@@ -17,6 +18,7 @@ function App() {
   return (
     <ErrorBoundary>
       <AppContent />
+      <Toaster />
     </ErrorBoundary>
   );
 }
@@ -135,9 +137,31 @@ function AppContent() {
         setInitStage('vpn');
         setInitProgress(75);
         
-        // Real VPN connection with proper error handling
+        // Real VPN connection with retry logic and proper error handling
         try {
-          const vpnConnected = await vpnService.connect();
+          // First check if VPN is already connected (to avoid unnecessary reconnection attempts)
+          console.log('🔍 Checking existing VPN connection status...');
+          let vpnConnected = await vpnService.isConnected();
+          
+          const maxRetries = 3;
+          
+          if (vpnConnected) {
+            console.log('✅ VPN is already connected, skipping connection attempt');
+          } else {
+            let retryCount = 0;
+            
+            // Try connecting with retries - don't show error immediately
+            while (!vpnConnected && retryCount < maxRetries) {
+              console.log(`🔄 VPN connection attempt ${retryCount + 1}/${maxRetries}...`);
+              vpnConnected = await vpnService.connect();
+              
+              if (!vpnConnected && retryCount < maxRetries - 1) {
+                console.log(`⏳ VPN connection attempt ${retryCount + 1} failed, retrying in 2 seconds...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              }
+              retryCount++;
+            }
+          }
           
           setVpnStatusInfo({
             connected: vpnConnected,
@@ -148,10 +172,12 @@ function AppContent() {
           });
           
           if (!vpnConnected) {
+            // Only show error after all retries failed
+            console.log(`❌ VPN connection failed after ${maxRetries} attempts`);
             setErrors([{
               type: 'vpn',
               title: 'VPN Connection Failed',
-              message: 'Failed to establish VPN connection to Australian servers',
+              message: 'Failed to establish VPN connection to Australian servers after multiple attempts',
               details: [
                 'VPN connection is required for security compliance',
                 'All browsing must be routed through Australian servers',
@@ -212,15 +238,40 @@ function AppContent() {
     initializeServices();
   }, [isLoading]);
 
-  const handleAccessLevelChange = (newLevel: 1 | 2 | 3) => {
+  const handleAccessLevelChange = async (newLevel: 1 | 2 | 3) => {
     if (user) {
-      // Update user access level for MVP testing
-      const updatedUser = { ...user, accessLevel: newLevel };
-      // In a real app, this would make an API call
-      // For MVP, we'll update localStorage
-      localStorage.setItem("auth", JSON.stringify(updatedUser));
-      // Force a page refresh to update the auth state
-      window.location.reload();
+      try {
+        // Show loading state while changing access level
+        setInitStage('vpn');
+        setInitProgress(50);
+        
+        // Update user access level for MVP testing
+        const updatedUser = { ...user, accessLevel: newLevel };
+        // In a real app, this would make an API call
+        // For MVP, we'll update localStorage
+        localStorage.setItem("auth", JSON.stringify(updatedUser));
+        
+        console.log(`🔄 Changing access level to ${newLevel}...`);
+        
+        // Small delay to show loading state
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Update state directly instead of forcing reload
+        setInitStage('ready');
+        setInitProgress(100);
+        
+        // Clear any existing errors
+        setErrors([]);
+        
+        console.log(`✅ Access level changed to ${newLevel} successfully`);
+        
+        // Force re-render by triggering auth state update
+        window.location.reload();
+      } catch (error) {
+        console.error('❌ Failed to change access level:', error);
+        setInitStage('ready');
+        setInitProgress(100);
+      }
     }
   };
 

@@ -20,6 +20,21 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   },
 })
 
+// Modern electronAPI (for useVPN hook compatibility)
+contextBridge.exposeInMainWorld('electronAPI', {
+  vpn: {
+    getStatus: () => ipcRenderer.invoke('vpn-get-status'),
+    connect: (provider: string) => ipcRenderer.invoke('vpn-connect', provider),
+    disconnect: () => ipcRenderer.invoke('vpn-disconnect'),
+    onStatusChange: (callback: (status: string) => void) => {
+      ipcRenderer.on('vpn-status-changed', (_, status) => callback(status))
+    },
+    removeStatusListener: () => {
+      ipcRenderer.removeAllListeners('vpn-status-changed')
+    }
+  }
+})
+
 // Secure API for VPN and Vault operations
 contextBridge.exposeInMainWorld('secureBrowser', {
   // VPN Operations

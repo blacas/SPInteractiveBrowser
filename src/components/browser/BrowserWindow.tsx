@@ -433,9 +433,9 @@ const BrowserWindow: React.FC = () => {
         </div>
 
         {/* Tab Content - Scrollable Area */}
-        <div className="flex-1 relative overflow-hidden">
+        <div className="flex-1">
           {tabs.map((tab) => (
-            <TabsContent key={tab.id} value={tab.id} className="h-full m-0 data-[state=active]:flex data-[state=active]:flex-col overflow-y-auto">
+            <TabsContent key={tab.id} value={tab.id} className="h-full m-0 data-[state=active]:block">
               {!allowBrowsing ? (
                 /* Show VPN Connection Error when VPN is not connected */
                 <VPNConnectionError
@@ -479,6 +479,7 @@ const BrowserWindow: React.FC = () => {
                     height: '100%',
                     border: 'none'
                   }}
+                  partition="persist:main"
                   allowpopups={true}
                   useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 />

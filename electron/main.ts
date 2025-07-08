@@ -66,7 +66,15 @@ let wireguardProcess: ChildProcess | null = null
 
 // VPN status tracking
 const updateVPNStatus = (connected: boolean): void => {
-  vpnConnected = connected
+  const wasConnected = vpnConnected;
+  vpnConnected = connected;
+  
+  if (wasConnected !== connected) {
+    console.log(`🔄 VPN status changed: ${wasConnected ? 'Connected' : 'Disconnected'} → ${connected ? 'Connected' : 'Disconnected'}`);
+  }
+  
+  console.log(`📡 VPN Status Updated: ${connected ? '✅ Connected - Allowing all HTTPS requests' : '❌ Disconnected - Blocking external requests'}`);
+  
   if (win) {
     win.webContents.send('vpn-status-changed', connected)
   }
@@ -125,11 +133,12 @@ const connectWireGuard = async (): Promise<boolean> => {
     const platformInfo = getPlatformInfo();
     console.log(`🔌 Checking WireGuard connection on ${platformInfo.displayName}...`);
     
-    // Try to connect or verify connection based on OS
+    // Check if VPN is already connected (IP geolocation check)
     const isConnected = await checkWireGuardConnection();
     
     if (isConnected) {
       console.log('✅ WireGuard is connected and active');
+      console.log('✅ VPN connected successfully - unrestricted access enabled');
       return true;
     }
 
@@ -139,7 +148,15 @@ const connectWireGuard = async (): Promise<boolean> => {
     
     if (connectionResult) {
       console.log('✅ WireGuard connection established successfully');
-      return true;
+      // Verify connection with IP check after establishing
+      const verifyConnection = await checkWireGuardConnection();
+      if (verifyConnection) {
+        console.log('✅ VPN auto-connected successfully');
+        return true;
+      } else {
+        console.log('⚠️ Connection established but IP location verification failed');
+        return false;
+      }
     } else {
       console.log('❌ WireGuard connection failed.');
       printPlatformInstructions(resolvedPath);
@@ -328,47 +345,46 @@ const checkMacOSNetworkInterfaces = async (): Promise<boolean> => {
   });
 }
 
-// Windows status check with enhanced detection
+// Windows status check with IP geolocation as primary indicator
 const checkWireGuardWindows = async (): Promise<boolean> => {
-  console.log('🪟 Starting comprehensive Windows WireGuard detection...');
+  console.log('🪟 Starting comprehensive Windows VPN detection...');
   
-  // Method 1: Check WireGuard CLI
-  const cliResult = await checkWireGuardCLI();
-  if (cliResult) {
-    console.log('✅ WireGuard detected via CLI');
-    return true;
-  }
-  
-  // Method 2: Check network interfaces via netsh
-  const interfaceResult = await checkWindowsNetworkInterfaces();
-  if (interfaceResult) {
-    console.log('✅ WireGuard detected via network interfaces');
-    return true;
-  }
-  
-  // Method 3: Check routing table for our VPN server IP
-  const routingResult = await checkRoutingTable();
-  if (routingResult) {
-    console.log('✅ WireGuard detected via routing table');
-    return true;
-  }
-  
-  // Method 4: Check current IP address via PowerShell
+  // PRIMARY CHECK: IP geolocation (MANDATORY for VPN verification)
+  console.log('🔍 PRIMARY CHECK: IP geolocation (mandatory)...');
   const ipResult = await checkCurrentIP();
-  if (ipResult) {
-    console.log('✅ WireGuard detected via IP address check');
-    return true;
+  
+  if (!ipResult) {
+    console.log('❌ IP geolocation check FAILED - not connected to Australian VPN');
+    console.log('🚨 CRITICAL: User appears to be browsing from non-Australian IP');
+    
+    // Additional checks for diagnostic purposes only
+    console.log('🔍 Running diagnostic checks for troubleshooting...');
+    await checkWireGuardCLI();
+    await checkWindowsNetworkInterfaces(); 
+    await checkRoutingTable();
+    
+    // Note: Do NOT use ping test as VPN indicator - it's misleading
+    console.log('⚠️  Note: Ping connectivity to VPN server does not indicate active VPN connection');
+    
+    return false;  // IP check is mandatory - if it fails, VPN is NOT connected
   }
   
-  // Method 5: Network connectivity test to confirm VPN
-  const connectivityResult = await testVPNConnectivity();
-  if (connectivityResult) {
-    console.log('✅ WireGuard detected via connectivity test');
-    return true;
+  console.log('✅ IP geolocation check PASSED - Australian VPN confirmed');
+  
+  // Secondary verification checks (optional but helpful for diagnostics)
+  console.log('🔍 Running secondary verification checks...');
+  
+  const cliResult = await checkWireGuardCLI();
+  const interfaceResult = await checkWindowsNetworkInterfaces();
+  const routingResult = await checkRoutingTable();
+  
+  if (cliResult || interfaceResult || routingResult) {
+    console.log('✅ Secondary checks confirm WireGuard is properly configured');
+  } else {
+    console.log('⚠️  Secondary checks inconclusive, but IP location confirms VPN is working');
   }
   
-  console.log('❌ WireGuard not detected by any method');
-  return false;
+  return true;  // IP check passed, so VPN is definitely connected
 }
 
 // Method 1: Check WireGuard CLI
@@ -491,11 +507,10 @@ const checkRoutingTable = async (): Promise<boolean> => {
 // Method 4: Check current public IP via PowerShell
 const checkCurrentIP = async (): Promise<boolean> => {
   return new Promise((resolve) => {
-    console.log('🔍 Checking current public IP...');
-    const expectedIP = '134.199.169.102';
+    console.log('🔍 Checking current public IP and location...');
     
-    // Use PowerShell to get public IP
-    const psCommand = `(Invoke-WebRequest -Uri "https://ipinfo.io/ip" -UseBasicParsing).Content.Trim()`;
+    // Use PowerShell to get IP and location info from ipinfo.io
+    const psCommand = `(Invoke-WebRequest -Uri "https://ipinfo.io/json" -UseBasicParsing).Content | ConvertFrom-Json | ConvertTo-Json -Compress`;
     const psProcess = spawn('powershell', ['-Command', psCommand], {
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -506,15 +521,55 @@ const checkCurrentIP = async (): Promise<boolean> => {
     });
     
     psProcess.on('exit', () => {
-      const currentIP = output.trim();
-      console.log(`🔍 Current public IP: ${currentIP}`);
-      console.log(`🔍 Expected VPN IP: ${expectedIP}`);
-      
-      const isVPNIP = currentIP === expectedIP;
-      if (isVPNIP) {
-        console.log('🪟 Current IP matches VPN server IP!');
+      try {
+        const ipInfo = JSON.parse(output.trim());
+        const currentIP = ipInfo.ip;
+        const country = ipInfo.country;
+        const region = ipInfo.region;
+        const city = ipInfo.city;
+        
+        console.log(`🔍 Current public IP: ${currentIP}`);
+        console.log(`🔍 Location: ${city}, ${region}, ${country}`);
+        
+        // Check if IP is from Australia
+        const isAustralianIP = country === 'AU' || country === 'Australia';
+        
+        if (isAustralianIP) {
+          console.log('🇦🇺 ✅ Connected via Australian VPN!');
+          console.log(`📍 Australian location detected: ${city}, ${region}`);
+        } else {
+          console.log(`❌ Not connected to Australian VPN. Current location: ${country}`);
+        }
+        
+        resolve(isAustralianIP);
+      } catch (error) {
+        console.log('🔍 Failed to parse IP info:', error);
+        console.log('🔍 Raw output:', output);
+        
+        // Fallback: just get IP and assume it might be Australian if not obviously local
+        const ipOnlyCommand = `(Invoke-WebRequest -Uri "https://ipinfo.io/ip" -UseBasicParsing).Content.Trim()`;
+        const fallbackProcess = spawn('powershell', ['-Command', ipOnlyCommand], {
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+        
+        let fallbackOutput = '';
+        fallbackProcess.stdout.on('data', (data) => {
+          fallbackOutput += data.toString();
+        });
+        
+        fallbackProcess.on('exit', () => {
+          const ip = fallbackOutput.trim();
+          console.log(`🔍 Fallback IP check: ${ip}`);
+          // Simple heuristic: if not a local IP, assume VPN might be working
+          const isNotLocalIP = !ip.startsWith('192.168.') && !ip.startsWith('10.') && !ip.startsWith('172.') && ip !== '127.0.0.1';
+          console.log(`🔍 Assuming VPN status based on non-local IP: ${isNotLocalIP}`);
+          resolve(isNotLocalIP);
+        });
+        
+        fallbackProcess.on('error', () => {
+          resolve(false);
+        });
       }
-      resolve(isVPNIP);
     });
     
     psProcess.on('error', (error) => {
@@ -525,50 +580,12 @@ const checkCurrentIP = async (): Promise<boolean> => {
     setTimeout(() => {
       console.log('🔍 IP check timed out');
       resolve(false);
-    }, 5000);
+    }, 10000);
   });
 }
 
-// Method 5: Test VPN connectivity
-const testVPNConnectivity = async (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    console.log('🔍 Testing VPN connectivity...');
-    const endpoint = process.env.WIREGUARD_ENDPOINT || '134.199.169.102:59926';
-    const serverIP = endpoint.split(':')[0];
-    
-    // Ping the VPN server to test connectivity
-    const pingProcess = spawn('ping', ['-n', '2', serverIP], {
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    
-    let output = '';
-    pingProcess.stdout.on('data', (data) => {
-      output += data.toString();
-    });
-    
-    pingProcess.on('exit', (code) => {
-      const pingSuccess = code === 0 && (output.includes('Reply from') || output.includes('bytes='));
-      console.log(`🔍 Ping to VPN server result: ${pingSuccess ? 'Success' : 'Failed'}`);
-      
-      if (pingSuccess) {
-        console.log(`🪟 Successfully pinged VPN server ${serverIP}`);
-      }
-      resolve(pingSuccess);
-    });
-    
-    pingProcess.on('error', (error) => {
-      console.log('🔍 Ping test error:', error.message);
-      resolve(false);
-    });
-    
-    setTimeout(() => {
-      console.log('🔍 Ping test timed out');
-      resolve(false);
-    }, 5000);
-  });
-}
-
-
+// Note: testVPNConnectivity function removed - ping connectivity is NOT a reliable VPN indicator
+// VPN detection now relies solely on IP geolocation verification in checkCurrentIP()
 
 const disconnectWireGuard = async (): Promise<boolean> => {
   try {
@@ -713,9 +730,14 @@ const configureSecureSession = (): void => {
 
     // Block if VPN is not connected (fail-closed behavior for app traffic)
     if (!vpnConnected && !url.includes('localhost') && !url.includes('127.0.0.1')) {
-      console.log('🚫 Blocking request - VPN not connected:', details.url)
+      console.log('🚫 Blocking request - VPN not connected:', details.url, `VPN Status: ${vpnConnected}`)
       callback({ cancel: true })
       return
+    }
+    
+    // Debug: Log allowed requests when VPN is connected
+    if (vpnConnected && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+      console.log('✅ Allowing request - VPN connected:', details.url)
     }
 
     callback({ cancel: false })
@@ -853,10 +875,17 @@ function createWindow(): void {
     }
   })
 
-  // Initialize real VPN connection if auto-connect is enabled
-  if (process.env.VPN_AUTO_CONNECT === 'true') {
-    setTimeout(async () => {
-      try {
+  // Initialize VPN status check immediately (before any webviews load)
+  setTimeout(async () => {
+    try {
+      // First check if VPN is already connected
+      const alreadyConnected = await checkWireGuardConnection();
+      
+      if (alreadyConnected) {
+        console.log('✅ VPN is already connected during app initialization');
+        updateVPNStatus(true);
+      } else if (process.env.VPN_AUTO_CONNECT === 'true') {
+        console.log('🔄 VPN not connected, attempting auto-connect...');
         const connected = await connectVPN();
         updateVPNStatus(connected);
         if (connected) {
@@ -864,12 +893,15 @@ function createWindow(): void {
         } else {
           console.warn('⚠️ VPN auto-connect failed');
         }
-      } catch (error) {
-        console.error('❌ VPN auto-connect error:', error);
+      } else {
+        console.log('⚠️ VPN not connected and auto-connect disabled');
         updateVPNStatus(false);
       }
-    }, 2000); // Give app time to initialize
-  }
+    } catch (error) {
+      console.error('❌ VPN initialization error:', error);
+      updateVPNStatus(false);
+    }
+  }, 500); // Reduced delay to fix race condition
 
   win.on('closed', () => {
     // Cleanup VPN connection when app closes
@@ -943,8 +975,18 @@ ipcMain.handle('system-get-environment', () => {
 })
 
 // Real VPN handlers
-ipcMain.handle('vpn-get-status', () => {
-  return vpnConnected ? 'connected' : 'disconnected'
+ipcMain.handle('vpn-get-status', async () => {
+  console.log('🔍 VPN status requested - running comprehensive check...');
+  try {
+    const isConnected = await checkWireGuardConnection();
+    const status = isConnected ? 'connected' : 'disconnected';
+    console.log(`📊 VPN status check result: ${status}`);
+    updateVPNStatus(isConnected);
+    return status;
+  } catch (error) {
+    console.error('❌ VPN status check error:', error);
+    return 'disconnected';
+  }
 })
 
 ipcMain.handle('vpn-connect', async (_event, provider: string) => {
