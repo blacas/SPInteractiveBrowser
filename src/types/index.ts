@@ -82,6 +82,7 @@ interface HTMLWebViewElement extends HTMLElement {
   allowpopups?: string;
   useragent?: string;
   partition?: string;
+  webpreferences?: string;
   canGoBack(): boolean;
   canGoForward(): boolean;
   goBack(): void;

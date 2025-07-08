@@ -406,17 +406,15 @@ const BrowserWindow: React.FC = () => {
                     ) : tab.title}
                   </span>
                   {tabs.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-5 w-5 p-0 hover:bg-red-100 hover:text-red-600 rounded-full transition-all duration-200"
+                    <span
+                      className="h-5 w-5 flex items-center justify-center hover:bg-red-100 hover:text-red-600 rounded-full transition-all duration-200 cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
                         closeTab(tab.id);
                       }}
                     >
                       <X className="h-3 w-3" />
-                    </Button>
+                    </span>
                   )}
                 </TabsTrigger>
               </div>
@@ -481,6 +479,7 @@ const BrowserWindow: React.FC = () => {
                   }}
                   partition="persist:main"
                   allowpopups={true}
+                  webpreferences="javascript=yes,plugins=yes,webSecurity=yes"
                   useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 />
               )}

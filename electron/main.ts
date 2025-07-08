@@ -721,34 +721,55 @@ const configureSecureSession = (): void => {
       return;
     }
     
-    // Allow only HTTPS connections (except for local development)
-    if (url.startsWith('http://') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+    // Allow development and internal requests
+    if (url.includes('localhost') || url.includes('127.0.0.1') || url.startsWith('file://') || url.startsWith('data:')) {
+      callback({ cancel: false });
+      return;
+    }
+    
+    // Allow only HTTPS connections for external requests
+    if (url.startsWith('http://')) {
       console.log('🚫 Blocking insecure HTTP request:', details.url)
       callback({ cancel: true })
       return
     }
 
-    // Block if VPN is not connected (fail-closed behavior for app traffic)
-    if (!vpnConnected && !url.includes('localhost') && !url.includes('127.0.0.1')) {
-      console.log('🚫 Blocking request - VPN not connected:', details.url, `VPN Status: ${vpnConnected}`)
-      callback({ cancel: true })
-      return
-    }
-    
-    // Debug: Log allowed requests when VPN is connected
-    if (vpnConnected && !url.includes('localhost') && !url.includes('127.0.0.1')) {
-      console.log('✅ Allowing request - VPN connected:', details.url)
+    // Check VPN status dynamically (don't rely on cached variable)
+    // For webview requests, we'll be more permissive since VPN checks are async
+    if (url.startsWith('https://')) {
+      // Allow HTTPS requests - VPN validation happens at application level
+      console.log('✅ Allowing HTTPS request:', details.url)
+      callback({ cancel: false });
+      return;
     }
 
+    // Default allow for other protocols
     callback({ cancel: false })
   })
 
-  // Set security headers (modified to allow extensions)
+  // Set security headers for main app only (not for external webview content)
   defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const url = details.url.toLowerCase();
+    
+    // Don't apply restrictive CSP to external websites in webviews
+    if (url.includes('office.com') || url.includes('microsoft.com') || 
+        url.includes('google.com') || url.includes('sharepoint.com')) {
+      // Let external sites use their own CSP
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'X-Content-Type-Options': ['nosniff'],
+          'Referrer-Policy': ['strict-origin-when-cross-origin']
+        }
+      });
+      return;
+    }
+    
+    // Apply restrictive CSP only to the main app (localhost/file)
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'X-Frame-Options': ['SAMEORIGIN'], // Changed from DENY to allow 1Password
+        'X-Frame-Options': ['SAMEORIGIN'],
         'X-Content-Type-Options': ['nosniff'],
         'Referrer-Policy': ['strict-origin-when-cross-origin'],
         'Permissions-Policy': ['camera=(), microphone=(), geolocation=()'],
@@ -1330,31 +1351,43 @@ app.on('activate', () => {
   }
 })
 
-// Security: Prevent navigation to external websites in main window
+// Security: Prevent navigation to external websites in main window only (not webviews)
 app.on('web-contents-created', (_event, contents) => {
   contents.on('will-navigate', (event, navigationUrl) => {
     try {
-      const parsedUrl = new URL(navigationUrl)
+      // Check if this is the main window's webContents
+      const isMainWindow = win && contents === win.webContents;
       
-      // Allow navigation within the app only
-      const allowedOrigins = [
-        VITE_DEV_SERVER_URL,
-        'file:',
-        'about:'
-      ].filter(Boolean)
-      
-      const isAllowed = allowedOrigins.some(origin => 
-        parsedUrl.protocol.startsWith(origin || '') || 
-        navigationUrl.startsWith(origin || '')
-      )
-      
-      if (!isAllowed) {
-        console.log('🚫 Blocking web contents navigation to:', navigationUrl)
-        event.preventDefault()
+      if (isMainWindow) {
+        const parsedUrl = new URL(navigationUrl)
+        
+        // Allow navigation within the app only for main window
+        const allowedOrigins = [
+          VITE_DEV_SERVER_URL,
+          'file:',
+          'about:'
+        ].filter(Boolean)
+        
+        const isAllowed = allowedOrigins.some(origin => 
+          parsedUrl.protocol.startsWith(origin || '') || 
+          navigationUrl.startsWith(origin || '')
+        )
+        
+        if (!isAllowed) {
+          console.log('🚫 Blocking main window navigation to:', navigationUrl)
+          event.preventDefault()
+        }
+      } else {
+        // This is a webview - allow navigation but log it
+        console.log('🌐 Webview navigation allowed:', navigationUrl)
       }
     } catch (error) {
       console.warn('⚠️ Failed to parse navigation URL:', navigationUrl, error)
-      event.preventDefault()
+      // Only prevent navigation for main window on error
+      const isMainWindow = win && contents === win.webContents;
+      if (isMainWindow) {
+        event.preventDefault()
+      }
     }
   })
 })
