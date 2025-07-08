@@ -1,0 +1,20 @@
+Subject: Location Change Explanation for Project: AussieVaultBrowser
+
+Dear Upwork Support Team,
+
+I hope this message finds you well.
+
+I wanted to proactively inform you about a location-related change you might notice on my account activity. I am currently working on a project titled "Electron/Node.js Developer for Secure Remote-Browser App", which is listed on Upwork here: https://www.upwork.com/jobs/~021930176243923539068.
+
+As part of the project requirements, I need to connect through an Australian VPN to develop and test features tied specifically to Australian networks. This is essential for the application's functionality, which includes secure browser access, integration with SharePoint, and region-specific network behavior.
+
+As a result, my connection may appear to originate from Australia during work hours. Please note that this VPN usage is strictly project-related, and I remain compliant with Upwork’s terms of service.
+
+I wanted to clarify this in advance to avoid any concerns or potential flags on my account due to the detected change in location.
+
+Thank you for your understanding and continued support. Please let me know if you need any additional information.
+
+Best regards,
+[Your Full Name]
+[Your Upwork Profile Link]
+

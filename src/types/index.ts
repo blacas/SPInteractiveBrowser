@@ -14,11 +14,33 @@ export interface BrowserTab {
   isLoading: boolean;
 }
 
-export type VPNStatus = "connected" | "connecting" | "disconnected";
+export type VPNStatus = "connected" | "connecting" | "disconnected" | "failed";
 
 export interface AuthCredentials {
   email: string;
   password: string;
+}
+
+// Vault-managed SharePoint credentials (shared)
+export interface VaultCredentials {
+  sharepointUsername: string;
+  sharepointPassword: string;
+  lastUpdated: Date;
+  vaultProvider: 'hashicorp' | 'aws-secrets' | '1password' | 'azure-keyvault' | '1password-cli';
+}
+
+export interface SharePointConfig {
+  tenantUrl: string;
+  libraryPath: string;
+  allowedFileTypes: string[];
+  credentials: VaultCredentials;
+}
+
+export interface VPNConfig {
+  provider: 'nordlayer' | 'expressvpn' | 'wireguard';
+  australianEndpoint: string;
+  failClosed: boolean; // Block access if VPN fails
+  retryAttempts: number;
 }
 
 export interface NavigationAttempt {
@@ -26,6 +48,7 @@ export interface NavigationAttempt {
   timestamp: Date;
   allowed: boolean;
   accessLevel: number;
+  vpnActive: boolean;
 }
 
 export interface SecuritySettings {
@@ -33,6 +56,8 @@ export interface SecuritySettings {
   allowedDomains: string[];
   blockedDomains: string[];
   sessionTimeout: number;
+  preventLocalDownloads: boolean;
+  sharepointOnly: boolean;
 }
 
 export interface AccessLevelConfig {
@@ -42,6 +67,7 @@ export interface AccessLevelConfig {
   color: string;
   allowedDomains: string[];
   restrictions: string[];
+  sharepointAccess: boolean;
 }
 
 // Electron webview type definitions
@@ -55,9 +81,12 @@ interface HTMLWebViewElement extends HTMLElement {
   src: string;
   allowpopups?: string;
   useragent?: string;
+  partition?: string;
+  webpreferences?: string;
   canGoBack(): boolean;
   canGoForward(): boolean;
   goBack(): void;
   goForward(): void;
   reload(): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject): void;
 } 
