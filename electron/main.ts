@@ -5,6 +5,12 @@ import { spawn, ChildProcess } from 'child_process'
 import { promises as fs } from 'fs'
 import { homedir } from 'os'
 import { getPlatformInfo, printPlatformInstructions } from '../src/utils/platform.js'
+import electronSquirrelStartup from 'electron-squirrel-startup'
+
+// Handle Squirrel.Windows events
+if (electronSquirrelStartup) {
+  app.quit()
+}
 
 // Load environment variables from .env file
 const loadEnvironmentVariables = async (): Promise<void> => {
