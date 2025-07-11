@@ -12,7 +12,8 @@ import {
   Shield,
   AlertTriangle,
   Lock,
-  Globe
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useVPN } from '@/hooks/useVPN';
@@ -224,6 +225,73 @@ const BrowserWindow: React.FC = () => {
     }
   };
 
+  const createNewWindow = async () => {
+    if (!allowBrowsing) {
+      alert(`VPN connection required. Cannot create new window until Australian VPN connection is established. Status: ${vpnStatus}`);
+      return;
+    }
+
+    try {
+      const result = await window.secureBrowser.window.createNew();
+      if (result.success) {
+        console.log('✅ New browser window created successfully:', result.windowId);
+      } else {
+        console.error('❌ Failed to create new window:', result.error);
+        alert(`Failed to create new window: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('❌ Error creating new window:', error);
+      alert('Failed to create new window. Please try again.');
+    }
+  };
+
+  const handleContextMenu = (event: React.MouseEvent) => {
+    event.preventDefault();
+    
+    const params = {
+      x: event.clientX,
+      y: event.clientY
+    };
+
+    window.secureBrowser.contextMenu.show(params);
+  };
+
+  useEffect(() => {
+    const handleContextMenuAction = (action: string) => {
+      switch (action) {
+        case 'new-tab':
+          createNewTab();
+          break;
+        case 'new-window':
+          createNewWindow();
+          break;
+        case 'reload':
+          reload();
+          break;
+        case 'go-back':
+          goBack();
+          break;
+        case 'go-forward':
+          goForward();
+          break;
+        case 'go-home':
+          goHome();
+          break;
+        case 'reconnect-vpn':
+          connectVPN();
+          break;
+        default:
+          console.log('Unknown context menu action:', action);
+      }
+    };
+
+    window.secureBrowser.contextMenu.onAction(handleContextMenuAction);
+
+    return () => {
+      window.secureBrowser.contextMenu.removeActionListener();
+    };
+  }, [createNewTab, createNewWindow, reload, goBack, goForward, goHome, connectVPN]);
+
   // Webview event handlers
   // Auto-inject SharePoint credentials when navigating to SharePoint
   useEffect(() => {
@@ -304,7 +372,10 @@ const BrowserWindow: React.FC = () => {
   const config = getAccessLevelConfig();
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div 
+      className="flex flex-col h-full bg-white"
+      onContextMenu={handleContextMenu}
+    >
       {/* Browser Controls - Fixed/Sticky */}
       <div className="flex items-center gap-3 p-3 border-b bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg flex-shrink-0">
         <div className="flex items-center gap-0.5 bg-slate-700/50 rounded-lg p-1">
@@ -337,6 +408,16 @@ const BrowserWindow: React.FC = () => {
             <Home className="h-4 w-4" />
           </Button>
         </div>
+
+        <Button 
+          variant="outline" 
+          onClick={createNewWindow}
+          className="h-8 px-3 text-slate-300 hover:text-white hover:bg-slate-700 border-slate-600 hover:border-slate-500 transition-all duration-200 bg-slate-800/50"
+          title="Open New Browser Window"
+        >
+          <ExternalLink className="h-4 w-4 mr-2" />
+          New Window
+        </Button>
         
         <SearchBar
           value={urlInput}

@@ -30,7 +30,7 @@ export const useAuth = () => {
       // Mock user data based on email for demo purposes
       const mockUser: User = {
         id: "user-123",
-        name: credentials.email.includes("admin") ? "Admin User" : "John Doe",
+        name: credentials.email.includes("admin") ? "Admin User" : extractNameFromEmail(credentials.email),
         email: credentials.email,
         accessLevel: credentials.email.includes("admin") ? 3 : 
                     credentials.email.includes("manager") ? 2 : 1,
@@ -59,13 +59,44 @@ export const useAuth = () => {
     localStorage.removeItem("auth");
   };
 
+  // Extract name from email (shared function)
+  const extractNameFromEmail = (email: string): string => {
+    const username = email.split('@')[0];
+    
+    // Handle common separators in email usernames
+    const nameParts = username.split(/[._-]/).filter(part => part.length > 0);
+    
+    // Capitalize each part and join with space
+    const formattedName = nameParts.map(part => 
+      part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+    ).join(' ');
+    
+    // If it's a single part or short, add "User" suffix
+    if (formattedName.length < 4 || !formattedName.includes(' ')) {
+      return formattedName + ' User';
+    }
+    
+    return formattedName;
+  };
+
   const checkAuthStatus = () => {
     const storedAuth = localStorage.getItem("auth");
     if (storedAuth) {
       try {
         const user = JSON.parse(storedAuth);
+        
+        // Migration: Update old hardcoded names with email-based names
+        let updatedUser = { ...user };
+        if (user.name === "John Doe" || user.name === "Admin User") {
+          updatedUser.name = user.email.includes("admin") ? "Admin User" : extractNameFromEmail(user.email);
+          
+          // Update localStorage with new name
+          localStorage.setItem("auth", JSON.stringify(updatedUser));
+          console.log(`🔄 Updated cached user name from "${user.name}" to "${updatedUser.name}"`);
+        }
+        
         setAuthState({
-          user,
+          user: updatedUser,
           isLoading: false,
           isAuthenticated: true,
         });

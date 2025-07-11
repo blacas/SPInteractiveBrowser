@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, ipcMain } from 'electron'
+import { app, BrowserWindow, session, ipcMain, Menu } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { spawn, ChildProcess } from 'child_process'
@@ -66,7 +66,8 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
-let win: BrowserWindow | null = null
+let windows: BrowserWindow[] = []
+let mainWindow: BrowserWindow | null = null
 let vpnConnected = false
 let wireguardProcess: ChildProcess | null = null
 
@@ -81,9 +82,12 @@ const updateVPNStatus = (connected: boolean): void => {
   
   console.log(`📡 VPN Status Updated: ${connected ? '✅ Connected - Allowing all HTTPS requests' : '❌ Disconnected - Blocking external requests'}`);
   
-  if (win) {
-    win.webContents.send('vpn-status-changed', connected)
-  }
+  // Send VPN status to all windows
+  windows.forEach(window => {
+    if (window && !window.isDestroyed()) {
+      window.webContents.send('vpn-status-changed', connected)
+    }
+  })
 }
 
 // Real WireGuard VPN functions
@@ -808,8 +812,8 @@ const configureSecureSession = (): void => {
   setTimeout(enable1PasswordExtension, 1000);
 }
 
-function createWindow(): void {
-  win = new BrowserWindow({
+function createBrowserWindow(isMain: boolean = false): BrowserWindow {
+  const newWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1200,
@@ -853,13 +857,13 @@ function createWindow(): void {
     },
   })
 
-  // Security: Prevent new window creation
-  win.webContents.setWindowOpenHandler(() => {
+  // Security: Prevent new window creation from webcontents
+  newWindow.webContents.setWindowOpenHandler(() => {
     return { action: 'deny' }
   })
 
-  // Security: Handle navigation attempts in main window
-  win.webContents.on('will-navigate', (event, navigationUrl) => {
+  // Security: Handle navigation attempts in window
+  newWindow.webContents.on('will-navigate', (event, navigationUrl) => {
     // Only allow navigation within the app
     const allowedOrigins = [
       VITE_DEV_SERVER_URL,
@@ -872,76 +876,101 @@ function createWindow(): void {
     )
     
     if (!isAllowed) {
-      console.log('🚫 Blocking main window navigation to:', navigationUrl)
+      console.log('🚫 Blocking window navigation to:', navigationUrl)
       event.preventDefault()
     }
   })
 
   // Security: Prevent downloads (files should not touch local machine)
-  win.webContents.session.on('will-download', (event, item) => {
+  newWindow.webContents.session.on('will-download', (event, item) => {
     console.log('🚫 Blocking download attempt:', item.getFilename())
     event.preventDefault()
   })
 
   // Load the app
   if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL)
+    newWindow.loadURL(VITE_DEV_SERVER_URL)
     // Open DevTools only in development
     if (process.env.NODE_ENV === 'development') {
-      win.webContents.openDevTools()
+      newWindow.webContents.openDevTools()
     }
   } else {
-    win.loadFile(path.join(RENDERER_DIST, 'index.html'))
+    newWindow.loadFile(path.join(RENDERER_DIST, 'index.html'))
   }
 
   // Show window when ready
-  win.once('ready-to-show', () => {
-    if (win) {
-      win.show()
-      win.focus()
-    }
+  newWindow.once('ready-to-show', () => {
+    newWindow.show()
+    newWindow.focus()
   })
 
-  // Initialize VPN status check immediately (before any webviews load)
-  setTimeout(async () => {
-    try {
-      // First check if VPN is already connected
-      const alreadyConnected = await checkWireGuardConnection();
-      
-      if (alreadyConnected) {
-        console.log('✅ VPN is already connected during app initialization');
-        updateVPNStatus(true);
-      } else if (process.env.VPN_AUTO_CONNECT === 'true') {
-        console.log('🔄 VPN not connected, attempting auto-connect...');
-        const connected = await connectVPN();
-        updateVPNStatus(connected);
-        if (connected) {
-          console.log('✅ VPN auto-connected successfully');
+  // Add to windows array
+  windows.push(newWindow)
+  
+  // Set as main window if this is the first window
+  if (isMain || !mainWindow) {
+    mainWindow = newWindow
+    
+    // Initialize VPN status check only for main window
+    setTimeout(async () => {
+      try {
+        // First check if VPN is already connected
+        const alreadyConnected = await checkWireGuardConnection();
+        
+        if (alreadyConnected) {
+          console.log('✅ VPN is already connected during app initialization');
+          updateVPNStatus(true);
+        } else if (process.env.VPN_AUTO_CONNECT === 'true') {
+          console.log('🔄 VPN not connected, attempting auto-connect...');
+          const connected = await connectVPN();
+          updateVPNStatus(connected);
+          if (connected) {
+            console.log('✅ VPN auto-connected successfully');
+          } else {
+            console.warn('⚠️ VPN auto-connect failed');
+          }
         } else {
-          console.warn('⚠️ VPN auto-connect failed');
+          console.log('⚠️ VPN not connected and auto-connect disabled');
+          updateVPNStatus(false);
         }
-      } else {
-        console.log('⚠️ VPN not connected and auto-connect disabled');
+      } catch (error) {
+        console.error('❌ VPN initialization error:', error);
         updateVPNStatus(false);
       }
-    } catch (error) {
-      console.error('❌ VPN initialization error:', error);
-      updateVPNStatus(false);
-    }
-  }, 500); // Reduced delay to fix race condition
+    }, 500); // Reduced delay to fix race condition
+  }
 
-  win.on('closed', () => {
-    // Cleanup VPN connection when app closes
-    disconnectVPN().catch((error: Error) => {
-      console.error('❌ Error disconnecting VPN on app close:', error);
-    });
-    win = null;
+  newWindow.on('closed', () => {
+    // Remove from windows array
+    const index = windows.indexOf(newWindow);
+    if (index > -1) {
+      windows.splice(index, 1);
+    }
+    
+    // If this was the main window, set new main window or quit
+    if (newWindow === mainWindow) {
+      if (windows.length > 0) {
+        mainWindow = windows[0];
+      } else {
+        // Cleanup VPN connection when last window closes
+        disconnectVPN().catch((error: Error) => {
+          console.error('❌ Error disconnecting VPN on app close:', error);
+        });
+        mainWindow = null;
+      }
+    }
   })
 
   // Production: Disable menu bar
   if (process.env.NODE_ENV === 'production') {
-    win.setMenuBarVisibility(false)
+    newWindow.setMenuBarVisibility(false)
   }
+
+  return newWindow
+}
+
+function createWindow(): void {
+  createBrowserWindow(true)
 }
 
 // IPC Handlers for secure communication
@@ -1299,6 +1328,137 @@ ipcMain.handle('sharepoint-validate-access', async (_event, url: string) => {
   return true
 })
 
+// Window management handlers
+ipcMain.handle('window-create-new', async () => {
+  console.log('🪟 Creating new browser window...')
+  try {
+    const newWindow = createBrowserWindow(false)
+    return {
+      success: true,
+      windowId: newWindow.id,
+      message: 'New browser window created successfully'
+    }
+  } catch (error) {
+    console.error('❌ Error creating new window:', error)
+    return {
+      success: false,
+      error: 'Failed to create new window'
+    }
+  }
+})
+
+// Context menu handlers
+ipcMain.handle('context-menu-show', async (event, params) => {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender)
+  
+  if (!senderWindow) return
+  
+  const baseMenu = [
+    {
+      label: 'New Tab',
+      click: () => {
+        senderWindow.webContents.send('context-menu-action', 'new-tab')
+      }
+    },
+    {
+      label: 'New Window', 
+      click: () => {
+        senderWindow.webContents.send('context-menu-action', 'new-window')
+      }
+    },
+    { type: 'separator' as const },
+    {
+      label: 'Reload',
+      accelerator: 'CmdOrCtrl+R' as const,
+      click: () => {
+        senderWindow.webContents.send('context-menu-action', 'reload')
+      }
+    }
+  ]
+
+  const vpnMenu = vpnConnected ? [
+    {
+      label: 'Go Back',
+      accelerator: 'Alt+Left' as const,
+      click: () => {
+        senderWindow.webContents.send('context-menu-action', 'go-back')
+      }
+    },
+    {
+      label: 'Go Forward',
+      accelerator: 'Alt+Right' as const,
+      click: () => {
+        senderWindow.webContents.send('context-menu-action', 'go-forward')
+      }
+    },
+    { type: 'separator' as const },
+    {
+      label: 'Go Home',
+      click: () => {
+        senderWindow.webContents.send('context-menu-action', 'go-home')
+      }
+    }
+  ] : []
+
+  const statusMenu = [
+    { type: 'separator' as const },
+    {
+      label: 'VPN Status',
+      submenu: [
+        {
+          label: vpnConnected ? '✅ VPN Connected' : '❌ VPN Disconnected',
+          enabled: false
+        },
+        {
+          label: vpnConnected ? 'Reconnect VPN' : 'Connect VPN',
+          click: () => {
+            senderWindow.webContents.send('context-menu-action', 'reconnect-vpn')
+          }
+        }
+      ]
+    }
+  ]
+  
+  const contextMenu = Menu.buildFromTemplate([...baseMenu, ...vpnMenu, ...statusMenu])
+  
+  contextMenu.popup({
+    window: senderWindow,
+    x: params.x,
+    y: params.y
+  })
+})
+
+ipcMain.handle('window-get-count', async () => {
+  return {
+    total: windows.length,
+    mainWindowId: mainWindow?.id || null
+  }
+})
+
+ipcMain.handle('window-close', async (_event, windowId?: number) => {
+  try {
+    if (windowId) {
+      const windowToClose = windows.find(win => win.id === windowId)
+      if (windowToClose && !windowToClose.isDestroyed()) {
+        windowToClose.close()
+        return { success: true, message: 'Window closed successfully' }
+      }
+      return { success: false, error: 'Window not found' }
+    } else {
+      // Close current window (from the event sender)
+      const senderWindow = BrowserWindow.fromWebContents(_event.sender)
+      if (senderWindow && !senderWindow.isDestroyed()) {
+        senderWindow.close()
+        return { success: true, message: 'Current window closed successfully' }
+      }
+      return { success: false, error: 'Could not identify current window' }
+    }
+  } catch (error) {
+    console.error('❌ Error closing window:', error)
+    return { success: false, error: 'Failed to close window' }
+  }
+})
+
 // Initialize security configuration
 app.whenReady().then(async () => {
   console.log('🚀 Initializing Secure Remote Browser...')
@@ -1333,10 +1493,10 @@ if (!gotTheLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    // Focus existing window if someone tries to run another instance
-    if (win) {
-      if (win.isMinimized()) win.restore()
-      win.focus()
+    // Focus existing main window if someone tries to run another instance
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
     }
   })
 }
@@ -1362,9 +1522,9 @@ app.on('web-contents-created', (_event, contents) => {
   contents.on('will-navigate', (event, navigationUrl) => {
     try {
       // Check if this is the main window's webContents
-      const isMainWindow = win && contents === win.webContents;
+      const isMainWindowContents = mainWindow && !mainWindow.isDestroyed() && contents === mainWindow.webContents;
       
-      if (isMainWindow) {
+      if (isMainWindowContents) {
         const parsedUrl = new URL(navigationUrl)
         
         // Allow navigation within the app only for main window
@@ -1390,8 +1550,8 @@ app.on('web-contents-created', (_event, contents) => {
     } catch (error) {
       console.warn('⚠️ Failed to parse navigation URL:', navigationUrl, error)
       // Only prevent navigation for main window on error
-      const isMainWindow = win && contents === win.webContents;
-      if (isMainWindow) {
+      const isMainWindowContentsError = mainWindow && !mainWindow.isDestroyed() && contents === mainWindow.webContents;
+      if (isMainWindowContentsError) {
         event.preventDefault()
       }
     }
