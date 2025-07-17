@@ -12,6 +12,7 @@ export class SecureBrowserDatabaseService {
   static async initializeUserSession(email: string, name: string): Promise<boolean> {
     try {
       console.log('🔑 Initializing user session for:', email)
+      console.log('🔍 Database connection check - Supabase URL exists:', !!import.meta.env?.NEXT_PUBLIC_SUPABASE_URL)
 
       // Check if user exists in database
       let user = await DatabaseService.getCurrentUser(email)
@@ -114,27 +115,58 @@ export class SecureBrowserDatabaseService {
     }
   }
 
-  // Log VPN connection details
+    // Log VPN connection details
   static async logVPNConnection(endpoint: string, serverLocation: string, clientIP: string, vpnIP: string) {
-    if (!this.currentUser) return null
+    console.log('🔧 logVPNConnection called with:', { endpoint, serverLocation, clientIP, vpnIP })
+    console.log('🔧 Current user exists:', !!this.currentUser)
+    console.log('🔧 Current user details:', this.currentUser ? { id: this.currentUser.id, email: this.currentUser.email } : 'null')
+    
+    if (!this.currentUser) {
+      console.error('❌ Cannot log VPN connection: no current user')
+      return null
+    }
 
     try {
+      // Get actual current IP if not provided
+      let actualClientIP = clientIP;
+      let actualVpnIP = vpnIP;
+      
+      if (clientIP === '127.0.0.1') {
+        try {
+          actualClientIP = await this.getCurrentIP();
+          // For VPN IP, we know it's the Australian endpoint IP
+          actualVpnIP = endpoint.split(':')[0]; // Extract IP from endpoint
+        } catch (error) {
+          console.warn('⚠️ Could not get actual IP addresses, using defaults');
+        }
+      }
+
       const connectionData = {
         user_id: this.currentUser.id,
         device_id: DEVICE_ID,
         endpoint,
         server_location: serverLocation,
-        client_ip: clientIP,
-        vpn_ip: vpnIP,
+        client_ip: actualClientIP,
+        vpn_ip: actualVpnIP,
         status: 'connected' as const
       }
 
+      console.log('🔧 Calling DatabaseService.logVPNConnection with:', connectionData)
       const connection = await DatabaseService.logVPNConnection(connectionData)
+      console.log('🔧 VPN connection result:', connection)
+      
       if (connection) {
         this.currentVPNConnection = connection
-        console.log('✅ VPN connection logged:', connection.id)
+        console.log('✅ VPN connection logged successfully:', connection.id, {
+          endpoint,
+          client_ip: actualClientIP,
+          vpn_ip: actualVpnIP,
+          location: serverLocation
+        })
+      } else {
+        console.error('❌ VPN connection logging failed: no connection returned')
       }
-      
+
       return connection
     } catch (error) {
       console.error('❌ Failed to log VPN connection:', error)
@@ -303,25 +335,92 @@ export class SecureBrowserDatabaseService {
     }
   }
 
-  // Monitor session health
+  // Monitor session health and VPN status
   static startSessionMonitoring() {
-    // Monitor session every 5 minutes
+    // Monitor session and VPN status every 2 minutes
     setInterval(async () => {
       if (this.currentUser && this.currentSession) {
         try {
-          // Update session heartbeat
-          await DatabaseService.updateUserSession(this.currentSession.id, {
+          // Check current VPN status
+          const vpnStatus = await window.secureBrowser?.vpn.getStatus();
+          const isVpnConnected = vpnStatus === 'connected';
+          
+          // Update session heartbeat and VPN status
+          const updates: any = {
             // Add a heartbeat timestamp or extend session
-          })
+          };
+          
+          // Only update VPN status if it has changed
+          if (this.currentSession.vpn_status !== (isVpnConnected ? 'connected' : 'disconnected')) {
+            updates.vpn_status = isVpnConnected ? 'connected' : 'disconnected';
+            
+            console.log(`🔄 VPN status changed: ${this.currentSession.vpn_status} → ${updates.vpn_status}`);
+            
+            // Log the status change as a security event
+            await this.logSecurityEvent(
+              'vpn_disconnected',
+              `VPN status changed to ${updates.vpn_status} during session monitoring`,
+              isVpnConnected ? 'low' : 'high'
+            );
+            
+            // If VPN disconnected, end current VPN connection record
+            if (!isVpnConnected && this.currentVPNConnection) {
+              await this.endVPNConnection();
+            }
+            // If VPN reconnected, create new VPN connection record
+            else if (isVpnConnected && !this.currentVPNConnection) {
+              const envConfigStr = await window.secureBrowser?.system.getEnvironment();
+              const envConfig = envConfigStr ? JSON.parse(envConfigStr) : {};
+              const endpoint = envConfig?.WIREGUARD_ENDPOINT || '134.199.169.102:59926';
+              
+              await this.logVPNConnection(
+                endpoint,
+                'Sydney, Australia',
+                '127.0.0.1', // Will be resolved to actual IP
+                '134.199.169.102'
+              );
+            }
+          }
+          
+          if (Object.keys(updates).length > 0) {
+            await DatabaseService.updateUserSession(this.currentSession.id, updates);
+            // Update local session data
+            this.currentSession = { ...this.currentSession, ...updates };
+          }
         } catch (error) {
           console.warn('⚠️ Session monitoring error:', error)
         }
       }
-    }, 5 * 60 * 1000) // 5 minutes
+    }, 2 * 60 * 1000) // 2 minutes
   }
 
   // Get device ID for this session
   static getDeviceId(): string {
     return DEVICE_ID
+  }
+
+  // Debug function to manually test VPN connection logging
+  static async debugVPNConnectionLogging(): Promise<void> {
+    console.log('🔧 DEBUG: Manual VPN connection logging test')
+    console.log('🔧 Current user:', this.currentUser)
+    console.log('🔧 Current session:', this.currentSession)
+    
+    if (!this.currentUser) {
+      console.error('❌ DEBUG: No current user for VPN logging test')
+      return
+    }
+    
+    try {
+      const result = await this.logVPNConnection(
+        '134.199.169.102:59926',
+        'Sydney, Australia (DEBUG TEST)',
+        '127.0.0.1',
+        '134.199.169.102'
+      )
+      
+      console.log('🔧 DEBUG: VPN connection logging test result:', result)
+    } catch (error) {
+      console.error('❌ DEBUG: VPN connection logging test failed:', error)
+    }
   }
 } 

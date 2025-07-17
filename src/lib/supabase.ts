@@ -220,23 +220,34 @@ export class DatabaseService {
   // VPN connections
   static async logVPNConnection(connectionData: Omit<VPNConnection, 'id' | 'connection_start'>): Promise<VPNConnection | null> {
     try {
+      const insertData = {
+        ...connectionData,
+        connection_start: new Date().toISOString()
+      }
+      
+      console.log('🔧 DatabaseService.logVPNConnection - Inserting data:', insertData)
+      
       const { data, error } = await supabase
         .from('vpn_connections')
-        .insert({
-          ...connectionData,
-          connection_start: new Date().toISOString()
-        })
+        .insert(insertData)
         .select()
         .single()
       
       if (error) {
-        console.error('Error logging VPN connection:', error)
+        console.error('❌ Error logging VPN connection to database:', error)
+        console.error('❌ Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
         return null
       }
       
+      console.log('✅ VPN connection successfully inserted into database:', data)
       return data
     } catch (error) {
-      console.error('Exception in logVPNConnection:', error)
+      console.error('❌ Exception in logVPNConnection:', error)
       return null
     }
   }

@@ -31,6 +31,16 @@ function AppContent() {
   const { vpnStatus } = useVPN();
   const [user, setUser] = useState<any>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // Make debug functions available globally for testing
+  useEffect(() => {
+    (window as any).debugVPN = SecureBrowserDatabaseService.debugVPNConnectionLogging;
+    (window as any).testVPNStatus = async () => {
+      const status = await vpnService.isConnected();
+      console.log('🔧 DEBUG: VPN Status check result:', status);
+      return status;
+    };
+  }, []);
   const [initStage, setInitStage] = useState<'auth' | 'vault' | 'vpn' | 'ready'>('auth');
   const [errors, setErrors] = useState<ErrorInfo[]>([]);
   const [vpnStatusInfo, setVpnStatusInfo] = useState<VPNStatus | null>(null);
@@ -473,6 +483,41 @@ function AppContent() {
             
             if (sessionSuccess) {
               console.log('✅ Database session initialized successfully');
+              
+              // Now that we have a session, update VPN status if connected
+              try {
+                const vpnConnected = await vpnService.isConnected();
+                console.log('🔍 Checking VPN status after session creation:', vpnConnected);
+                
+                if (vpnConnected) {
+                  // Get current environment config
+                  const envConfigStr = await window.secureBrowser?.system.getEnvironment();
+                  const currentEnvConfig = envConfigStr ? JSON.parse(envConfigStr) : {};
+                  const endpoint = currentEnvConfig?.WIREGUARD_ENDPOINT || '134.199.169.102:59926';
+                  
+                  // Update session with VPN status
+                  await SecureBrowserDatabaseService.updateVPNStatus(
+                    true,
+                    endpoint,
+                    'Australia'
+                  );
+                  
+                  // Create VPN connection record for admin panel monitoring
+                  await SecureBrowserDatabaseService.logVPNConnection(
+                    endpoint,
+                    'Sydney, Australia',
+                    '127.0.0.1', // Will be updated with actual client IP
+                    '134.199.169.102' // VPN IP
+                  );
+                  
+                  console.log('✅ VPN status synchronized to database');
+                } else {
+                  console.log('⚠️ VPN not connected during session initialization');
+                }
+              } catch (error) {
+                console.error('❌ Failed to sync VPN status after session creation:', error);
+              }
+              
               // Start session monitoring
               SecureBrowserDatabaseService.startSessionMonitoring();
             } else {
