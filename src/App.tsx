@@ -1,13 +1,15 @@
 import { useVPN } from "@/hooks/useVPN";
-import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
 import { vaultService } from "@/services/vaultService";
 import { vpnService } from "@/services/vpnService";
-import { LoginForm } from "@/components/auth/LoginForm";
+import { SecureBrowserDatabaseService } from "@/services/databaseService";
+import { ClerkLoginForm } from "@/components/auth/ClerkLoginForm";
 import { Dashboard } from "@/components/layout/Dashboard";
 import LoadingScreen from "@/components/ui/loading-screen";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import { Toaster } from "@/components/ui/sonner";
+import { QueryProvider } from "@/providers/QueryProvider";
+import clerkAuth from "@/services/clerkService";
 
 import ErrorDisplay, { ErrorInfo, VPNStatus, EnvironmentStatus } from "@/components/ui/error-display";
 import { EnvironmentValidator } from "@/config/environment";
@@ -17,15 +19,18 @@ import "./App.css";
 function App() {
   return (
     <ErrorBoundary>
-      <AppContent />
-      <Toaster />
+      <QueryProvider>
+        <AppContent />
+        <Toaster />
+      </QueryProvider>
     </ErrorBoundary>
   );
 }
 
 function AppContent() {
-  const { user, isAuthenticated, isLoading, login, logout } = useAuth();
   const { vpnStatus } = useVPN();
+  const [user, setUser] = useState<any>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [initStage, setInitStage] = useState<'auth' | 'vault' | 'vpn' | 'ready'>('auth');
   const [errors, setErrors] = useState<ErrorInfo[]>([]);
   const [vpnStatusInfo, setVpnStatusInfo] = useState<VPNStatus | null>(null);
@@ -70,6 +75,13 @@ function AppContent() {
             });
             
             if (!validation.isValid) {
+              // Log configuration error as security event
+              await SecureBrowserDatabaseService.logSecurityEvent(
+                'unauthorized_access',
+                'Invalid environment configuration detected',
+                'critical'
+              );
+              
               setErrors([{
                 type: 'environment',
                 title: 'Environment Configuration Invalid',
@@ -83,11 +95,24 @@ function AppContent() {
             
             if (validation.warnings.length > 0) {
               console.warn('⚠️ Environment warnings:', validation.warnings);
+              // Log warnings as low-severity security events
+              await SecureBrowserDatabaseService.logSecurityEvent(
+                'unauthorized_access',
+                `Environment configuration warnings: ${validation.warnings.join(', ')}`,
+                'low'
+              );
             }
           } else {
             throw new Error('No environment configuration received');
           }
         } catch (error) {
+          // Log configuration loading failure
+          await SecureBrowserDatabaseService.logSecurityEvent(
+            'unauthorized_access',
+            'Failed to load environment configuration',
+            'critical'
+          );
+          
           setEnvStatusInfo({
             loaded: false,
             valid: false,
@@ -112,8 +137,7 @@ function AppContent() {
           return;
         }
         
-        // Wait for auth to be ready
-        if (isLoading) return;
+        // Auth is handled by Clerk service, no need to wait
         
         setInitProgress(25);
         
@@ -128,6 +152,13 @@ function AppContent() {
           const errorMessage = error instanceof Error ? error.message : 'Vault initialization failed';
           setVaultError(errorMessage);
           console.error('❌ Vault initialization failed:', error);
+          
+          // Log vault initialization failure
+          await SecureBrowserDatabaseService.logSecurityEvent(
+            'unauthorized_access',
+            `Vault initialization failed: ${errorMessage}`,
+            'medium'
+          );
           
           // Only set as critical error if vault is required
           // For now, allow continuation without vault
@@ -147,16 +178,33 @@ function AppContent() {
           
           if (vpnConnected) {
             console.log('✅ VPN is already connected, skipping connection attempt');
+            
+            // Update database with existing connection status
+            await SecureBrowserDatabaseService.updateVPNStatus(
+              true, 
+              envConfig?.WIREGUARD_ENDPOINT, 
+              'Australia'
+            );
           } else {
             let retryCount = 0;
             
             // Try connecting with retries - don't show error immediately
             while (!vpnConnected && retryCount < maxRetries) {
               console.log(`🔄 VPN connection attempt ${retryCount + 1}/${maxRetries}...`);
+              
+              // Use the enhanced VPN service that integrates with database
               vpnConnected = await vpnService.connect();
               
               if (!vpnConnected && retryCount < maxRetries - 1) {
                 console.log(`⏳ VPN connection attempt ${retryCount + 1} failed, retrying in 2 seconds...`);
+                
+                // Log retry attempt
+                await SecureBrowserDatabaseService.logSecurityEvent(
+                  'vpn_disconnected',
+                  `VPN connection attempt ${retryCount + 1} failed, retrying...`,
+                  'medium'
+                );
+                
                 await new Promise(resolve => setTimeout(resolve, 2000));
               }
               retryCount++;
@@ -172,6 +220,13 @@ function AppContent() {
           });
           
           if (!vpnConnected) {
+            // Log final VPN connection failure
+            await SecureBrowserDatabaseService.logSecurityEvent(
+              'vpn_disconnected',
+              `VPN connection failed after ${maxRetries} attempts`,
+              'critical'
+            );
+            
             // Only show error after all retries failed
             console.log(`❌ VPN connection failed after ${maxRetries} attempts`);
             setErrors([{
@@ -190,8 +245,23 @@ function AppContent() {
             return;
           }
           console.log('✅ VPN connected successfully');
+          
+          // Log successful VPN initialization
+          await SecureBrowserDatabaseService.logSecurityEvent(
+            'vpn_disconnected', // Note: We use vpn_disconnected type but with positive message
+            'VPN successfully connected and initialized',
+            'low'
+          );
+          
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'VPN connection failed';
+          
+          // Log VPN connection error
+          await SecureBrowserDatabaseService.logSecurityEvent(
+            'vpn_disconnected',
+            `VPN connection error during startup: ${errorMessage}`,
+            'critical'
+          );
           
           setVpnStatusInfo({
             connected: false,
@@ -222,8 +292,23 @@ function AppContent() {
         setInitStage('ready');
         setInitProgress(100);
         
+        // Log successful app initialization
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access', // Using this type for positive security events
+          'Secure browser application successfully initialized',
+          'low'
+        );
+        
       } catch (error) {
         console.error('❌ Service initialization failed:', error);
+        
+        // Log general initialization failure
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Application initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          'critical'
+        );
+        
         setErrors([{
           type: 'config',
           title: 'Application Initialization Failed',
@@ -236,7 +321,41 @@ function AppContent() {
     };
 
     initializeServices();
-  }, [isLoading]);
+  }, []);
+
+  // Monitor VPN status changes and log to database
+  useEffect(() => {
+    const handleVPNStatusChange = async () => {
+      if (vpnStatus && vpnStatusInfo) {
+        const isCurrentlyConnected = vpnStatus === 'connected';
+        const wasConnected = vpnStatusInfo.connected;
+        
+        // Only log if status actually changed
+        if (isCurrentlyConnected !== wasConnected) {
+          if (isCurrentlyConnected) {
+            console.log('✅ VPN reconnected detected');
+            await SecureBrowserDatabaseService.logSecurityEvent(
+              'vpn_disconnected', // Using this type but with positive message
+              'VPN connection restored',
+              'low'
+            );
+          } else {
+            console.warn('⚠️ VPN disconnection detected');
+            await SecureBrowserDatabaseService.logSecurityEvent(
+              'vpn_disconnected',
+              'VPN connection lost during session',
+              'high'
+            );
+          }
+          
+          // Update VPN status info
+          setVpnStatusInfo(prev => prev ? { ...prev, connected: isCurrentlyConnected } : null);
+        }
+      }
+    };
+    
+    handleVPNStatusChange();
+  }, [vpnStatus, vpnStatusInfo]);
 
   const handleAccessLevelChange = async (newLevel: 1 | 2 | 3) => {
     if (user) {
@@ -244,6 +363,13 @@ function AppContent() {
         // Show loading state while changing access level
         setInitStage('vpn');
         setInitProgress(50);
+        
+        // Log access level change as security event
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `User access level changed from ${user.accessLevel} to ${newLevel}`,
+          'medium'
+        );
         
         // Update user access level for MVP testing
         const updatedUser = { ...user, accessLevel: newLevel };
@@ -269,6 +395,14 @@ function AppContent() {
         window.location.reload();
       } catch (error) {
         console.error('❌ Failed to change access level:', error);
+        
+        // Log access level change failure
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Failed to change access level: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          'medium'
+        );
+        
         setInitStage('ready');
         setInitProgress(100);
       }
@@ -298,7 +432,7 @@ function AppContent() {
   }
 
   // Show loading screen during initialization
-  if (isLoading || initStage !== 'ready') {
+  if (initStage !== 'ready') {
     const currentMessage = (() => {
       switch (initStage) {
         case 'auth':
@@ -307,8 +441,6 @@ function AppContent() {
           return vaultError ? 'Vault connection failed - continuing with reduced functionality' : 'Connecting to secure credential vault...';
         case 'vpn':
           return 'Establishing secure VPN tunnel to Australia...';
-        case 'ready':
-          return 'All systems ready! Launching secure browser...';
         default:
           return 'Initializing...';
       }
@@ -326,18 +458,98 @@ function AppContent() {
 
   // Show login form if not authenticated
   if (!isAuthenticated || !user) {
-    return <LoginForm onLogin={login} />;
+    return (
+      <ClerkLoginForm 
+        onAuthSuccess={async (userData) => {
+          console.log('✅ User authenticated via Clerk:', userData);
+          
+          // Initialize database session for the authenticated user
+          try {
+            console.log('🔑 Initializing database session for Clerk user...');
+            const sessionSuccess = await SecureBrowserDatabaseService.initializeUserSession(
+              userData.email, 
+              userData.name
+            );
+            
+            if (sessionSuccess) {
+              console.log('✅ Database session initialized successfully');
+              // Start session monitoring
+              SecureBrowserDatabaseService.startSessionMonitoring();
+            } else {
+              console.warn('⚠️ Database session initialization failed, but continuing with authentication');
+              // Log the failure but don't block authentication
+              await SecureBrowserDatabaseService.logSecurityEvent(
+                'unauthorized_access',
+                `Database session init failed for ${userData.email} - continuing without DB tracking`,
+                'medium'
+              );
+            }
+          } catch (error) {
+            console.error('❌ Failed to initialize database session:', error);
+            // Log the error but don't block authentication
+            await SecureBrowserDatabaseService.logSecurityEvent(
+              'unauthorized_access',
+              `Database session init error for ${userData.email}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              'high'
+            );
+          }
+          
+          // Set authentication state
+          setUser(userData);
+          setIsAuthenticated(true);
+        }}
+        onAuthError={(error) => {
+          console.error('❌ Clerk authentication failed:', error);
+          setErrors([{
+            type: 'config',
+            title: 'Authentication Failed',
+            message: error,
+            details: ['Check your internet connection', 'Verify Clerk configuration'],
+            critical: false
+          }]);
+        }}
+      />
+    );
   }
+
+  // Enhanced logout to clean up database session
+  const handleLogout = async () => {
+    try {
+      // End database session before logout
+      await SecureBrowserDatabaseService.endSession();
+      
+      // Log logout event
+      await SecureBrowserDatabaseService.logSecurityEvent(
+        'unauthorized_access',
+        'User logged out',
+        'low'
+      );
+      
+      // Sign out from Clerk
+      await clerkAuth.signOut();
+      
+      // Clear local state
+      setUser(null);
+      setIsAuthenticated(false);
+      
+      console.log('✅ User logged out successfully');
+    } catch (error) {
+      console.error('❌ Failed to clean up session during logout:', error);
+      // Still proceed with logout even if database cleanup fails
+      setUser(null);
+      setIsAuthenticated(false);
+    }
+  };
 
   // Show main dashboard with browser
   return (
     <Dashboard
       user={user}
       vpnStatus={vpnStatus}
-      onLogout={logout}
+      onLogout={handleLogout}
       onAccessLevelChange={handleAccessLevelChange}
     >
-      <BrowserWindow />
+      <BrowserWindow user={user} />
     </Dashboard>
   );
 }

@@ -15,9 +15,10 @@ import {
   Globe,
   ExternalLink
 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+
 import { useVPN } from '@/hooks/useVPN';
 import { injectSharePointCredentials } from '@/services/vaultService';
+import { SecureBrowserDatabaseService } from '@/services/databaseService';
 import SearchBar from './SearchBar';
 import VPNConnectionError from '@/components/ui/vpn-connection-error';
 
@@ -28,8 +29,11 @@ interface Tab {
   isLoading: boolean;
 }
 
-const BrowserWindow: React.FC = () => {
-  const { user } = useAuth();
+interface BrowserWindowProps {
+  user?: any;
+}
+
+const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
   const { vpnStatus, allowBrowsing, connection, connectVPN, checkVPNStatus, isConnecting, isCheckingStatus, lastError } = useVPN();
   const [tabs, setTabs] = useState<Tab[]>([
     { id: '1', title: 'New Tab', url: getDefaultUrl(user?.accessLevel || 1), isLoading: false }
@@ -123,14 +127,53 @@ const BrowserWindow: React.FC = () => {
   const handleUrlSubmit = () => {
     // Block navigation if VPN is not connected (fail-closed behavior)
     if (!allowBrowsing) {
+      // Log blocked navigation due to VPN
+      SecureBrowserDatabaseService.logNavigation(
+        urlInput, 
+        false, 
+        'VPN connection required'
+      );
+      
+      SecureBrowserDatabaseService.logSecurityEvent(
+        'domain_blocked',
+        `Navigation blocked due to VPN disconnection: ${urlInput}`,
+        'high',
+        urlInput
+      );
+      
       alert(`VPN connection required. Browser access is blocked until Australian VPN connection is established. Status: ${vpnStatus}`);
       return;
     }
 
-    if (!isUrlAllowed(urlInput)) {
+    const urlAllowed = isUrlAllowed(urlInput);
+    
+    // Log navigation attempt
+    SecureBrowserDatabaseService.logNavigation(
+      urlInput, 
+      urlAllowed, 
+      urlAllowed ? undefined : `Access level ${getAccessLevelConfig().name} does not permit this domain`
+    );
+
+    if (!urlAllowed) {
+      // Log security event for blocked domain
+      SecureBrowserDatabaseService.logSecurityEvent(
+        'domain_blocked',
+        `Domain access blocked for user with ${getAccessLevelConfig().name} access level`,
+        'medium',
+        urlInput
+      );
+      
       alert(`Access denied. Your access level (${getAccessLevelConfig().name}) does not permit accessing this URL.`);
       return;
     }
+
+    // Log successful navigation
+    SecureBrowserDatabaseService.logSecurityEvent(
+      'unauthorized_access', // Using this type for positive security events
+      `User navigated to allowed URL: ${urlInput}`,
+      'low',
+      urlInput
+    );
 
     const webview = webviewRefs.current[activeTab] as HTMLElement & { 
       src: string;
@@ -184,6 +227,16 @@ const BrowserWindow: React.FC = () => {
 
   const goHome = () => {
     const homeUrl = getHomeUrl();
+    
+    // Log home navigation
+    SecureBrowserDatabaseService.logNavigation(homeUrl, true);
+    SecureBrowserDatabaseService.logSecurityEvent(
+      'unauthorized_access',
+      'User navigated to home page',
+      'low',
+      homeUrl
+    );
+    
     setUrlInput(homeUrl);
     const webview = webviewRefs.current[activeTab] as HTMLElement & { 
       src: string;
@@ -208,6 +261,14 @@ const BrowserWindow: React.FC = () => {
       isLoading: false
     };
     
+    // Log new tab creation
+    SecureBrowserDatabaseService.logSecurityEvent(
+      'unauthorized_access',
+      'User created new browser tab',
+      'low',
+      homeUrl
+    );
+    
     setTabs([...tabs, newTab]);
     setActiveTab(newTabId);
     setUrlInput(homeUrl);
@@ -227,20 +288,50 @@ const BrowserWindow: React.FC = () => {
 
   const createNewWindow = async () => {
     if (!allowBrowsing) {
+      // Log blocked window creation due to VPN
+      SecureBrowserDatabaseService.logSecurityEvent(
+        'domain_blocked',
+        'New window creation blocked due to VPN disconnection',
+        'medium'
+      );
+      
       alert(`VPN connection required. Cannot create new window until Australian VPN connection is established. Status: ${vpnStatus}`);
       return;
     }
 
     try {
+      // Log new window creation attempt
+      SecureBrowserDatabaseService.logSecurityEvent(
+        'unauthorized_access',
+        'User created new browser window',
+        'low'
+      );
+      
       const result = await window.secureBrowser.window.createNew();
       if (result.success) {
         console.log('✅ New browser window created successfully:', result.windowId);
       } else {
         console.error('❌ Failed to create new window:', result.error);
+        
+        // Log window creation failure
+        SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Failed to create new window: ${result.error}`,
+          'medium'
+        );
+        
         alert(`Failed to create new window: ${result.error}`);
       }
     } catch (error) {
       console.error('❌ Error creating new window:', error);
+      
+      // Log window creation error
+      SecureBrowserDatabaseService.logSecurityEvent(
+        'unauthorized_access',
+        `Error creating new window: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'medium'
+      );
+      
       alert('Failed to create new window. Please try again.');
     }
   };
@@ -300,17 +391,44 @@ const BrowserWindow: React.FC = () => {
       const handleNavigation = async (event: Event & { url?: string }) => {
         const url = event.url || webview.getAttribute('src') || '';
         
+        // Log all navigation events for monitoring
+        SecureBrowserDatabaseService.logNavigation(url, true);
+        
         // Check if navigating to SharePoint/Office365
         if (url.includes('sharepoint.com') || url.includes('login.microsoftonline.com') || url.includes('office.com')) {
           console.log('SharePoint detected - preparing credential injection');
+          
+          // Log SharePoint access
+          SecureBrowserDatabaseService.logSecurityEvent(
+            'unauthorized_access',
+            'User accessed SharePoint/Office365 site',
+            'low',
+            url
+          );
           
           // Wait for page load, then inject credentials
           setTimeout(async () => {
             try {
               await injectSharePointCredentials(webview);
               console.log('SharePoint credentials injected successfully');
+              
+              // Log successful credential injection
+              SecureBrowserDatabaseService.logSecurityEvent(
+                'unauthorized_access',
+                'SharePoint credentials automatically injected',
+                'low',
+                url
+              );
             } catch (error) {
               console.error('Failed to inject SharePoint credentials:', error);
+              
+              // Log credential injection failure
+              SecureBrowserDatabaseService.logSecurityEvent(
+                'unauthorized_access',
+                `Failed to inject SharePoint credentials: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                'medium',
+                url
+              );
             }
           }, 2000);
         }
@@ -350,6 +468,10 @@ const BrowserWindow: React.FC = () => {
 
     webview.addEventListener('did-navigate', (event: Event) => {
       const webviewEvent = event as WebviewEvent;
+      
+      // Log navigation for monitoring
+      SecureBrowserDatabaseService.logNavigation(webviewEvent.url, true);
+      
       if (tabId === activeTab) {
         setUrlInput(webviewEvent.url);
       }
@@ -360,12 +482,47 @@ const BrowserWindow: React.FC = () => {
 
     webview.addEventListener('did-navigate-in-page', (event: Event) => {
       const webviewEvent = event as WebviewEvent;
+      
+      // Log in-page navigation for monitoring
+      SecureBrowserDatabaseService.logNavigation(webviewEvent.url, true);
+      
       if (tabId === activeTab) {
         setUrlInput(webviewEvent.url);
       }
       setTabs(tabs => tabs.map(tab => 
         tab.id === tabId ? { ...tab, url: webviewEvent.url } : tab
       ));
+    });
+
+    // Log download attempts (if webview supports it)
+    webview.addEventListener('will-download', (event: Event) => {
+      const downloadEvent = event as Event & { url?: string; filename?: string };
+      
+      SecureBrowserDatabaseService.logSecurityEvent(
+        'download_blocked',
+        `Download attempt detected: ${downloadEvent.filename || 'unknown file'} from ${downloadEvent.url || 'unknown URL'}`,
+        'medium',
+        downloadEvent.url
+      );
+      
+      // Block downloads by default for security
+      event.preventDefault();
+      console.log('🚫 Download blocked for security');
+    });
+
+    // Log console errors and security warnings
+    webview.addEventListener('console-message', (event: Event) => {
+      const consoleEvent = event as Event & { level: number; message: string; sourceId: string };
+      
+      // Log security-related console messages (level 3 = error, level 2 = warning)
+      if (consoleEvent.level >= 2) {
+        SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Console ${consoleEvent.level >= 3 ? 'error' : 'warning'}: ${consoleEvent.message}`,
+          consoleEvent.level >= 3 ? 'low' : 'low',
+          consoleEvent.sourceId
+        );
+      }
     });
   };
 

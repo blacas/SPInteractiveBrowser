@@ -1,4 +1,5 @@
 import { getPlatformInfo } from '../utils/platform';
+import { SecureBrowserDatabaseService } from './databaseService';
 
 export interface VPNStatus {
   connected: boolean;
@@ -58,18 +59,61 @@ export class VPNService {
       const platformInfo = getPlatformInfo();
       console.log(`🌐 Attempting VPN connection with ${this.config.provider} on ${platformInfo.displayName} ${platformInfo.emoji}...`);
       
+      let connected = false;
       switch (this.config.provider) {
         case 'wireguard':
-          return await this.connectWireGuard();
+          connected = await this.connectWireGuard();
+          break;
         case 'nordlayer':
-          return await this.connectNordLayer();
+          connected = await this.connectNordLayer();
+          break;
         case 'expressvpn':
-          return await this.connectExpressVPN();
+          connected = await this.connectExpressVPN();
+          break;
         default:
           throw new Error(`Unsupported VPN provider: ${this.config.provider}`);
       }
+
+      if (connected) {
+        // Log successful VPN connection to database
+        await SecureBrowserDatabaseService.updateVPNStatus(
+          true, 
+          this.config.endpoint, 
+          'Australia'
+        );
+
+        // Get current IP addresses for logging
+        const clientIP = await this.getCurrentIP();
+        const vpnIP = await this.getVPNIP();
+        
+        await SecureBrowserDatabaseService.logVPNConnection(
+          this.config.endpoint,
+          'Australia',
+          clientIP,
+          vpnIP
+        );
+
+        console.log('✅ VPN connection logged to database');
+      } else {
+        // Log failed connection as security event
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'vpn_disconnected',
+          `Failed to establish VPN connection to ${this.config.endpoint}`,
+          'high'
+        );
+      }
+
+      return connected;
     } catch (error) {
       console.error('❌ VPN connection failed:', error);
+      
+      // Log VPN connection failure as critical security event
+      await SecureBrowserDatabaseService.logSecurityEvent(
+        'vpn_disconnected',
+        `VPN connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'critical'
+      );
+      
       this.notifyStatusChange({ connected: false });
       return false;
     }
@@ -77,16 +121,41 @@ export class VPNService {
 
   async disconnect(): Promise<boolean> {
     try {
+      let disconnected = false;
       if (this.config?.provider === 'wireguard') {
-        return await this.disconnectWireGuard();
+        disconnected = await this.disconnectWireGuard();
+      } else {
+        // For other providers, implement specific disconnect logic
+        disconnected = true;
       }
       
-      // For other providers, implement specific disconnect logic
-      console.log('🔌 VPN disconnected');
-      this.notifyStatusChange({ connected: false });
-      return true;
+      if (disconnected) {
+        // Update database with disconnection
+        await SecureBrowserDatabaseService.updateVPNStatus(false);
+        await SecureBrowserDatabaseService.endVPNConnection();
+        
+        // Log disconnection event
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'vpn_disconnected',
+          'VPN disconnected by user request',
+          'medium'
+        );
+        
+        console.log('🔌 VPN disconnected and logged to database');
+        this.notifyStatusChange({ connected: false });
+      }
+      
+      return disconnected;
     } catch (error) {
       console.error('❌ VPN disconnect failed:', error);
+      
+      // Log disconnect failure
+      await SecureBrowserDatabaseService.logSecurityEvent(
+        'vpn_disconnected',
+        `VPN disconnect failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'high'
+      );
+      
       return false;
     }
   }
@@ -133,6 +202,21 @@ export class VPNService {
         console.error('❌ Error in VPN status callback:', error);
       }
     });
+
+    // Update database when status changes
+    this.updateDatabaseStatus(status);
+  }
+
+  private async updateDatabaseStatus(status: VPNStatus): Promise<void> {
+    try {
+      await SecureBrowserDatabaseService.updateVPNStatus(
+        status.connected,
+        status.endpoint,
+        status.connected ? 'Australia' : undefined
+      );
+    } catch (error) {
+      console.warn('⚠️ Failed to update VPN status in database:', error);
+    }
   }
 
   // WireGuard Implementation
@@ -219,6 +303,20 @@ export class VPNService {
 
     this.statusCheckInterval = setInterval(async () => {
       const status = await this.getStatus();
+      
+      // Check for unexpected disconnections
+      if (!status.connected) {
+        console.warn('⚠️ VPN disconnection detected during monitoring');
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'vpn_disconnected',
+          'Unexpected VPN disconnection detected during monitoring',
+          'high'
+        );
+        
+        await SecureBrowserDatabaseService.updateVPNStatus(false);
+        await SecureBrowserDatabaseService.endVPNConnection();
+      }
+      
       this.notifyStatusChange(status);
     }, 5000); // Check every 5 seconds
   }
@@ -243,6 +341,29 @@ export class VPNService {
   destroy(): void {
     this.stopStatusMonitoring();
     this.connectionCallbacks = [];
+  }
+
+  // Helper methods for IP detection
+  private async getCurrentIP(): Promise<string> {
+    try {
+      // In Electron, we can get this from the main process or use a web service
+      // For now, return a placeholder - you could implement actual IP detection
+      return '192.168.1.100'; // Placeholder for actual client IP
+    } catch (error) {
+      console.warn('⚠️ Failed to get current IP:', error);
+      return '127.0.0.1';
+    }
+  }
+
+  private async getVPNIP(): Promise<string> {
+    try {
+      // This should get the actual VPN IP when connected
+      // For Australian VPN, return the actual server IP
+      return '134.199.169.102'; // Your actual Australian VPN IP
+    } catch (error) {
+      console.warn('⚠️ Failed to get VPN IP:', error);
+      return '134.199.169.102';
+    }
   }
 }
 

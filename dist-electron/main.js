@@ -1,4 +1,4 @@
-import require$$3$1, { app, ipcMain, session, BrowserWindow, Menu } from "electron";
+import require$$3$1, { app, ipcMain, session, BrowserWindow, Menu, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import require$$1$1, { spawn } from "child_process";
@@ -1164,10 +1164,19 @@ const configureSecureSession = () => {
     });
   });
   defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const url = details.url.toLowerCase();
+    let userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    if (url.includes("accounts.google.com") || url.includes("googleapis.com")) {
+      userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
+    }
     callback({
       requestHeaders: {
         ...details.requestHeaders,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": userAgent,
+        // Add additional headers for OAuth compatibility
+        "Sec-Fetch-Site": "cross-site",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Dest": "document"
       }
     });
   });
@@ -1209,7 +1218,22 @@ function createBrowserWindow(isMain = false) {
       plugins: false
     }
   });
-  newWindow.webContents.setWindowOpenHandler(() => {
+  newWindow.webContents.setWindowOpenHandler((details) => {
+    const url = details.url;
+    const oauthProviders = [
+      "https://accounts.google.com",
+      "https://login.microsoftonline.com",
+      "https://github.com/login",
+      "https://clerk.shared.lcl.dev",
+      "https://api.clerk.dev",
+      "https://clerk.dev",
+      "https://major-snipe-9.clerk.accounts.dev"
+    ];
+    if (oauthProviders.some((provider) => url.startsWith(provider))) {
+      console.log("🔐 Opening OAuth in system browser:", url);
+      shell.openExternal(url);
+      return { action: "deny" };
+    }
     return { action: "deny" };
   });
   newWindow.webContents.on("will-navigate", (event, navigationUrl) => {
@@ -1218,12 +1242,25 @@ function createBrowserWindow(isMain = false) {
       "file://",
       "about:blank"
     ].filter(Boolean);
+    const oauthProviders = [
+      "https://accounts.google.com",
+      "https://login.microsoftonline.com",
+      "https://github.com/login",
+      "https://clerk.shared.lcl.dev",
+      "https://api.clerk.dev",
+      "https://clerk.dev",
+      "https://major-snipe-9.clerk.accounts.dev"
+    ];
     const isAllowed = allowedOrigins.some(
       (origin) => navigationUrl.startsWith(origin || "")
+    ) || oauthProviders.some(
+      (provider) => navigationUrl.startsWith(provider)
     );
     if (!isAllowed) {
       console.log("🚫 Blocking window navigation to:", navigationUrl);
       event.preventDefault();
+    } else if (oauthProviders.some((provider) => navigationUrl.startsWith(provider))) {
+      console.log("🔐 Allowing OAuth navigation to:", navigationUrl);
     }
   });
   newWindow.webContents.session.on("will-download", (event, item) => {
@@ -1754,12 +1791,25 @@ app.on("web-contents-created", (_event, contents) => {
           "file:",
           "about:"
         ].filter(Boolean);
+        const oauthProviders = [
+          "https://accounts.google.com",
+          "https://login.microsoftonline.com",
+          "https://github.com/login",
+          "https://clerk.shared.lcl.dev",
+          "https://api.clerk.dev",
+          "https://clerk.dev",
+          "https://major-snipe-9.clerk.accounts.dev"
+        ];
         const isAllowed = allowedOrigins.some(
           (origin) => parsedUrl.protocol.startsWith(origin || "") || navigationUrl.startsWith(origin || "")
+        ) || oauthProviders.some(
+          (provider) => navigationUrl.startsWith(provider)
         );
         if (!isAllowed) {
           console.log("🚫 Blocking main window navigation to:", navigationUrl);
           event.preventDefault();
+        } else if (oauthProviders.some((provider) => navigationUrl.startsWith(provider))) {
+          console.log("🔐 Allowing OAuth navigation to:", navigationUrl);
         }
       } else {
         console.log("🌐 Webview navigation allowed:", navigationUrl);

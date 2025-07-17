@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, session, ipcMain, Menu, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { spawn, ChildProcess } from 'child_process'
@@ -798,12 +798,26 @@ const configureSecureSession = (): void => {
     })
   })
 
-  // Configure user agent for SharePoint compatibility
+  // Configure user agent for SharePoint compatibility and OAuth
   defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const url = details.url.toLowerCase();
+    
+    // Use a more standard user agent for OAuth providers
+    let userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    
+    // For Google OAuth, use a more specific user agent
+    if (url.includes('accounts.google.com') || url.includes('googleapis.com')) {
+      userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0';
+    }
+    
     callback({ 
       requestHeaders: {
         ...details.requestHeaders,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': userAgent,
+        // Add additional headers for OAuth compatibility
+        'Sec-Fetch-Site': 'cross-site',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Dest': 'document'
       }
     })
   })
@@ -857,27 +871,65 @@ function createBrowserWindow(isMain: boolean = false): BrowserWindow {
     },
   })
 
-  // Security: Prevent new window creation from webcontents
-  newWindow.webContents.setWindowOpenHandler(() => {
+  // Security: Handle window opening for OAuth (allow OAuth popups)
+  newWindow.webContents.setWindowOpenHandler((details) => {
+    const url = details.url;
+    
+    // Allow OAuth popup windows
+    const oauthProviders = [
+      'https://accounts.google.com',
+      'https://login.microsoftonline.com',
+      'https://github.com/login',
+      'https://clerk.shared.lcl.dev',
+      'https://api.clerk.dev',
+      'https://clerk.dev',
+      'https://major-snipe-9.clerk.accounts.dev'
+    ];
+    
+    if (oauthProviders.some(provider => url.startsWith(provider))) {
+      console.log('🔐 Opening OAuth in system browser:', url);
+      
+      // Open OAuth in system browser instead of popup
+      shell.openExternal(url);
+      
+      return { action: 'deny' };
+    }
+    
+    // Deny all other popup attempts
     return { action: 'deny' }
   })
 
   // Security: Handle navigation attempts in window
   newWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-    // Only allow navigation within the app
+    // Allow navigation within the app and to OAuth providers
     const allowedOrigins = [
       VITE_DEV_SERVER_URL,
       'file://',
       'about:blank'
     ].filter(Boolean)
     
+    // Allow Clerk OAuth and common OAuth providers
+    const oauthProviders = [
+      'https://accounts.google.com',
+      'https://login.microsoftonline.com',
+      'https://github.com/login',
+      'https://clerk.shared.lcl.dev',
+      'https://api.clerk.dev',
+      'https://clerk.dev',
+      'https://major-snipe-9.clerk.accounts.dev'
+    ]
+    
     const isAllowed = allowedOrigins.some(origin => 
       navigationUrl.startsWith(origin || '')
+    ) || oauthProviders.some(provider => 
+      navigationUrl.startsWith(provider)
     )
     
     if (!isAllowed) {
       console.log('🚫 Blocking window navigation to:', navigationUrl)
       event.preventDefault()
+    } else if (oauthProviders.some(provider => navigationUrl.startsWith(provider))) {
+      console.log('🔐 Allowing OAuth navigation to:', navigationUrl)
     }
   })
 
@@ -1527,21 +1579,36 @@ app.on('web-contents-created', (_event, contents) => {
       if (isMainWindowContents) {
         const parsedUrl = new URL(navigationUrl)
         
-        // Allow navigation within the app only for main window
+        // Allow navigation within the app and to OAuth providers for main window
         const allowedOrigins = [
           VITE_DEV_SERVER_URL,
           'file:',
           'about:'
         ].filter(Boolean)
         
+        // Allow Clerk OAuth and common OAuth providers
+        const oauthProviders = [
+          'https://accounts.google.com',
+          'https://login.microsoftonline.com',
+          'https://github.com/login',
+          'https://clerk.shared.lcl.dev',
+          'https://api.clerk.dev',
+          'https://clerk.dev',
+          'https://major-snipe-9.clerk.accounts.dev'
+        ]
+        
         const isAllowed = allowedOrigins.some(origin => 
           parsedUrl.protocol.startsWith(origin || '') || 
           navigationUrl.startsWith(origin || '')
+        ) || oauthProviders.some(provider => 
+          navigationUrl.startsWith(provider)
         )
         
         if (!isAllowed) {
           console.log('🚫 Blocking main window navigation to:', navigationUrl)
           event.preventDefault()
+        } else if (oauthProviders.some(provider => navigationUrl.startsWith(provider))) {
+          console.log('🔐 Allowing OAuth navigation to:', navigationUrl)
         }
       } else {
         // This is a webview - allow navigation but log it

@@ -11,6 +11,10 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  define: {
+    'process.env': {},
+  },
+  envPrefix: ['VITE_', 'CLERK_', 'NEXT_PUBLIC_'],
   plugins: [
     react(),
     electron({
@@ -45,4 +49,14 @@ export default defineConfig({
     }),
     tailwindcss(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          clerk: ['@clerk/clerk-js'],
+        }
+      }
+    }
+  }
 });

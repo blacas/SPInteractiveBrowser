@@ -1,1 +1,103 @@
-"use strict";const e=require("electron");e.contextBridge.exposeInMainWorld("ipcRenderer",{on(...n){const[r,t]=n;return e.ipcRenderer.on(r,(o,...i)=>t(o,...i))},off(...n){const[r,...t]=n;return e.ipcRenderer.off(r,...t)},send(...n){const[r,...t]=n;return e.ipcRenderer.send(r,...t)},invoke(...n){const[r,...t]=n;return e.ipcRenderer.invoke(r,...t)}});e.contextBridge.exposeInMainWorld("electronAPI",{vpn:{getStatus:()=>e.ipcRenderer.invoke("vpn-get-status"),connect:n=>e.ipcRenderer.invoke("vpn-connect",n),disconnect:()=>e.ipcRenderer.invoke("vpn-disconnect"),onStatusChange:n=>{e.ipcRenderer.on("vpn-status-changed",(r,t)=>n(t))},removeStatusListener:()=>{e.ipcRenderer.removeAllListeners("vpn-status-changed")}}});e.contextBridge.exposeInMainWorld("secureBrowser",{vpn:{getStatus:()=>e.ipcRenderer.invoke("vpn-get-status"),connect:n=>e.ipcRenderer.invoke("vpn-connect",n),disconnect:()=>e.ipcRenderer.invoke("vpn-disconnect"),onStatusChange:n=>{e.ipcRenderer.on("vpn-status-changed",(r,t)=>n(t))},removeStatusListener:()=>{e.ipcRenderer.removeAllListeners("vpn-status-changed")}},vault:{getSharePointCredentials:()=>e.ipcRenderer.invoke("vault-get-sharepoint-credentials"),rotateCredentials:()=>e.ipcRenderer.invoke("vault-rotate-credentials"),getVaultStatus:()=>e.ipcRenderer.invoke("vault-get-status")},security:{checkUrlAllowed:(n,r)=>e.ipcRenderer.invoke("security-check-url",n,r),logNavigation:(n,r,t)=>e.ipcRenderer.invoke("security-log-navigation",n,r,t),preventDownload:n=>e.ipcRenderer.invoke("security-prevent-download",n)},sharepoint:{injectCredentials:n=>e.ipcRenderer.invoke("sharepoint-inject-credentials",n),getLibraryConfig:()=>e.ipcRenderer.invoke("sharepoint-get-config"),validateAccess:n=>e.ipcRenderer.invoke("sharepoint-validate-access",n)},system:{getVersion:()=>e.ipcRenderer.invoke("system-get-version"),getEnvironment:()=>e.ipcRenderer.invoke("system-get-environment"),isProduction:()=>!1},extensions:{get1PasswordStatus:()=>e.ipcRenderer.invoke("extension-get-1password-status"),install1Password:()=>e.ipcRenderer.invoke("extension-install-1password")},window:{createNew:()=>e.ipcRenderer.invoke("window-create-new"),getCount:()=>e.ipcRenderer.invoke("window-get-count"),close:n=>e.ipcRenderer.invoke("window-close",n)},contextMenu:{show:n=>e.ipcRenderer.invoke("context-menu-show",n),onAction:n=>{e.ipcRenderer.on("context-menu-action",(r,t)=>n(t))},removeActionListener:()=>{e.ipcRenderer.removeAllListeners("context-menu-action")}}});delete window.module;delete window.exports;delete window.require;try{Object.freeze(console)}catch{}console.log("🔒 Secure Browser Preload: Context isolation enabled");console.log("🌐 VPN-routed traffic: Ready for Australian endpoint");console.log("🔑 Vault integration: SharePoint credentials secure");
+"use strict";
+const electron = require("electron");
+electron.contextBridge.exposeInMainWorld("ipcRenderer", {
+  on(...args) {
+    const [channel, listener] = args;
+    return electron.ipcRenderer.on(channel, (event, ...args2) => listener(event, ...args2));
+  },
+  off(...args) {
+    const [channel, ...omit] = args;
+    return electron.ipcRenderer.off(channel, ...omit);
+  },
+  send(...args) {
+    const [channel, ...omit] = args;
+    return electron.ipcRenderer.send(channel, ...omit);
+  },
+  invoke(...args) {
+    const [channel, ...omit] = args;
+    return electron.ipcRenderer.invoke(channel, ...omit);
+  }
+});
+electron.contextBridge.exposeInMainWorld("electronAPI", {
+  vpn: {
+    getStatus: () => electron.ipcRenderer.invoke("vpn-get-status"),
+    connect: (provider) => electron.ipcRenderer.invoke("vpn-connect", provider),
+    disconnect: () => electron.ipcRenderer.invoke("vpn-disconnect"),
+    onStatusChange: (callback) => {
+      electron.ipcRenderer.on("vpn-status-changed", (_, status) => callback(status));
+    },
+    removeStatusListener: () => {
+      electron.ipcRenderer.removeAllListeners("vpn-status-changed");
+    }
+  }
+});
+electron.contextBridge.exposeInMainWorld("secureBrowser", {
+  // VPN Operations
+  vpn: {
+    getStatus: () => electron.ipcRenderer.invoke("vpn-get-status"),
+    connect: (provider) => electron.ipcRenderer.invoke("vpn-connect", provider),
+    disconnect: () => electron.ipcRenderer.invoke("vpn-disconnect"),
+    onStatusChange: (callback) => {
+      electron.ipcRenderer.on("vpn-status-changed", (_, status) => callback(status));
+    },
+    removeStatusListener: () => {
+      electron.ipcRenderer.removeAllListeners("vpn-status-changed");
+    }
+  },
+  // Vault Operations  
+  vault: {
+    getSharePointCredentials: () => electron.ipcRenderer.invoke("vault-get-sharepoint-credentials"),
+    rotateCredentials: () => electron.ipcRenderer.invoke("vault-rotate-credentials"),
+    getVaultStatus: () => electron.ipcRenderer.invoke("vault-get-status")
+  },
+  // Security Operations
+  security: {
+    checkUrlAllowed: (url, accessLevel) => electron.ipcRenderer.invoke("security-check-url", url, accessLevel),
+    logNavigation: (url, allowed, accessLevel) => electron.ipcRenderer.invoke("security-log-navigation", url, allowed, accessLevel),
+    preventDownload: (filename) => electron.ipcRenderer.invoke("security-prevent-download", filename)
+  },
+  // SharePoint Operations
+  sharepoint: {
+    injectCredentials: (webviewId) => electron.ipcRenderer.invoke("sharepoint-inject-credentials", webviewId),
+    getLibraryConfig: () => electron.ipcRenderer.invoke("sharepoint-get-config"),
+    validateAccess: (url) => electron.ipcRenderer.invoke("sharepoint-validate-access", url)
+  },
+  // System Information
+  system: {
+    getVersion: () => electron.ipcRenderer.invoke("system-get-version"),
+    getEnvironment: () => electron.ipcRenderer.invoke("system-get-environment"),
+    isProduction: () => false
+    // Will be determined by main process
+  },
+  // Extension Management
+  extensions: {
+    get1PasswordStatus: () => electron.ipcRenderer.invoke("extension-get-1password-status"),
+    install1Password: () => electron.ipcRenderer.invoke("extension-install-1password")
+  },
+  // Window Management
+  window: {
+    createNew: () => electron.ipcRenderer.invoke("window-create-new"),
+    getCount: () => electron.ipcRenderer.invoke("window-get-count"),
+    close: (windowId) => electron.ipcRenderer.invoke("window-close", windowId)
+  },
+  // Context Menu
+  contextMenu: {
+    show: (params) => electron.ipcRenderer.invoke("context-menu-show", params),
+    onAction: (callback) => {
+      electron.ipcRenderer.on("context-menu-action", (_, action) => callback(action));
+    },
+    removeActionListener: () => {
+      electron.ipcRenderer.removeAllListeners("context-menu-action");
+    }
+  }
+});
+delete window.module;
+delete window.exports;
+delete window.require;
+try {
+  Object.freeze(console);
+} catch (error) {
+}
+console.log("🔒 Secure Browser Preload: Context isolation enabled");
+console.log("🌐 VPN-routed traffic: Ready for Australian endpoint");
+console.log("🔑 Vault integration: SharePoint credentials secure");
