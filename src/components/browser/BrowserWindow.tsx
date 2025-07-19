@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -41,6 +41,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
   const [activeTab, setActiveTab] = useState('1');
   const [urlInput, setUrlInput] = useState(getDefaultUrl(user?.accessLevel || 1));
   const webviewRefs = useRef<{ [key: string]: HTMLElement | null }>({});
+  const webviewInitialized = useRef<{ [key: string]: boolean }>({});
 
   // Get default URL based on access level (SharePoint-focused)
   function getDefaultUrl(accessLevel: number): string {
@@ -52,7 +53,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
   }
 
   // Access level configurations
-  const getAccessLevelConfig = () => {
+  const getAccessLevelConfig = useCallback(() => {
     const level = user?.accessLevel || 1;
     switch (level) {
       case 3:
@@ -81,9 +82,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
           variant: 'outline' as const
         };
     }
-  };
+  }, [user?.accessLevel]);
 
-  const isUrlAllowed = (url: string): boolean => {
+  const isUrlAllowed = useCallback((url: string): boolean => {
     const config = getAccessLevelConfig();
     if (config.allowedDomains.includes('*')) return true;
     
@@ -113,18 +114,18 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
       console.error('URL parsing error:', error);
       return false;
     }
-  };
+  }, [getAccessLevelConfig]);
 
-  const getHomeUrl = (): string => {
+  const getHomeUrl = useCallback((): string => {
     const level = user?.accessLevel || 1;
     switch (level) {
       case 3: return 'https://www.google.com';
       case 2: return 'https://github.com';
       default: return 'https://www.office.com';
     }
-  };
+  }, [user?.accessLevel]);
 
-  const handleUrlSubmit = () => {
+  const handleUrlSubmit = useCallback(() => {
     // Block navigation if VPN is not connected (fail-closed behavior)
     if (!allowBrowsing) {
       // Log blocked navigation due to VPN
@@ -181,7 +182,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
     
     if (webview) {
       // Update tab state
-      setTabs(tabs.map(tab => 
+      setTabs(tabs => tabs.map(tab => 
         tab.id === activeTab 
           ? { ...tab, url: urlInput, isLoading: true, title: 'Loading...' }
           : tab
@@ -190,13 +191,13 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
       // Navigate webview
       webview.src = urlInput;
     }
-  };
+  }, [urlInput, allowBrowsing, vpnStatus, isUrlAllowed, activeTab, getAccessLevelConfig]);
 
-  const handleUrlChange = (value: string) => {
+  const handleUrlChange = useCallback((value: string) => {
     setUrlInput(value);
-  };
+  }, []);
 
-  const goBack = () => {
+  const goBack = useCallback(() => {
     const webview = webviewRefs.current[activeTab] as HTMLElement & { 
       canGoBack(): boolean;
       goBack(): void;
@@ -204,9 +205,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
     if (webview && webview.canGoBack()) {
       webview.goBack();
     }
-  };
+  }, [activeTab]);
 
-  const goForward = () => {
+  const goForward = useCallback(() => {
     const webview = webviewRefs.current[activeTab] as HTMLElement & { 
       canGoForward(): boolean;
       goForward(): void;
@@ -214,18 +215,18 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
     if (webview && webview.canGoForward()) {
       webview.goForward();
     }
-  };
+  }, [activeTab]);
 
-  const reload = () => {
+  const reload = useCallback(() => {
     const webview = webviewRefs.current[activeTab] as HTMLElement & { 
       reload(): void;
     };
     if (webview) {
       webview.reload();
     }
-  };
+  }, [activeTab]);
 
-  const goHome = () => {
+  const goHome = useCallback(() => {
     const homeUrl = getHomeUrl();
     
     // Log home navigation
@@ -242,16 +243,16 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
       src: string;
     };
     if (webview) {
-      setTabs(tabs.map(tab => 
+      setTabs(tabs => tabs.map(tab => 
         tab.id === activeTab 
           ? { ...tab, url: homeUrl, isLoading: true, title: 'Loading...' }
           : tab
       ));
       webview.src = homeUrl;
     }
-  };
+  }, [activeTab, getHomeUrl]);
 
-  const createNewTab = () => {
+  const createNewTab = useCallback(() => {
     const newTabId = Date.now().toString();
     const homeUrl = getHomeUrl();
     const newTab: Tab = {
@@ -269,24 +270,28 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
       homeUrl
     );
     
-    setTabs([...tabs, newTab]);
+    setTabs(prevTabs => [...prevTabs, newTab]);
     setActiveTab(newTabId);
     setUrlInput(homeUrl);
-  };
+  }, [getHomeUrl]);
 
-  const closeTab = (tabId: string) => {
+  const closeTab = useCallback((tabId: string) => {
     if (tabs.length <= 1) return;
     
     const newTabs = tabs.filter(tab => tab.id !== tabId);
     setTabs(newTabs);
     
+    // Clean up webview refs
+    delete webviewRefs.current[tabId];
+    delete webviewInitialized.current[tabId];
+    
     if (activeTab === tabId) {
       setActiveTab(newTabs[0].id);
       setUrlInput(newTabs[0].url);
     }
-  };
+  }, [tabs, activeTab]);
 
-  const createNewWindow = async () => {
+  const createNewWindow = useCallback(async () => {
     if (!allowBrowsing) {
       // Log blocked window creation due to VPN
       SecureBrowserDatabaseService.logSecurityEvent(
@@ -334,9 +339,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
       
       alert('Failed to create new window. Please try again.');
     }
-  };
+  }, [allowBrowsing, vpnStatus]);
 
-  const handleContextMenu = (event: React.MouseEvent) => {
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
     
     const params = {
@@ -345,7 +350,15 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
     };
 
     window.secureBrowser.contextMenu.show(params);
-  };
+  }, []);
+
+  // Update URL input when switching tabs
+  useEffect(() => {
+    const currentTab = tabs.find(tab => tab.id === activeTab);
+    if (currentTab) {
+      setUrlInput(currentTab.url);
+    }
+  }, [activeTab, tabs]);
 
   useEffect(() => {
     const handleContextMenuAction = (action: string) => {
@@ -444,7 +457,14 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
     }
   }, [activeTab]);
 
-  const setupWebviewEvents = (webview: HTMLElement, tabId: string) => {
+  const setupWebviewEvents = useCallback((webview: HTMLElement, tabId: string) => {
+    // Prevent setting up events multiple times for the same webview
+    if (webviewInitialized.current[tabId]) {
+      return;
+    }
+    
+    webviewInitialized.current[tabId] = true;
+    
     type WebviewEvent = Event & { url: string; title?: string };
     
     webview.addEventListener('did-start-loading', () => {
@@ -472,6 +492,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
       // Log navigation for monitoring
       SecureBrowserDatabaseService.logNavigation(webviewEvent.url, true);
       
+      // Only update URL input if this is the active tab
       if (tabId === activeTab) {
         setUrlInput(webviewEvent.url);
       }
@@ -486,6 +507,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
       // Log in-page navigation for monitoring
       SecureBrowserDatabaseService.logNavigation(webviewEvent.url, true);
       
+      // Only update URL input if this is the active tab
       if (tabId === activeTab) {
         setUrlInput(webviewEvent.url);
       }
@@ -524,9 +546,19 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
         );
       }
     });
-  };
+  }, [activeTab]);
 
-  const config = getAccessLevelConfig();
+  // Memoize webview ref callback to prevent unnecessary re-initialization
+  const createWebviewRef = useCallback((tabId: string) => {
+    return (ref: HTMLElement | null) => {
+      if (ref && !webviewRefs.current[tabId]) {
+        webviewRefs.current[tabId] = ref;
+        setupWebviewEvents(ref, tabId);
+      }
+    };
+  }, [setupWebviewEvents]);
+
+  const config = useMemo(() => getAccessLevelConfig(), [getAccessLevelConfig]);
 
   return (
     <div 
@@ -703,12 +735,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
               ) : (
                 /* Show webview when VPN is connected and URL is allowed */
                 <webview
-                  ref={(ref: HTMLElement | null) => {
-                    if (ref) {
-                      webviewRefs.current[tab.id] = ref;
-                      setupWebviewEvents(ref, tab.id);
-                    }
-                  }}
+                  ref={createWebviewRef(tab.id)}
                   src={tab.url}
                   style={{ 
                     width: '100%', 
