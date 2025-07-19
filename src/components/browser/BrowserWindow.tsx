@@ -25,7 +25,10 @@ import {
 import { useVPN } from "@/hooks/useVPN";
 import { injectSharePointCredentials } from "@/services/vaultService";
 import { SecureBrowserDatabaseService } from "@/services/databaseService";
+import { HistoryService } from "@/services/historyService";
 import SearchBar from "./SearchBar";
+import BrowserMenu from "./BrowserMenu";
+import HistoryModal from "./HistoryModal";
 import VPNConnectionError from "@/components/ui/vpn-connection-error";
 
 interface Tab {
@@ -37,9 +40,10 @@ interface Tab {
 
 interface BrowserWindowProps {
   user?: any;
+  onLogout?: () => void;
 }
 
-const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
+const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   const {
     vpnStatus,
     allowBrowsing,
@@ -62,8 +66,17 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
   const [urlInput, setUrlInput] = useState(
     getDefaultUrl(user?.accessLevel || 1)
   );
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const webviewRefs = useRef<{ [key: string]: HTMLElement | null }>({});
   const webviewInitialized = useRef<{ [key: string]: boolean }>({});
+
+  // Initialize HistoryService with current user
+  useEffect(() => {
+    if (user) {
+      HistoryService.setCurrentUser(user);
+      console.log('✅ HistoryService initialized with user:', user.email);
+    }
+  }, [user]);
 
   // Get default URL based on access level (SharePoint-focused)
   function getDefaultUrl(accessLevel: number): string {
@@ -109,46 +122,63 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
     }
   }, [user?.accessLevel]);
 
-  const isUrlAllowed = useCallback(
-    (url: string): boolean => {
-      const config = getAccessLevelConfig();
-
-      // For Level 3, always allow all URLs
-      if (config.allowedDomains.includes("*")) {
-        console.log(`✅ Level 3 access - allowing all URLs: ${url}`);
-        return true;
+  // Add history tracking function
+  const addToHistory = useCallback(async (url: string, title?: string) => {
+    try {
+      if (url && url.startsWith('http')) {
+        await HistoryService.addHistoryEntry(url, title || 'Untitled');
+        console.log('✅ Added to history:', { url, title });
       }
+    } catch (error) {
+      console.error('❌ Failed to add to history:', error);
+    }
+  }, []);
 
-      try {
-        // Ensure URL has protocol
-        let fullUrl = url;
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-          fullUrl = "https://" + url;
-        }
+  // Navigate to URL from history
+  const navigateToUrl = useCallback((url: string) => {
+    setUrlInput(url);
+    const webview = webviewRefs.current[activeTab] as HTMLElement & { 
+      src: string;
+    };
+    
+    if (webview) {
+      // Update tab state
+      setTabs(tabs => tabs.map(tab => 
+        tab.id === activeTab 
+          ? { ...tab, url, isLoading: true, title: 'Loading...' }
+          : tab
+      ));
+      
+      // Navigate webview
+      webview.src = url;
+    }
+  }, [activeTab]);
 
-        const urlObj = new URL(fullUrl);
-        const domain = urlObj.hostname.replace("www.", "");
+  // Menu handlers
+  const handleHistoryClick = () => {
+    setIsHistoryModalOpen(true);
+  };
 
-        console.log("Checking URL:", fullUrl);
-        console.log("Extracted domain:", domain);
-        console.log("Allowed domains:", config.allowedDomains);
-        console.log("User access level:", user?.accessLevel);
+  const handleDownloadsClick = () => {
+    console.log('Downloads clicked');
+    // TODO: Implement downloads modal
+  };
 
-        const isAllowed = config.allowedDomains.some((allowed) => {
-          const match = domain === allowed || domain.endsWith("." + allowed);
-          console.log(`Checking ${domain} against ${allowed}: ${match}`);
-          return match;
-        });
+  const handleBookmarksClick = () => {
+    console.log('Bookmarks clicked');
+    // TODO: Implement bookmarks modal
+  };
 
-        console.log("Final result:", isAllowed);
-        return isAllowed;
-      } catch (error) {
-        console.error("URL parsing error:", error);
-        return false;
-      }
-    },
-    [getAccessLevelConfig, user?.accessLevel]
-  );
+  const handleSettingsClick = () => {
+    console.log('Settings clicked');
+    // TODO: Implement settings modal
+  };
+
+  const handleLogout = () => {
+    if (onLogout) {
+      onLogout();
+    }
+  };
 
   const getHomeUrl = useCallback((): string => {
     const level = user?.accessLevel || 1;
@@ -165,32 +195,28 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
   // Smart URL/Search detection helper function
   const isValidUrl = useCallback((input: string): boolean => {
     // Check if it looks like a URL
-    if (input.startsWith("http://") || input.startsWith("https://")) {
+    if (input.startsWith('http://') || input.startsWith('https://')) {
       return true;
     }
-
+    
     // Check if it has a domain-like structure (contains a dot and no spaces)
-    if (input.includes(".") && !input.includes(" ")) {
+    if (input.includes('.') && !input.includes(' ')) {
       // Simple domain pattern check
-      const domainPattern =
-        /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-      const parts = input.split("/");
+      const domainPattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+      const parts = input.split('/');
       const domain = parts[0];
-
+      
       // Check if the domain part looks valid
       if (domainPattern.test(domain)) {
         return true;
       }
     }
-
+    
     // Check for localhost or IP addresses
-    if (
-      input.startsWith("localhost") ||
-      input.match(/^\d+\.\d+\.\d+\.\d+(:\d+)?/)
-    ) {
+    if (input.startsWith('localhost') || input.match(/^\d+\.\d+\.\d+\.\d+(:\d+)?/)) {
       return true;
     }
-
+    
     return false;
   }, []);
 
@@ -244,6 +270,47 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
       return trimmedInput;
     },
     [isValidUrl, constructSearchUrl, getHomeUrl, user?.accessLevel]
+  );
+
+  const isUrlAllowed = useCallback(
+    (url: string): boolean => {
+      const config = getAccessLevelConfig();
+
+      // For Level 3, always allow all URLs
+      if (config.allowedDomains.includes("*")) {
+        console.log(`✅ Level 3 access - allowing all URLs: ${url}`);
+        return true;
+      }
+
+      try {
+        // Ensure URL has protocol
+        let fullUrl = url;
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+          fullUrl = "https://" + url;
+        }
+
+        const urlObj = new URL(fullUrl);
+        const domain = urlObj.hostname.replace("www.", "");
+
+        console.log("Checking URL:", fullUrl);
+        console.log("Extracted domain:", domain);
+        console.log("Allowed domains:", config.allowedDomains);
+        console.log("User access level:", user?.accessLevel);
+
+        const isAllowed = config.allowedDomains.some((allowed) => {
+          const match = domain === allowed || domain.endsWith("." + allowed);
+          console.log(`Checking ${domain} against ${allowed}: ${match}`);
+          return match;
+        });
+
+        console.log("Final result:", isAllowed);
+        return isAllowed;
+      } catch (error) {
+        console.error("URL parsing error:", error);
+        return false;
+      }
+    },
+    [getAccessLevelConfig, user?.accessLevel]
   );
 
   const handleUrlSubmit = useCallback(() => {
@@ -749,12 +816,17 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
 
       webview.addEventListener("page-title-updated", (event: Event) => {
         const webviewEvent = event as WebviewEvent;
+        const newTitle = webviewEvent.title || "Untitled";
+        
         setTabs((tabs) =>
-          tabs.map((tab) =>
-            tab.id === tabId
-              ? { ...tab, title: webviewEvent.title || "Untitled" }
-              : tab
-          )
+          tabs.map((tab) => {
+            if (tab.id === tabId) {
+              // Add to history when title is updated (page fully loaded)
+              addToHistory(tab.url, newTitle);
+              return { ...tab, title: newTitle };
+            }
+            return tab;
+          })
         );
       });
 
@@ -763,6 +835,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
 
         // Log navigation for monitoring
         SecureBrowserDatabaseService.logNavigation(webviewEvent.url, true);
+
+        // Add to history for navigation
+        addToHistory(webviewEvent.url, "Loading...");
 
         // Only update URL input if this is the active tab
         if (tabId === activeTab) {
@@ -969,6 +1044,17 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
               Blocked
             </Badge>
           )}
+
+          {/* Browser Menu */}
+          <BrowserMenu
+            user={user}
+            onHistoryClick={handleHistoryClick}
+            onDownloadsClick={handleDownloadsClick}
+            onBookmarksClick={handleBookmarksClick}
+            onSettingsClick={handleSettingsClick}
+            onLogout={handleLogout}
+            className="ml-2"
+          />
         </div>
       </div>
 
@@ -1145,6 +1231,13 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
           ))}
         </div>
       </Tabs>
+
+      {/* History Modal */}
+      <HistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        onNavigate={navigateToUrl}
+      />
     </div>
   );
 };

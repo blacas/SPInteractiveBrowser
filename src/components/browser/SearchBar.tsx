@@ -116,7 +116,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
     }
   };
 
-  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleInputFocus = () => {
     console.log('✅ Input focused');
   };
 

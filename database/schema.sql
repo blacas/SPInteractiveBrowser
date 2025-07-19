@@ -142,6 +142,33 @@ CREATE INDEX idx_navigation_logs_timestamp ON navigation_logs(timestamp);
 CREATE INDEX idx_navigation_logs_domain ON navigation_logs(domain);
 CREATE INDEX idx_navigation_logs_allowed ON navigation_logs(allowed);
 
+-- Browsing History table for Chrome-like history functionality
+CREATE TABLE browsing_history (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    device_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+    domain TEXT NOT NULL,
+    page_title TEXT NOT NULL,
+    visit_count INTEGER NOT NULL DEFAULT 1,
+    first_visit TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    last_visit TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    favicon_url TEXT,
+    is_bookmarked BOOLEAN NOT NULL DEFAULT false,
+    access_level INTEGER NOT NULL CHECK (access_level IN (1, 2, 3)),
+    
+    -- Unique constraint to prevent duplicate URLs per user
+    UNIQUE(user_id, url)
+);
+
+-- Create indexes for browsing_history table
+CREATE INDEX idx_browsing_history_user_id ON browsing_history(user_id);
+CREATE INDEX idx_browsing_history_last_visit ON browsing_history(last_visit DESC);
+CREATE INDEX idx_browsing_history_domain ON browsing_history(domain);
+CREATE INDEX idx_browsing_history_title ON browsing_history USING gin(to_tsvector('english', page_title));
+CREATE INDEX idx_browsing_history_url ON browsing_history USING gin(to_tsvector('english', url));
+CREATE INDEX idx_browsing_history_visit_count ON browsing_history(visit_count DESC);
+
 -- System Settings table for application configuration
 CREATE TABLE system_settings (
     id BIGSERIAL PRIMARY KEY,
@@ -252,6 +279,12 @@ ALTER TABLE navigation_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow authenticated access to navigation_logs" ON navigation_logs
     FOR ALL USING (true);
 
+-- Browsing History policies
+ALTER TABLE browsing_history ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow authenticated access to browsing_history" ON browsing_history
+    FOR ALL USING (true);
+
 -- System Settings policies
 ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
 
@@ -293,6 +326,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE user_sessions;
 ALTER PUBLICATION supabase_realtime ADD TABLE security_events;
 ALTER PUBLICATION supabase_realtime ADD TABLE vpn_connections;
 ALTER PUBLICATION supabase_realtime ADD TABLE navigation_logs;
+ALTER PUBLICATION supabase_realtime ADD TABLE browsing_history;
 
 -- Grant permissions for authenticated users
 GRANT SELECT, INSERT, UPDATE ON users TO authenticated;
@@ -300,6 +334,7 @@ GRANT SELECT, INSERT, UPDATE ON user_sessions TO authenticated;
 GRANT SELECT, INSERT ON security_events TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON vpn_connections TO authenticated;
 GRANT SELECT, INSERT ON navigation_logs TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON browsing_history TO authenticated;
 GRANT SELECT ON access_levels TO authenticated;
 GRANT SELECT ON system_settings TO authenticated;
 
@@ -317,4 +352,5 @@ COMMENT ON TABLE access_levels IS 'Access level configurations and domain restri
 COMMENT ON TABLE security_events IS 'Security incident logging and monitoring';
 COMMENT ON TABLE vpn_connections IS 'VPN connection monitoring and analytics';
 COMMENT ON TABLE navigation_logs IS 'User browsing activity and access control logs';
+COMMENT ON TABLE browsing_history IS 'Chrome-like browsing history with local and cloud sync';
 COMMENT ON TABLE system_settings IS 'Application configuration and system settings'; 
