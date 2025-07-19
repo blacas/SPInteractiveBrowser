@@ -381,10 +381,10 @@ function AppContent() {
           'medium'
         );
         
-        // Update user access level for MVP testing
+        // Update user access level
         const updatedUser = { ...user, accessLevel: newLevel };
-        // In a real app, this would make an API call
-        // For MVP, we'll update localStorage
+        
+        // Update localStorage with new access level
         localStorage.setItem("auth", JSON.stringify(updatedUser));
         
         console.log(`🔄 Changing access level to ${newLevel}...`);
@@ -393,6 +393,7 @@ function AppContent() {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Update state directly instead of forcing reload
+        setUser(updatedUser);
         setInitStage('ready');
         setInitProgress(100);
         
@@ -401,8 +402,9 @@ function AppContent() {
         
         console.log(`✅ Access level changed to ${newLevel} successfully`);
         
-        // Force re-render by triggering auth state update
-        window.location.reload();
+        // No page reload - let React handle the state update
+        // The browser component will automatically update based on the new user prop
+        
       } catch (error) {
         console.error('❌ Failed to change access level:', error);
         
