@@ -1042,6 +1042,62 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user }) => {
                     }
                   />
                 </div>
+              ) : isCheckingStatus || (tab.isLoading && !tab.url.startsWith('http')) ? (
+                /* Show beautiful loader while determining permissions or loading */
+                <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 min-h-full">
+                  <div className="text-center">
+                    {/* Beautiful animated loader */}
+                    <div className="relative mb-8">
+                      {/* Outer rotating ring */}
+                      <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-spin mx-auto">
+                        <div className="w-16 h-16 border-4 border-transparent border-t-blue-600 rounded-full animate-spin"></div>
+                      </div>
+                      {/* Inner pulsing dot */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-3 h-3 bg-blue-600 rounded-full animate-pulse"></div>
+                      </div>
+                    </div>
+                    
+                    {/* Loading text */}
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold text-slate-700">
+                        {isCheckingStatus ? 'Verifying Access Permissions' : 'Securing Connection'}
+                      </h3>
+                      <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+                        {isCheckingStatus 
+                          ? 'Checking your access level and domain permissions...'
+                          : 'Establishing secure browsing session through Australian VPN...'
+                        }
+                      </p>
+                    </div>
+                    
+                    {/* Progress indicator */}
+                    <div className="mt-6 w-48 mx-auto">
+                      <div className="flex items-center space-x-2 text-xs text-slate-400">
+                        <div className="flex-1 h-1 bg-slate-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full animate-pulse"></div>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-center space-x-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                    </div>
+                    
+                    {/* Security badges */}
+                    <div className="mt-8 flex items-center justify-center space-x-4">
+                      <div className="flex items-center space-x-2 px-3 py-1.5 bg-white/70 rounded-full border border-emerald-200">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                        <span className="text-xs font-medium text-emerald-700">VPN Secured</span>
+                      </div>
+                      <div className="flex items-center space-x-2 px-3 py-1.5 bg-white/70 rounded-full border border-blue-200">
+                        <Shield className="w-3 h-3 text-blue-600" />
+                        <span className="text-xs font-medium text-blue-700">Level {user?.accessLevel || 1} Access</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ) : !isUrlAllowed(tab.url) ? (
                 /* Show URL restriction error for blocked domains */
                 <div className="flex-1 flex items-center justify-center bg-gray-50">
