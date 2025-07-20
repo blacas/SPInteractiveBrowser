@@ -54,27 +54,51 @@ $env:WINDOWS_CERTIFICATE_PASSWORD = "your_certificate_password"
 ### 4. Build and Publish Commands
 
 ```bash
-# Build distributables for current platform
+# Build distributables for ALL platforms (Windows, macOS, Linux)
 npm run make
 
-# Build for specific platform
-npm run make -- --platform=win32
-npm run make -- --platform=darwin
-npm run make -- --platform=linux
+# Build for all platforms (explicit)
+npm run make:all
 
-# Publish to GitHub (requires GITHUB_TOKEN)
+# Build for specific platform
+npm run make:win           # Windows only
+npm run make:mac           # macOS Universal (Intel + Apple Silicon)
+npm run make:mac:intel     # macOS Intel only
+npm run make:mac:silicon   # macOS Apple Silicon only
+npm run make:linux         # Linux only
+
+# Publish to GitHub for ALL platforms (requires GITHUB_TOKEN)
 npm run publish
 
+# Publish for all platforms (explicit)
+npm run publish:all
+
 # Publish for specific platform
-npm run publish -- --platform=win32
+npm run publish:win           # Windows only
+npm run publish:mac           # macOS Universal (Intel + Apple Silicon)
+npm run publish:mac:intel     # macOS Intel only
+npm run publish:mac:silicon   # macOS Apple Silicon only
+npm run publish:linux         # Linux only
 ```
+
+**🚀 Default Behavior Change**: The `make` and `publish` commands now build for **all three platforms** by default (Windows, macOS, and Linux). This ensures every release includes downloads for all supported operating systems.
 
 ## Platform-Specific Builds
 
-The configuration includes makers for:
-- **Windows**: Squirrel.Windows installer (`.exe`)
-- **macOS**: ZIP archive (`.zip`)
-- **Linux**: DEB package (`.deb`) and RPM package (`.rpm`)
+The configuration includes makers for all platforms. When you run `npm run make`, you'll get:
+
+### Windows
+- **Installer**: `Secure.Remote.Browser-1.2.4.Setup.exe` (Squirrel installer)
+- **Package**: `secure_remote_browser-1.2.4-full.nupkg` (NuGet package)
+
+### macOS  
+- **Universal Binary**: `Secure.Remote.Browser-1.2.4-darwin-universal.zip` (Intel + Apple Silicon)
+- **Intel Only**: `Secure.Remote.Browser-1.2.4-darwin-x64.zip` (Intel Macs)
+- **Apple Silicon Only**: `Secure.Remote.Browser-1.2.4-darwin-arm64.zip` (Apple Silicon Macs)
+
+### Linux
+- **Debian/Ubuntu**: `secure-remote-browser_1.2.4_amd64.deb` (DEB package)
+- **Red Hat/Fedora**: `secure-remote-browser-1.2.4.x86_64.rpm` (RPM package)
 
 ## Publishing Process
 
@@ -88,14 +112,27 @@ The publisher is configured to:
 
 ## Testing Your Setup
 
-1. First, test building locally:
+1. **Quick test** - Build and compile for all platforms:
+   ```bash
+   npm run test:build
+   ```
+
+2. **Full test** - Build distributables for all platforms locally:
    ```bash
    npm run make
    ```
 
-2. Check the `out/` directory for your distributables
+3. **Check output** - Verify the `out/` directory contains files for all platforms:
+   ```
+   out/
+   ├── make/
+   │   ├── squirrel.windows/           # Windows files
+   │   ├── zip/darwin/                 # macOS files  
+   │   ├── deb/                        # Linux DEB files
+   │   └── rpm/                        # Linux RPM files
+   ```
 
-3. Test publishing (will create a draft release):
+4. **Test publishing** (will create a draft release):
    ```bash
    npm run publish
    ```

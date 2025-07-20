@@ -6,6 +6,10 @@ module.exports = {
     asar: true,
     name: 'Secure Remote Browser',
     appBundleId: 'com.securebrowser.app',
+    // Support multiple architectures
+    osxUniversal: {
+      mergeASARs: false,
+    },
   },
   rebuildConfig: {},
   makers: [
