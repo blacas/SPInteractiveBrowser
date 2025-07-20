@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
+import { SecureBrowserDatabaseService } from '@/services/databaseService';
 
 interface User {
-  id: string;
+  id: number; // Changed from string to number
   name: string;
   email: string;
   accessLevel: 1 | 2 | 3;
@@ -22,54 +23,249 @@ export const useAuth = () => {
   });
 
   const login = async (credentials: { email: string; password: string }): Promise<void> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    setAuthState(prev => ({ ...prev, isLoading: true }));
     
-    // Mock authentication logic - replace with real API call
-    if (credentials.email && credentials.password) {
-      // Mock user data based on email for demo purposes
-      const mockUser: User = {
-        id: "user-123",
-        name: credentials.email.includes("admin") ? "Admin User" : "John Doe",
-        email: credentials.email,
-        accessLevel: credentials.email.includes("admin") ? 3 : 
-                    credentials.email.includes("manager") ? 2 : 1,
+    try {
+      // Simulate API call delay for UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Basic credential validation
+      if (!credentials.email || !credentials.password) {
+        // Log failed login attempt
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Login attempt failed: Missing email or password`,
+          'medium'
+        );
+        
+        throw new Error("Email and password are required");
+      }
+
+      // Additional validation - email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(credentials.email)) {
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Login attempt failed: Invalid email format for ${credentials.email}`,
+          'medium'
+        );
+        
+        throw new Error("Invalid email format");
+      }
+
+      // Additional validation - password length
+      if (credentials.password.length < 3) { // Simple validation for MVP
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Login attempt failed: Password too short for ${credentials.email}`,
+          'medium'
+        );
+        
+        throw new Error("Password is too short");
+      }
+
+      // Extract name from email for user creation
+      const userName = credentials.email.includes("admin") ? "Admin User" : extractNameFromEmail(credentials.email);
+      
+      // Log login attempt
+      await SecureBrowserDatabaseService.logSecurityEvent(
+        'unauthorized_access',
+        `Login attempt for user: ${credentials.email}`,
+        'low'
+      );
+      
+      // Initialize database session
+      const success = await SecureBrowserDatabaseService.initializeUserSession(credentials.email, userName);
+      
+      if (!success) {
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Login failed: Database session initialization failed for ${credentials.email}`,
+          'high'
+        );
+        
+        throw new Error("Failed to initialize user session");
+      }
+
+      // Get the current user from database service
+      const dbUser = SecureBrowserDatabaseService.getCurrentUser();
+      
+      if (!dbUser) {
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Login failed: Could not retrieve user data for ${credentials.email}`,
+          'high'
+        );
+        
+        throw new Error("Failed to retrieve user data");
+      }
+
+      // Update last login time
+      await SecureBrowserDatabaseService.updateLastLogin();
+
+      // Create the user object for the frontend
+      const user: User = {
+        id: dbUser.id,
+        name: dbUser.name,
+        email: dbUser.email,
+        accessLevel: dbUser.access_level as 1 | 2 | 3,
         avatar: undefined
       };
       
       setAuthState({
-        user: mockUser,
+        user,
         isLoading: false,
         isAuthenticated: true,
       });
       
       // Store auth state in localStorage for persistence
-      localStorage.setItem("auth", JSON.stringify(mockUser));
-    } else {
-      throw new Error("Invalid credentials");
+      localStorage.setItem("auth", JSON.stringify(user));
+      
+      // Start session monitoring
+      SecureBrowserDatabaseService.startSessionMonitoring();
+      
+      // Log successful login
+      await SecureBrowserDatabaseService.logSecurityEvent(
+        'unauthorized_access',
+        `User successfully logged in: ${credentials.email} with access level ${dbUser.access_level}`,
+        'low'
+      );
+      
+      console.log('✅ Login successful for:', credentials.email, 'with access level:', dbUser.access_level);
+      
+    } catch (error) {
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+      
+      // Log login failure with details
+      await SecureBrowserDatabaseService.logSecurityEvent(
+        'unauthorized_access',
+        `Login failed for ${credentials.email}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'medium'
+      );
+      
+      console.error('❌ Login failed:', error);
+      throw error;
     }
   };
 
-  const logout = () => {
-    setAuthState({
-      user: null,
-      isLoading: false,
-      isAuthenticated: false,
-    });
-    localStorage.removeItem("auth");
+  const logout = async () => {
+    try {
+      const currentUser = authState.user;
+      
+      // Log logout attempt
+      if (currentUser) {
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `User initiated logout: ${currentUser.email}`,
+          'low'
+        );
+      }
+      
+      // End database session before clearing state
+      await SecureBrowserDatabaseService.endSession();
+      
+      // Clear authentication state
+      setAuthState({
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+      });
+      
+      localStorage.removeItem("auth");
+      
+      // Log successful logout
+      if (currentUser) {
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `User successfully logged out: ${currentUser.email}`,
+          'low'
+        );
+      }
+      
+      console.log('✅ User logged out successfully');
+      
+    } catch (error) {
+      console.error('❌ Error during logout:', error);
+      
+      // Log logout error but still clear local state
+      await SecureBrowserDatabaseService.logSecurityEvent(
+        'unauthorized_access',
+        `Logout error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'medium'
+      );
+      
+      // Still clear the state even if database cleanup fails
+      setAuthState({
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+      });
+      localStorage.removeItem("auth");
+    }
   };
 
-  const checkAuthStatus = () => {
+  // Extract name from email (shared function)
+  const extractNameFromEmail = (email: string): string => {
+    const username = email.split('@')[0];
+    
+    // Handle common separators in email usernames
+    const nameParts = username.split(/[._-]/).filter(part => part.length > 0);
+    
+    // Capitalize each part and join with space
+    const formattedName = nameParts.map(part => 
+      part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+    ).join(' ');
+    
+    // If it's a single part or short, add "User" suffix
+    if (formattedName.length < 4 || !formattedName.includes(' ')) {
+      return formattedName + ' User';
+    }
+    
+    return formattedName;
+  };
+
+  const checkAuthStatus = async () => {
     const storedAuth = localStorage.getItem("auth");
     if (storedAuth) {
       try {
         const user = JSON.parse(storedAuth);
+        
+        // Migration: Update old hardcoded names with email-based names
+        let updatedUser = { ...user };
+        if (user.name === "John Doe" || user.name === "Admin User") {
+          updatedUser.name = user.email.includes("admin") ? "Admin User" : extractNameFromEmail(user.email);
+          
+          // Update localStorage with new name
+          localStorage.setItem("auth", JSON.stringify(updatedUser));
+          console.log(`🔄 Updated cached user name from "${user.name}" to "${updatedUser.name}"`);
+        }
+        
+        // Log session restoration
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Session restored for user: ${updatedUser.email}`,
+          'low'
+        );
+        
         setAuthState({
-          user,
+          user: updatedUser,
           isLoading: false,
           isAuthenticated: true,
         });
-      } catch {
+        
+        // Restart session monitoring if user was restored from localStorage
+        SecureBrowserDatabaseService.startSessionMonitoring();
+        
+      } catch (error) {
+        console.error('❌ Failed to restore auth session:', error);
+        
+        // Log session restoration failure
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Failed to restore user session from localStorage: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          'medium'
+        );
+        
         localStorage.removeItem("auth");
         setAuthState({
           user: null,
@@ -85,6 +281,62 @@ export const useAuth = () => {
       });
     }
   };
+
+  // Session timeout functionality
+  useEffect(() => {
+    let sessionTimeout: NodeJS.Timeout;
+    
+    if (authState.isAuthenticated && authState.user) {
+      // Set session timeout (30 minutes of inactivity)
+      const TIMEOUT_DURATION = 30 * 60 * 1000; // 30 minutes
+      
+      const resetTimeout = () => {
+        if (sessionTimeout) {
+          clearTimeout(sessionTimeout);
+        }
+        
+        sessionTimeout = setTimeout(async () => {
+          console.warn('⚠️ Session timeout reached');
+          
+          // Log session timeout
+          await SecureBrowserDatabaseService.logSecurityEvent(
+            'session_timeout',
+            `User session timed out due to inactivity: ${authState.user?.email}`,
+            'medium'
+          );
+          
+          // Auto-logout due to timeout
+          await logout();
+          
+          alert('Your session has expired due to inactivity. Please log in again.');
+        }, TIMEOUT_DURATION);
+      };
+      
+      // Reset timeout on user activity
+      const handleActivity = () => {
+        resetTimeout();
+      };
+      
+      // Listen for user activity
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+      events.forEach(event => {
+        document.addEventListener(event, handleActivity, true);
+      });
+      
+      // Initial timeout setup
+      resetTimeout();
+      
+      // Cleanup
+      return () => {
+        events.forEach(event => {
+          document.removeEventListener(event, handleActivity, true);
+        });
+        if (sessionTimeout) {
+          clearTimeout(sessionTimeout);
+        }
+      };
+    }
+  }, [authState.isAuthenticated, authState.user]);
 
   useEffect(() => {
     checkAuthStatus();

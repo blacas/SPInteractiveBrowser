@@ -86,6 +86,24 @@ contextBridge.exposeInMainWorld('secureBrowser', {
   extensions: {
     get1PasswordStatus: () => ipcRenderer.invoke('extension-get-1password-status'),
     install1Password: () => ipcRenderer.invoke('extension-install-1password')
+  },
+
+  // Window Management
+  window: {
+    createNew: () => ipcRenderer.invoke('window-create-new'),
+    getCount: () => ipcRenderer.invoke('window-get-count'),
+    close: (windowId?: number) => ipcRenderer.invoke('window-close', windowId)
+  },
+
+  // Context Menu
+  contextMenu: {
+    show: (params: { x: number, y: number }) => ipcRenderer.invoke('context-menu-show', params),
+    onAction: (callback: (action: string) => void) => {
+      ipcRenderer.on('context-menu-action', (_, action) => callback(action))
+    },
+    removeActionListener: () => {
+      ipcRenderer.removeAllListeners('context-menu-action')
+    }
   }
 })
 
@@ -153,6 +171,28 @@ export interface SecureBrowserAPI {
       steps: string[];
       webStoreUrl: string;
     }>;
+  };
+  window: {
+    createNew: () => Promise<{
+      success: boolean;
+      windowId?: number;
+      message?: string;
+      error?: string;
+    }>;
+    getCount: () => Promise<{
+      total: number;
+      mainWindowId: number | null;
+    }>;
+    close: (windowId?: number) => Promise<{
+      success: boolean;
+      message?: string;
+      error?: string;
+    }>;
+  };
+  contextMenu: {
+    show: (params: { x: number, y: number }) => Promise<void>;
+    onAction: (callback: (action: string) => void) => void;
+    removeActionListener: () => void;
   };
 }
 

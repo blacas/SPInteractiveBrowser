@@ -157,10 +157,24 @@ html {
     outline: none !important;
   }
   
-  /* Ensure input field has proper text rendering */
+  /* Ensure input field has proper text rendering and interaction */
   input[type="text"], input[type="url"] {
     -webkit-appearance: none;
     appearance: none;
     caret-color: #1e293b !important;
+    pointer-events: auto !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+  }
+
+  /* Ensure input fields are interactive */
+  input:not([disabled]):not([readonly]) {
+    pointer-events: auto !important;
+    cursor: text !important;
+  }
+
+  /* Fix for Electron webview input issues */
+  webview {
+    pointer-events: auto;
   }
 }

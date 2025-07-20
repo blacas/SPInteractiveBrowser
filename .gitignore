@@ -25,3 +25,4 @@ dist-ssr
 
 # release (Please don't commit this)
 release
+out/

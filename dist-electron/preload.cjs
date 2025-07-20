@@ -73,6 +73,22 @@ electron.contextBridge.exposeInMainWorld("secureBrowser", {
   extensions: {
     get1PasswordStatus: () => electron.ipcRenderer.invoke("extension-get-1password-status"),
     install1Password: () => electron.ipcRenderer.invoke("extension-install-1password")
+  },
+  // Window Management
+  window: {
+    createNew: () => electron.ipcRenderer.invoke("window-create-new"),
+    getCount: () => electron.ipcRenderer.invoke("window-get-count"),
+    close: (windowId) => electron.ipcRenderer.invoke("window-close", windowId)
+  },
+  // Context Menu
+  contextMenu: {
+    show: (params) => electron.ipcRenderer.invoke("context-menu-show", params),
+    onAction: (callback) => {
+      electron.ipcRenderer.on("context-menu-action", (_, action) => callback(action));
+    },
+    removeActionListener: () => {
+      electron.ipcRenderer.removeAllListeners("context-menu-action");
+    }
   }
 });
 delete window.module;

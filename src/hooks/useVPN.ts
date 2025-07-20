@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from 'react';
 
 type VPNStatus = "connected" | "connecting" | "disconnected" | "failed";
 
@@ -9,7 +9,6 @@ interface VPNConnection {
   latency?: number;
 }
 
-// Type for electron API
 interface ElectronVPNAPI {
   connect: (provider: string) => Promise<boolean>;
   getStatus: () => Promise<string>;
@@ -34,10 +33,13 @@ export const useVPN = () => {
   const [retryCount, setRetryCount] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [autoReconnectAttempts, setAutoReconnectAttempts] = useState(0);
+  const [isAutoReconnecting, setIsAutoReconnecting] = useState(false);
 
   const connectVPN = async (): Promise<void> => {
     setVpnStatus("connecting");
     setLastError(null);
+    setIsAutoReconnecting(false);
     
     try {
       // Use IPC to connect VPN via main process
@@ -47,6 +49,7 @@ export const useVPN = () => {
       if (success) {
         setVpnStatus("connected");
         setRetryCount(0);
+        setAutoReconnectAttempts(0);
         console.log("✅ VPN Connected successfully via main process");
         
         // Update connection info
@@ -68,6 +71,8 @@ export const useVPN = () => {
   const disconnectVPN = async (): Promise<void> => {
     console.log("Disconnecting VPN...");
     setVpnStatus("disconnected");
+    setAutoReconnectAttempts(0);
+    setIsAutoReconnecting(false);
     setConnection(prev => ({
       ...prev,
       ipAddress: undefined,
@@ -75,7 +80,50 @@ export const useVPN = () => {
     }));
   };
 
-  // Check VPN status function with better error handling
+  // Auto-reconnect function
+  const autoReconnectVPN = useCallback(async (): Promise<void> => {
+    if (isAutoReconnecting || vpnStatus === "connecting") {
+      return; // Prevent multiple concurrent reconnection attempts
+    }
+
+    setIsAutoReconnecting(true);
+    setAutoReconnectAttempts(prev => prev + 1);
+    console.log(`🔄 Auto-reconnect attempt ${autoReconnectAttempts + 1}...`);
+
+    try {
+      // Use IPC to connect VPN via main process
+      const success = await window.electronAPI?.vpn?.connect('wireguard');
+      
+      if (success) {
+        setVpnStatus("connected");
+        setRetryCount(0);
+        setAutoReconnectAttempts(0);
+        setIsAutoReconnecting(false);
+        console.log("✅ VPN Auto-reconnected successfully");
+        
+        // Update connection info
+        setConnection(prev => ({
+          ...prev,
+          ipAddress: "134.199.169.102",
+          latency: Math.floor(Math.random() * 30) + 15
+        }));
+      } else {
+        throw new Error("Auto-reconnection failed");
+      }
+    } catch (error) {
+      console.error("❌ VPN auto-reconnection failed:", error);
+      setIsAutoReconnecting(false);
+      
+      // If we've tried too many times, give up auto-reconnect
+      if (autoReconnectAttempts >= 5) {
+        console.log("❌ Auto-reconnect failed after 5 attempts, stopping");
+        setVpnStatus("failed");
+        setLastError("Auto-reconnection failed after multiple attempts");
+      }
+    }
+  }, [isAutoReconnecting, vpnStatus, autoReconnectAttempts]);
+
+  // Check VPN status function with better error handling and more reliable status detection
   const checkVPNStatus = useCallback(async (): Promise<void> => {
     setIsCheckingStatus(true);
     try {
@@ -84,44 +132,83 @@ export const useVPN = () => {
       console.log(`📊 VPN status received from main process: ${status}`);
       
       if (status === 'connected') {
-        setVpnStatus("connected");
-        setLastError(null);
-        
-        // Update connection info
-        setConnection(prev => ({
-          ...prev,
-          ipAddress: "134.199.169.102", // Your actual Australian IP
-          latency: Math.floor(Math.random() * 30) + 15
-        }));
-        
-        console.log("✅ VPN is connected to Australia");
+        // Only update if currently not connected to prevent unnecessary re-renders
+        if (vpnStatus !== "connected") {
+          setVpnStatus("connected");
+          setLastError(null);
+          setAutoReconnectAttempts(0);
+          setIsAutoReconnecting(false);
+          
+          // Update connection info
+          setConnection(prev => ({
+            ...prev,
+            ipAddress: "134.199.169.102", // Your actual Australian IP
+            latency: Math.floor(Math.random() * 30) + 15
+          }));
+          
+          console.log("✅ VPN is connected to Australia");
+        }
       } else if (status === 'disconnected') {
-        setVpnStatus("disconnected");
-        setLastError("WireGuard VPN is not connected to Australia");
+        // Only update if currently connected and trigger auto-reconnect
+        if (vpnStatus === "connected") {
+          console.warn("⚠️ VPN disconnection detected, triggering auto-reconnect...");
+          setVpnStatus("disconnected");
+          setLastError("WireGuard VPN disconnected unexpectedly");
+          
+          // Trigger auto-reconnect if not already reconnecting
+          if (!isAutoReconnecting && autoReconnectAttempts < 5) {
+            setTimeout(() => {
+              autoReconnectVPN();
+            }, 5000); // Wait 5 seconds before auto-reconnect
+          }
+        } else if (vpnStatus !== "disconnected" && vpnStatus !== "connecting") {
+          setVpnStatus("disconnected");
+          setLastError("WireGuard VPN is not connected to Australia");
+        }
         console.log("❌ VPN is disconnected");
       } else if (status === undefined || status === null) {
         // Handle undefined/null status - likely means IPC is not working
         console.warn("⚠️ VPN status is undefined - checking if main process is ready...");
         
-        // Wait a bit and try again
-        setTimeout(() => {
-          checkVPNStatus();
-        }, 2000);
+        // Don't immediately fail, give it more time
+        if (vpnStatus !== "failed") {
+          // Wait a bit and try again
+          setTimeout(() => {
+            checkVPNStatus();
+          }, 5000); // Increased timeout
+        }
         
         return; // Don't change status yet
       } else {
-        setVpnStatus("failed");
-        setLastError(`Unknown VPN status: ${status}`);
         console.log(`❌ Unknown VPN status: ${status}`);
+        // Don't immediately set to failed, could be a temporary issue
+        if (vpnStatus === "connected") {
+          console.warn("⚠️ Unknown status but was connected, will retry status check");
+          setTimeout(() => {
+            checkVPNStatus();
+          }, 10000); // Retry in 10 seconds
+        } else {
+          setVpnStatus("failed");
+          setLastError(`Unknown VPN status: ${status}`);
+        }
       }
     } catch (error) {
       console.error("❌ Failed to check VPN status:", error);
-      setVpnStatus("failed");
-      setLastError("Failed to check VPN connection status");
+      
+      // Don't immediately fail if we were connected, could be a temporary IPC issue
+      if (vpnStatus === "connected") {
+        console.warn("⚠️ Status check failed but was connected, will retry");
+        setTimeout(() => {
+          checkVPNStatus();
+        }, 15000); // Retry in 15 seconds
+      } else {
+        setVpnStatus("failed");
+        setLastError("Failed to check VPN connection status");
+      }
     } finally {
       setIsCheckingStatus(false);
     }
-  }, []);
+  }, [vpnStatus, isAutoReconnecting, autoReconnectAttempts, autoReconnectVPN]);
 
   // Check VPN status on mount with retry logic
   useEffect(() => {
@@ -140,7 +227,7 @@ export const useVPN = () => {
           console.log("⏳ Waiting for electronAPI to be ready...");
           if (retryAttempts < maxRetries) {
             retryAttempts++;
-            setTimeout(checkInitialStatus, 1000);
+            setTimeout(checkInitialStatus, 2000); // Increased from 1000ms
           } else {
             console.error("❌ electronAPI not ready after max retries");
             setVpnStatus("failed");
@@ -167,7 +254,7 @@ export const useVPN = () => {
           console.warn("⚠️ Initial VPN status is undefined - retrying...");
           if (retryAttempts < maxRetries) {
             retryAttempts++;
-            setTimeout(checkInitialStatus, 2000);
+            setTimeout(checkInitialStatus, 3000); // Increased timeout
           } else {
             console.error("❌ VPN status still undefined after max retries");
             setVpnStatus("failed");
@@ -182,7 +269,7 @@ export const useVPN = () => {
         console.error("❌ Failed to check initial VPN status:", error);
         if (retryAttempts < maxRetries) {
           retryAttempts++;
-          setTimeout(checkInitialStatus, 2000);
+          setTimeout(checkInitialStatus, 3000); // Increased timeout
         } else {
           setVpnStatus("failed");
           setLastError("Failed to initialize VPN status");
@@ -190,24 +277,43 @@ export const useVPN = () => {
       }
     };
 
-    // Start checking after a short delay to ensure everything is loaded
-    setTimeout(checkInitialStatus, 500);
+    // Start checking after a longer delay to ensure everything is loaded
+    setTimeout(checkInitialStatus, 1000); // Increased from 500ms
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  // Periodic VPN status check every 30 seconds
+  // Periodic VPN status check with more conservative timing
   useEffect(() => {
     const interval = setInterval(() => {
-      if (vpnStatus === "connected") {
+      // Only check status if we think we're connected or if we're not auto-reconnecting
+      if (vpnStatus === "connected" || (vpnStatus === "disconnected" && !isAutoReconnecting)) {
         checkVPNStatus();
       }
-    }, 30000);
+    }, 45000); // Increased from 30 seconds to 45 seconds to reduce frequent checks
 
     return () => clearInterval(interval);
-  }, [vpnStatus, checkVPNStatus]);
+  }, [vpnStatus, checkVPNStatus, isAutoReconnecting]);
+
+  // Auto-reconnect logic for when VPN unexpectedly disconnects
+  useEffect(() => {
+    let autoReconnectTimeout: NodeJS.Timeout;
+
+    if (vpnStatus === "disconnected" && autoReconnectAttempts < 5 && !isAutoReconnecting) {
+      console.log(`⏰ Scheduling auto-reconnect attempt ${autoReconnectAttempts + 1} in 30 seconds...`);
+      autoReconnectTimeout = setTimeout(() => {
+        autoReconnectVPN();
+      }, 30000); // Auto-reconnect every 30 seconds
+    }
+
+    return () => {
+      if (autoReconnectTimeout) {
+        clearTimeout(autoReconnectTimeout);
+      }
+    };
+  }, [vpnStatus, autoReconnectAttempts, isAutoReconnecting, autoReconnectVPN]);
 
   return {
     vpnStatus,
@@ -218,9 +324,11 @@ export const useVPN = () => {
     retryCount,
     lastError,
     isConnected: vpnStatus === "connected",
-    isConnecting: vpnStatus === "connecting",
+    isConnecting: vpnStatus === "connecting" || isAutoReconnecting,
     isCheckingStatus,
     hasFailed: vpnStatus === "failed",
+    autoReconnectAttempts,
+    isAutoReconnecting,
     // Allow browsing only if VPN is connected
     allowBrowsing: vpnStatus === "connected",
   };
