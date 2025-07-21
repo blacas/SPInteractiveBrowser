@@ -10,6 +10,21 @@ module.exports = {
     osxUniversal: {
       mergeASARs: false,
     },
+    // Code signing configuration for macOS
+    osxSign: {
+      identity: process.env.APPLE_IDENTITY || 'Developer ID Application: Your Name (TEAM_ID)',
+      'hardened-runtime': true,
+      'gatekeeper-assess': false,
+      entitlements: 'entitlements.plist',
+      'entitlements-inherit': 'entitlements.plist',
+      'signature-flags': 'library'
+    },
+    // Notarization configuration
+    osxNotarize: process.env.APPLE_ID ? {
+      appleId: process.env.APPLE_ID,
+      appleIdPassword: process.env.APPLE_PASSWORD,
+      teamId: process.env.APPLE_TEAM_ID,
+    } : false,
   },
   rebuildConfig: {},
   makers: [

@@ -784,15 +784,15 @@ const configureSecureSession = (): void => {
         'Referrer-Policy': ['strict-origin-when-cross-origin'],
         'Permissions-Policy': ['camera=(), microphone=(), geolocation=()'],
         'Content-Security-Policy': [
-          'default-src \'self\' chrome-extension: moz-extension: extension:; ' +
-          'script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' chrome-extension: moz-extension: extension:; ' +
-          'style-src \'self\' \'unsafe-inline\' https: chrome-extension: moz-extension: extension:; ' +
-          'connect-src \'self\' https: wss: data: chrome-extension: moz-extension: extension:; ' +
-          'img-src \'self\' https: data: blob: chrome-extension: moz-extension: extension:; ' +
-          'font-src \'self\' https: data: chrome-extension: moz-extension: extension:; ' +
-          'media-src \'self\' https: data: chrome-extension: moz-extension: extension:; ' +
-          'frame-src \'self\' https: chrome-extension: moz-extension: extension:; ' +
-          'child-src \'self\' https: chrome-extension: moz-extension: extension:;'
+          'default-src \'self\' file: chrome-extension: moz-extension: extension:; ' +
+          'script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' file: chrome-extension: moz-extension: extension:; ' +
+          'style-src \'self\' \'unsafe-inline\' https: file: chrome-extension: moz-extension: extension:; ' +
+          'connect-src \'self\' https: wss: data: file: chrome-extension: moz-extension: extension:; ' +
+          'img-src \'self\' https: data: blob: file: chrome-extension: moz-extension: extension:; ' +
+          'font-src \'self\' https: data: file: chrome-extension: moz-extension: extension:; ' +
+          'media-src \'self\' https: data: file: chrome-extension: moz-extension: extension:; ' +
+          'frame-src \'self\' https: file: chrome-extension: moz-extension: extension:; ' +
+          'child-src \'self\' https: file: chrome-extension: moz-extension: extension:;'
         ]
       }
     })

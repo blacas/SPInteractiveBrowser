@@ -12,6 +12,23 @@ This application provides secure remote access to SharePoint-hosted documents wi
 - **🛡️ Role-Based Access Control**: Three access levels with different browsing permissions
 - **⚡ Fail-Closed Security**: Browser access blocked if VPN connection fails
 
+## 🚀 Installation
+
+### macOS Installation
+
+Due to macOS security features (Gatekeeper), you may encounter a "damaged and can't be opened" error when first running the app.
+
+**Quick Solution:**
+1. Download and extract the app
+2. Open Terminal and run:
+   ```bash
+   sudo xattr -rd com.apple.quarantine "/path/to/Secure Remote Browser.app"
+   ```
+3. Enter your password when prompted
+4. The app will now launch normally
+
+For more detailed information about code signing and distribution options, see [docs/MACOS_CODE_SIGNING.md](docs/MACOS_CODE_SIGNING.md).
+
 ## 🏗️ Architecture
 
 ### Core Components
