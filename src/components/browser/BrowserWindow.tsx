@@ -8,6 +8,7 @@ import React, {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,8 +19,12 @@ import {
   Shield,
   AlertTriangle,
   Lock,
-  Globe,
+  FileDown,
+  Printer,
+  Copy,
   ExternalLink,
+  Globe,
+
 } from "lucide-react";
 
 import { useVPN } from "@/hooks/useVPN";
@@ -70,8 +75,98 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isDownloadsModalOpen, setIsDownloadsModalOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+  }>({ visible: false, x: 0, y: 0 });
+  // Download interface to match DownloadsModal
+  interface DownloadItem {
+    id: string;
+    filename: string;
+    url: string;
+    size: number;
+    totalBytes: number;
+    downloadedBytes: number;
+    status: 'downloading' | 'completed' | 'cancelled' | 'blocked';
+    startTime: Date;
+    endTime?: Date;
+    speed?: number;
+    progress: number;
+    filePath?: string;
+  }
+
+  // Downloads state with localStorage persistence
+  const [downloads, setDownloads] = useState<DownloadItem[]>(() => {
+    try {
+      const savedDownloads = localStorage.getItem('app-downloads');
+      if (savedDownloads) {
+        const parsed = JSON.parse(savedDownloads);
+        // Convert date strings back to Date objects and handle interrupted downloads
+        const restoredDownloads = parsed.map((download: any) => {
+          const restored = {
+            ...download,
+            startTime: new Date(download.startTime),
+            endTime: download.endTime ? new Date(download.endTime) : undefined
+          };
+          
+          // Mark any downloads that were in progress as cancelled since they can't continue
+          if (restored.status === 'downloading') {
+            restored.status = 'cancelled';
+            restored.endTime = new Date();
+            console.log('📋 Restored interrupted download as cancelled:', restored.filename);
+          }
+          
+          return restored;
+        });
+        
+        console.log('📥 Restored', restoredDownloads.length, 'downloads from localStorage');
+        return restoredDownloads;
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to load downloads from localStorage:', error);
+    }
+    return [];
+  });
   const webviewRefs = useRef<{ [key: string]: HTMLElement | null }>({});
   const webviewInitialized = useRef<{ [key: string]: boolean }>({});
+
+  // Debug downloads state changes
+  useEffect(() => {
+    console.log('📊 Downloads state changed:', {
+      total: downloads.length,
+      downloading: downloads.filter(d => d.status === 'downloading').length,
+      completed: downloads.filter(d => d.status === 'completed').length,
+      cancelled: downloads.filter(d => d.status === 'cancelled').length,
+      blocked: downloads.filter(d => d.status === 'blocked').length,
+      downloads: downloads.map(d => ({ id: d.id, filename: d.filename, status: d.status }))
+    });
+  }, [downloads]);
+
+  // Save downloads to localStorage whenever downloads change
+  useEffect(() => {
+    try {
+      localStorage.setItem('app-downloads', JSON.stringify(downloads));
+      console.log('💾 Downloads saved to localStorage:', downloads.length, 'items');
+    } catch (error) {
+      console.error('❌ Failed to save downloads to localStorage:', error);
+      
+      // Handle quota exceeded error by clearing old downloads
+      if (error instanceof Error && error.name === 'QuotaExceededError') {
+        console.warn('⚠️ localStorage quota exceeded, clearing old downloads...');
+        try {
+          // Keep only the last 50 downloads
+          const recentDownloads = downloads.slice(-50);
+          localStorage.setItem('app-downloads', JSON.stringify(recentDownloads));
+          setDownloads(recentDownloads);
+          console.log('✅ Cleared old downloads, keeping', recentDownloads.length, 'recent ones');
+        } catch (retryError) {
+          console.error('❌ Failed to save even after cleanup:', retryError);
+          localStorage.removeItem('app-downloads');
+        }
+      }
+    }
+  }, [downloads]);
 
   // Initialize HistoryService with current user
   useEffect(() => {
@@ -521,6 +616,401 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     }
   }, [activeTab]);
 
+  // Context menu handlers
+  const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setContextMenu({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }, []);
+
+  const hideContextMenu = useCallback(() => {
+    setContextMenu({ visible: false, x: 0, y: 0 });
+  }, []);
+
+  const saveAsPDF = useCallback(async () => {
+    try {
+      const webview = webviewRefs.current[activeTab] as any;
+      if (webview && webview.printToPDF) {
+        console.log('📄 Saving page as PDF...');
+        
+        // Use Electron's IPC to handle PDF generation
+        // const result = await window.electronAPI?.savePageAsPDF?.();
+        console.log('PDF save feature would be implemented here');
+        console.log('✅ PDF save triggered (functionality pending)');
+      } else {
+        console.error('❌ PDF functionality not available');
+      }
+    } catch (error) {
+      console.error('❌ Error saving PDF:', error);
+    }
+    hideContextMenu();
+  }, [activeTab, hideContextMenu]);
+
+  const printPage = useCallback(() => {
+    const webview = webviewRefs.current[activeTab] as any;
+    if (webview && webview.print) {
+      webview.print();
+    }
+    hideContextMenu();
+  }, [activeTab, hideContextMenu]);
+
+  const copyUrl = useCallback(() => {
+    const currentTab = tabs.find(tab => tab.id === activeTab);
+    if (currentTab) {
+      navigator.clipboard.writeText(currentTab.url);
+      console.log('📋 URL copied to clipboard');
+    }
+    hideContextMenu();
+  }, [activeTab, tabs, hideContextMenu]);
+
+  const testDownload = useCallback(() => {
+    // Create a test file download
+    const testContent = `Test file downloaded at ${new Date().toISOString()}\n\nThis is a test download from the Aussie Vault Browser.\nDownload functionality is working correctly!`;
+    const blob = new Blob([testContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create a temporary link and trigger download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `test-download-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('🧪 Test download initiated');
+    hideContextMenu();
+  }, [hideContextMenu]);
+
+  const openInNewTab = useCallback(() => {
+    const currentTab = tabs.find(tab => tab.id === activeTab);
+    if (currentTab) {
+      // Create new tab functionality
+      const newTabId = Date.now().toString();
+      setTabs(prev => [...prev, {
+        id: newTabId,
+        title: "New Tab",
+        url: currentTab.url,
+        isLoading: false,
+      }]);
+      setActiveTab(newTabId);
+    }
+    hideContextMenu();
+  }, [activeTab, tabs, hideContextMenu]);
+
+  // Download management functions
+  const addDownloadToState = useCallback((downloadData: any) => {
+    const newDownload: DownloadItem = {
+      id: downloadData.id,
+      filename: downloadData.filename,
+      url: downloadData.url,
+      size: downloadData.totalBytes || 0,
+      totalBytes: downloadData.totalBytes || 0,
+      downloadedBytes: 0,
+      status: 'downloading',
+      startTime: new Date(),
+      speed: 0,
+      progress: 0,
+    };
+    
+    setDownloads(prev => {
+      // Check if download with this ID already exists
+      const existingDownload = prev.find(d => d.id === downloadData.id);
+      if (existingDownload) {
+        console.log('⚠️ Download with ID already exists, skipping duplicate:', downloadData.id);
+        return prev; // Don't add duplicate
+      }
+      
+      console.log('📥 Added download to state:', newDownload.filename);
+      return [...prev, newDownload];
+    });
+    
+    return newDownload.id;
+  }, []);
+
+  const updateDownloadProgress = useCallback((progressData: any) => {
+    setDownloads(prev => prev.map(download => {
+      if (download.id === progressData.id) {
+        const progress = progressData.totalBytes > 0 
+          ? Math.round((progressData.receivedBytes / progressData.totalBytes) * 100)
+          : 0;
+        
+        const updatedDownload = {
+          ...download,
+          downloadedBytes: progressData.receivedBytes || 0,
+          totalBytes: progressData.totalBytes || download.totalBytes,
+          speed: progressData.speed || 0,
+          progress: progress
+        };
+        
+        console.log(`📊 Updated download progress: ${updatedDownload.filename} - ${progress}%`);
+        return updatedDownload;
+      }
+      return download;
+    }));
+  }, []);
+
+  const cancelDownload = useCallback((id: string) => {
+    console.log('🚫 Cancelling download:', id);
+    
+    // Update UI state to mark as cancelled
+    setDownloads(prev => prev.map(download => 
+      download.id === id 
+        ? { ...download, status: 'cancelled' as const, endTime: new Date() }
+        : download
+    ));
+    
+    console.log('✅ Download marked as cancelled in UI:', id);
+  }, []);
+
+  const viewFile = useCallback(async (filePath: string, filename: string) => {
+    try {
+      console.log('📁 Opening file:', { filePath, filename });
+      
+      // Use Electron's shell to open the file with the system's default application
+      if (window.electronAPI?.shell?.openPath) {
+        const result = await window.electronAPI.shell.openPath(filePath);
+        if (result) {
+          console.error('❌ Failed to open file:', result);
+          alert(`Failed to open file: ${result}`);
+        } else {
+          console.log('✅ File opened successfully');
+        }
+      } else {
+        // Fallback: try to open using the browser (for blob URLs, etc.)
+        console.log('⚠️ Electron shell not available, trying browser fallback');
+        if (filePath.startsWith('blob:') || filePath.startsWith('data:')) {
+          const link = document.createElement('a');
+          link.href = filePath;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          console.log('✅ File downloaded via browser fallback');
+        } else {
+          console.error('❌ Cannot open file: No suitable method available');
+          alert('Cannot open file: File opening is not supported in this environment');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error opening file:', error);
+      alert(`Error opening file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, []);
+
+  const revealInExplorer = useCallback(async (filePath: string, filename: string) => {
+    try {
+      console.log('📂 Revealing file in explorer:', { filePath, filename });
+      
+      // Use Electron's shell to show the file in the system's file manager
+      if (window.electronAPI?.shell?.showItemInFolder) {
+        const result = await window.electronAPI.shell.showItemInFolder(filePath);
+        if (result) {
+          console.error('❌ Failed to reveal file:', result);
+          alert(`Failed to show file in folder: ${result}`);
+        } else {
+          console.log('✅ File revealed in explorer successfully');
+        }
+      } else {
+        console.error('❌ Cannot reveal file: Shell API not available');
+        alert('Cannot show file in folder: This feature is not supported in this environment');
+      }
+    } catch (error) {
+      console.error('❌ Error revealing file:', error);
+      alert(`Error showing file in folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, []);
+
+  // Clear downloads history
+  const clearDownloads = useCallback(() => {
+    try {
+      setDownloads([]);
+      localStorage.removeItem('app-downloads');
+      console.log('🗑️ Downloads history cleared');
+    } catch (error) {
+      console.error('❌ Failed to clear downloads:', error);
+    }
+  }, []);
+
+  const getActiveDownloads = useCallback(() => {
+    return downloads.filter(d => d.status === 'downloading');
+  }, [downloads]);
+
+  // Click handler to hide context menu
+  useEffect(() => {
+    const handleClick = () => {
+      hideContextMenu();
+    };
+    
+    if (contextMenu.visible) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu.visible, hideContextMenu]);
+
+  // Listen for download events from main process
+  useEffect(() => {
+    const handleDownloadStarted = (_event: any, downloadData: any) => {
+      try {
+        console.log('🎯 [REACT] Download started event received:', downloadData);
+        console.log('🎯 [REACT] Current downloads state before adding:', {
+          total: downloads.length,
+          byId: downloads.map(d => ({ id: d.id, filename: d.filename, status: d.status }))
+        });
+        
+        if (downloadData && downloadData.id && downloadData.filename) {
+          addDownloadToState(downloadData);
+        } else {
+          console.warn('⚠️ [REACT] Invalid download started data:', downloadData);
+        }
+      } catch (error) {
+        console.error('❌ [REACT] Error handling download started event:', error);
+      }
+    };
+
+    const handleDownloadProgress = (_event: any, progressData: any) => {
+      try {
+        const percent = progressData.totalBytes > 0 
+          ? Math.round((progressData.receivedBytes / progressData.totalBytes) * 100)
+          : 0;
+        console.log('🎯 [REACT] Download progress event received:', {
+          id: progressData.id,
+          progress: progressData.receivedBytes + '/' + progressData.totalBytes,
+          percent: percent + '%'
+        });
+        
+        if (progressData && progressData.id) {
+          updateDownloadProgress(progressData);
+        } else {
+          console.warn('⚠️ [REACT] Invalid download progress data:', progressData);
+        }
+      } catch (error) {
+        console.error('❌ [REACT] Error handling download progress event:', error);
+      }
+    };
+
+    const handleDownloadCompleted = (_event: any, completedData: any) => {
+      try {
+        console.log('🎯 [REACT] Download completed event received:', completedData);
+        
+        if (completedData && completedData.id) {
+          setDownloads(prev => prev.map(download => {
+            if (download.id === completedData.id) {
+              const finalStatus = completedData.state === 'completed' ? 'completed' : 
+                                completedData.state === 'cancelled' ? 'cancelled' : 'blocked';
+              
+              return {
+                ...download,
+                status: finalStatus as 'completed' | 'cancelled' | 'blocked',
+                endTime: new Date(),
+                progress: completedData.state === 'completed' ? 100 : download.progress,
+                filePath: completedData.filePath
+              };
+            }
+            return download;
+          }));
+        } else {
+          console.warn('⚠️ [REACT] Invalid download completed data:', completedData);
+        }
+      } catch (error) {
+        console.error('❌ [REACT] Error handling download completed event:', error);
+      }
+    };
+
+    const handleDownloadBlocked = (_event: any, blockedData: any) => {
+      try {
+        console.log('🎯 [REACT] Download blocked event received:', blockedData);
+        
+        if (blockedData && blockedData.filename) {
+          // First check if this is an existing download that got blocked
+          setDownloads(prev => {
+            const existingDownload = prev.find(d => 
+              d.filename === blockedData.filename && 
+              d.url === blockedData.url &&
+              d.status === 'downloading'
+            );
+            
+            if (existingDownload) {
+              // Update existing download to blocked status
+              console.log('📋 Updating existing download to blocked status:', blockedData.filename);
+              return prev.map(download => 
+                download.id === existingDownload.id 
+                  ? { ...download, status: 'blocked' as const, endTime: new Date() }
+                  : download
+              );
+            } else {
+              // Create new blocked download entry (only if no existing download found)
+              const blockedDownload = {
+                id: `blocked-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                filename: blockedData.filename,
+                url: blockedData.url,
+                size: blockedData.size || 0,
+                totalBytes: blockedData.size || 0,
+                downloadedBytes: 0,
+                status: 'blocked' as const,
+                startTime: new Date(),
+                progress: 0,
+              };
+              console.log('📥 Created new blocked download entry:', blockedData.filename);
+              return [...prev, blockedDownload];
+            }
+          });
+        } else {
+          console.warn('⚠️ [REACT] Invalid download blocked data:', blockedData);
+        }
+      } catch (error) {
+        console.error('❌ [REACT] Error handling download blocked event:', error);
+      }
+    };
+
+    // Set up actual download IPC listeners with error handling
+    try {
+      console.log('🔧 [REACT] Setting up download IPC listeners...');
+      console.log('🔧 [REACT] secureBrowser availability:', {
+        exists: !!window.secureBrowser,
+        onMethod: !!window.secureBrowser?.on,
+        removeListenerMethod: !!window.secureBrowser?.removeListener
+      });
+      
+      if (window.secureBrowser?.on) {
+        console.log('🔧 [REACT] Attaching download event listeners...');
+        window.secureBrowser.on('download-started', handleDownloadStarted);
+        window.secureBrowser.on('download-progress', handleDownloadProgress);
+        window.secureBrowser.on('download-completed', handleDownloadCompleted);
+        window.secureBrowser.on('download-blocked', handleDownloadBlocked);
+        console.log('✅ [REACT] Download IPC listeners attached successfully');
+        
+        // Test connection with a simple IPC call
+        window.secureBrowser.system?.getEnvironment?.()
+          .then(() => console.log('✅ [REACT] IPC connection test successful'))
+          .catch((err) => console.warn('⚠️ [REACT] IPC connection test failed:', err));
+      } else {
+        console.warn('⚠️ [REACT] secureBrowser.on not available - download events will not work');
+        console.warn('⚠️ [REACT] Available methods:', Object.keys(window.secureBrowser || {}));
+      }
+    } catch (error) {
+      console.error('❌ [REACT] Failed to set up download listeners:', error);
+    }
+
+    return () => {
+      // Cleanup listeners with error handling
+      try {
+        if (window.secureBrowser?.removeListener) {
+          window.secureBrowser.removeListener('download-started', handleDownloadStarted);
+          window.secureBrowser.removeListener('download-progress', handleDownloadProgress);
+          window.secureBrowser.removeListener('download-completed', handleDownloadCompleted);
+          window.secureBrowser.removeListener('download-blocked', handleDownloadBlocked);
+          console.log('🧹 [REACT] Download listeners cleaned up successfully');
+        }
+      } catch (error) {
+        console.error('❌ [REACT] Error during download listener cleanup:', error);
+      }
+    };
+    }, [addDownloadToState, updateDownloadProgress]);
+
   const goHome = useCallback(() => {
     const homeUrl = getHomeUrl();
 
@@ -648,17 +1138,6 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     }
   }, [allowBrowsing, vpnStatus]);
 
-  const handleContextMenu = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-
-    const params = {
-      x: event.clientX,
-      y: event.clientY,
-    };
-
-    window.secureBrowser.contextMenu.show(params);
-  }, []);
-
   // Update URL input when switching tabs
   useEffect(() => {
     const currentTab = tabs.find((tab) => tab.id === activeTab);
@@ -666,50 +1145,6 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       setUrlInput(currentTab.url);
     }
   }, [activeTab, tabs]);
-
-  useEffect(() => {
-    const handleContextMenuAction = (action: string) => {
-      switch (action) {
-        case "new-tab":
-          createNewTab();
-          break;
-        case "new-window":
-          createNewWindow();
-          break;
-        case "reload":
-          reload();
-          break;
-        case "go-back":
-          goBack();
-          break;
-        case "go-forward":
-          goForward();
-          break;
-        case "go-home":
-          goHome();
-          break;
-        case "reconnect-vpn":
-          connectVPN();
-          break;
-        default:
-          console.log("Unknown context menu action:", action);
-      }
-    };
-
-    window.secureBrowser.contextMenu.onAction(handleContextMenuAction);
-
-    return () => {
-      window.secureBrowser.contextMenu.removeActionListener();
-    };
-  }, [
-    createNewTab,
-    createNewWindow,
-    reload,
-    goBack,
-    goForward,
-    goHome,
-    connectVPN,
-  ]);
 
   // Webview event handlers
   // Auto-inject SharePoint credentials when navigating to SharePoint
@@ -894,26 +1329,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         );
       });
 
-      // Log download attempts (if webview supports it)
-      webview.addEventListener("will-download", (event: Event) => {
-        const downloadEvent = event as Event & {
-          url?: string;
-          filename?: string;
-        };
-
-        SecureBrowserDatabaseService.logSecurityEvent(
-          "download_blocked",
-          `Download attempt detected: ${
-            downloadEvent.filename || "unknown file"
-          } from ${downloadEvent.url || "unknown URL"}`,
-          "medium",
-          downloadEvent.url
-        );
-
-        // Block downloads by default for security
-        event.preventDefault();
-        console.log("🚫 Download blocked for security");
-      });
+      // Note: Download events are now handled in the main process
 
       // Log console errors and security warnings
       webview.addEventListener("console-message", (event: Event) => {
@@ -935,6 +1351,55 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           );
         }
       });
+
+      // Add context menu event listener for webview content
+      const webviewContextMenu = (event: Event) => {
+        const mouseEvent = event as MouseEvent;
+        mouseEvent.preventDefault();
+        mouseEvent.stopPropagation();
+        
+        console.log('🖱️ Webview context menu triggered at:', mouseEvent.clientX, mouseEvent.clientY);
+        
+        setContextMenu({
+          visible: true,
+          x: mouseEvent.clientX,
+          y: mouseEvent.clientY,
+        });
+      };
+      
+      // Listen to context menu events from the webview
+      webview.addEventListener("contextmenu", webviewContextMenu, true);
+      
+      // Also handle the Electron webview's context-menu event
+      if ((webview as any).addEventListener) {
+        (webview as any).addEventListener("context-menu", (e: any) => {
+          console.log('🖱️ Electron webview context-menu event:', e);
+          e.preventDefault();
+          
+          setContextMenu({
+            visible: true,
+            x: e.params?.x || 100,
+            y: e.params?.y || 100,
+          });
+        });
+      }
+      
+      // Fallback: Listen for right-click using mousedown events
+      const handleMouseDown = (event: Event) => {
+        const mouseEvent = event as MouseEvent;
+        if (mouseEvent.button === 2) { // Right mouse button
+          console.log('🖱️ Right mouse button detected on webview at:', mouseEvent.clientX, mouseEvent.clientY);
+          mouseEvent.preventDefault();
+          
+          setContextMenu({
+            visible: true,
+            x: mouseEvent.clientX,
+            y: mouseEvent.clientY,
+          });
+        }
+      };
+      
+      webview.addEventListener("mousedown", handleMouseDown, true);
     },
     [activeTab]
   );
@@ -1071,6 +1536,132 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
               Blocked
             </Badge>
           )}
+
+          {/* Downloads Button (Always Visible Like Chrome) */}
+          <div className="ml-2 mr-2 relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDownloadsClick}
+              className="relative p-2 hover:bg-slate-100"
+              title="Downloads"
+            >
+              <div className="relative">
+                {/* Enhanced download icon with professional progress indicator */}
+                <div className="relative w-4 h-4 group">
+                  <FileDown className="w-4 h-4 transition-transform group-hover:scale-110" />
+                  
+                  {/* Enhanced circular progress indicator for active downloads */}
+                  {getActiveDownloads().length > 0 && (() => {
+                    const activeDownloads = getActiveDownloads();
+                    const totalProgress = activeDownloads.reduce((sum, d) => sum + d.progress, 0) / activeDownloads.length;
+                    const strokeDasharray = 2 * Math.PI * 8; // radius = 8
+                    const strokeDashoffset = strokeDasharray - (strokeDasharray * totalProgress) / 100;
+                    
+                    return (
+                      <svg 
+                        className="absolute -top-1 -left-1 w-6 h-6 transform -rotate-90" 
+                        viewBox="0 0 20 20"
+                      >
+                        {/* Background circle with subtle glow */}
+                        <circle
+                          cx="10"
+                          cy="10"
+                          r="8"
+                          stroke="rgba(59, 130, 246, 0.2)"
+                          strokeWidth="1.5"
+                          fill="none"
+                        />
+                        {/* Progress circle with gradient */}
+                        <circle
+                          cx="10"
+                          cy="10"
+                          r="8"
+                          stroke="url(#navProgressGradient)"
+                          strokeWidth="2.5"
+                          fill="none"
+                          strokeDasharray={strokeDasharray}
+                          strokeDashoffset={strokeDashoffset}
+                          strokeLinecap="round"
+                          className="transition-all duration-500 ease-out"
+                          style={{ filter: 'drop-shadow(0 0 3px rgba(59, 130, 246, 0.6))' }}
+                        />
+                        <defs>
+                          <linearGradient id="navProgressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#3b82f6" />
+                            <stop offset="50%" stopColor="#8b5cf6" />
+                            <stop offset="100%" stopColor="#3b82f6" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                    );
+                  })()}
+                  
+                  {/* Enhanced download count badge */}
+                  {getActiveDownloads().length > 0 && (
+                    <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center z-10 shadow-lg ring-2 ring-white animate-pulse">
+                      <span className="text-xs text-white font-bold leading-none">
+                        {getActiveDownloads().length}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Enhanced completed downloads indicator */}
+                  {downloads.filter(d => d.status === 'completed').length > 0 && getActiveDownloads().length === 0 && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full shadow-md ring-1 ring-white"></div>
+                  )}
+                </div>
+              </div>
+            </Button>
+            
+            {/* Download Progress Tooltip - Shows on Hover When Active Downloads */}
+            {getActiveDownloads().length > 0 && (
+              <div className="absolute top-full right-0 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50 opacity-0 hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                <div className="text-xs font-medium text-gray-700 mb-2">
+                  Active Downloads ({getActiveDownloads().length})
+                </div>
+                
+                {getActiveDownloads().slice(0, 3).map((download) => (
+                  <div key={download.id} className="mb-3 last:mb-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-gray-700 truncate flex-1">
+                        {download.filename}
+                      </span>
+                      <span className="text-xs text-gray-500 ml-2">
+                        {download.progress}%
+                      </span>
+                    </div>
+                    
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1">
+                      <div 
+                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
+                        style={{ width: `${download.progress}%` }}
+                      ></div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>
+                        {download.downloadedBytes > 0 && download.totalBytes > 0 
+                          ? `${Math.round((download.downloadedBytes / 1024 / 1024) * 100) / 100} MB / ${Math.round((download.totalBytes / 1024 / 1024) * 100) / 100} MB`
+                          : 'Calculating...'}
+                      </span>
+                      {download.speed && download.speed > 0 && (
+                        <span>
+                          {Math.round((download.speed / 1024 / 1024) * 100) / 100} MB/s
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                {getActiveDownloads().length > 3 && (
+                  <div className="text-xs text-gray-500 text-center mt-2 pt-2 border-t">
+                    +{getActiveDownloads().length - 3} more downloads
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Browser Menu */}
           <BrowserMenu
@@ -1274,7 +1865,82 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       <DownloadsModal
         isOpen={isDownloadsModalOpen}
         onClose={() => setIsDownloadsModalOpen(false)}
+        downloads={downloads}
+        onCancelDownload={cancelDownload}
+        onViewFile={viewFile}
+        onRevealInExplorer={revealInExplorer}
+        onClearDownloads={clearDownloads}
       />
+
+      {/* Context Menu */}
+      {contextMenu.visible && (
+        <div
+          className="fixed bg-white border border-gray-300 rounded-lg shadow-xl py-2 z-50 min-w-48"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="text-xs text-gray-600 px-3 py-1 border-b border-gray-200 font-medium">
+            Browser Actions
+          </div>
+          
+          <button
+            onClick={saveAsPDF}
+            className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-900 transition-colors"
+          >
+            <FileDown className="w-4 h-4 text-gray-700" />
+            Save as PDF
+          </button>
+          
+          <button
+            onClick={printPage}
+            className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-900 transition-colors"
+          >
+            <Printer className="w-4 h-4 text-gray-700" />
+            Print
+          </button>
+          
+          <div className="border-t border-gray-200 my-1"></div>
+          
+          <button
+            onClick={copyUrl}
+            className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-900 transition-colors"
+          >
+            <Copy className="w-4 h-4 text-gray-700" />
+            Copy URL
+          </button>
+          
+          <button
+            onClick={openInNewTab}
+            className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-900 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4 text-gray-700" />
+            Open in New Tab
+          </button>
+          
+          <div className="border-t border-gray-200 my-1"></div>
+          
+          <button
+            onClick={reload}
+            className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-900 transition-colors"
+          >
+            <RotateCcw className="w-4 h-4 text-gray-700" />
+            Reload Page
+          </button>
+          
+          <div className="border-t border-gray-200 my-1"></div>
+          
+          <button
+            onClick={testDownload}
+            className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center gap-2 text-sm text-blue-700 transition-colors font-medium"
+          >
+            <FileDown className="w-4 h-4 text-blue-600" />
+            Test Download
+          </button>
+        </div>
+      )}
     </div>
   );
 };

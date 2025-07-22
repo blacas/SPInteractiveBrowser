@@ -32,6 +32,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeStatusListener: () => {
       ipcRenderer.removeAllListeners('vpn-status-changed')
     }
+  },
+  shell: {
+    openPath: (path: string) => ipcRenderer.invoke('shell-open-path', path),
+    showItemInFolder: (path: string) => ipcRenderer.invoke('shell-show-item-in-folder', path),
   }
 })
 
@@ -86,6 +90,30 @@ contextBridge.exposeInMainWorld('secureBrowser', {
   extensions: {
     get1PasswordStatus: () => ipcRenderer.invoke('extension-get-1password-status'),
     install1Password: () => ipcRenderer.invoke('extension-install-1password')
+  },
+
+  // Browser Actions
+  savePageAsPDF: () => ipcRenderer.invoke('save-page-as-pdf'),
+  
+  // File System Operations
+  shell: {
+    openPath: (path: string) => ipcRenderer.invoke('shell-open-path', path),
+    showItemInFolder: (path: string) => ipcRenderer.invoke('shell-show-item-in-folder', path),
+  },
+
+  // Event listeners for download events
+  on: (channel: string, func: (...args: any[]) => void) => {
+    const validChannels = ['download-started', 'download-progress', 'download-completed', 'download-blocked'];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.on(channel, func);
+    }
+  },
+  
+  removeListener: (channel: string, func: (...args: any[]) => void) => {
+    const validChannels = ['download-started', 'download-progress', 'download-completed', 'download-blocked'];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.removeListener(channel, func);
+    }
   },
 
   // Window Management
@@ -194,6 +222,12 @@ export interface SecureBrowserAPI {
     onAction: (callback: (action: string) => void) => void;
     removeActionListener: () => void;
   };
+  shell: {
+    openPath: (path: string) => Promise<string | null>;
+    showItemInFolder: (path: string) => Promise<string | null>;
+  };
+  on: (channel: string, func: (...args: any[]) => void) => void;
+  removeListener: (channel: string, func: (...args: any[]) => void) => void;
 }
 
 declare global {

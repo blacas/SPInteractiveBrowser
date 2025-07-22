@@ -1,4 +1,4 @@
-import require$$3$1, { app, ipcMain, session, BrowserWindow, Menu, shell } from "electron";
+import require$$3$1, { app, ipcMain, shell, BrowserWindow, session, Menu } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import require$$1$1, { spawn } from "child_process";
@@ -1069,6 +1069,83 @@ const disconnectWireGuardWindows = async () => {
 };
 const configureSecureSession = () => {
   const defaultSession = session.defaultSession;
+  const handleDownload = (event, item, sessionName) => {
+    console.log("🎯 Download detected from", sessionName, ":", {
+      filename: item.getFilename(),
+      url: item.getURL(),
+      size: item.getTotalBytes(),
+      blocked: process.env.SECURITY_BLOCK_DOWNLOADS === "true"
+    });
+    if (process.env.SECURITY_BLOCK_DOWNLOADS === "true") {
+      console.log("🚫 Blocking download (SECURITY_BLOCK_DOWNLOADS=true):", item.getFilename());
+      event.preventDefault();
+      windows.forEach((window2) => {
+        if (window2 && !window2.isDestroyed()) {
+          window2.webContents.send("download-blocked", {
+            filename: item.getFilename(),
+            url: item.getURL(),
+            size: item.getTotalBytes()
+          });
+        }
+      });
+      return;
+    }
+    console.log("✅ Download allowed from", sessionName, ":", item.getFilename());
+    const downloadId = `download_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const downloadStartedData = {
+      id: downloadId,
+      filename: item.getFilename(),
+      url: item.getURL(),
+      totalBytes: item.getTotalBytes()
+    };
+    console.log("📤 Sending download-started event from", sessionName, ":", downloadStartedData);
+    windows.forEach((window2) => {
+      if (window2 && !window2.isDestroyed()) {
+        window2.webContents.send("download-started", downloadStartedData);
+      }
+    });
+    item.on("updated", (_event, state) => {
+      const progressData = {
+        id: downloadId,
+        filename: item.getFilename(),
+        state,
+        receivedBytes: item.getReceivedBytes(),
+        totalBytes: item.getTotalBytes(),
+        speed: item.getCurrentBytesPerSecond ? item.getCurrentBytesPerSecond() : 0
+      };
+      console.log("📤 Sending download-progress event:", {
+        id: downloadId,
+        progress: `${progressData.receivedBytes}/${progressData.totalBytes}`,
+        percent: Math.round(progressData.receivedBytes / progressData.totalBytes * 100)
+      });
+      windows.forEach((window2) => {
+        if (window2 && !window2.isDestroyed()) {
+          window2.webContents.send("download-progress", progressData);
+        }
+      });
+    });
+    item.once("done", (_event, state) => {
+      const completedData = {
+        id: downloadId,
+        filename: item.getFilename(),
+        state,
+        filePath: state === "completed" ? item.getSavePath() : null
+      };
+      console.log("📤 Sending download-completed event:", completedData);
+      windows.forEach((window2) => {
+        if (window2 && !window2.isDestroyed()) {
+          window2.webContents.send("download-completed", completedData);
+        }
+      });
+    });
+  };
+  defaultSession.on("will-download", (event, item) => {
+    handleDownload(event, item, "default-session");
+  });
+  const webviewSession = session.fromPartition("persist:main");
+  webviewSession.on("will-download", (event, item) => {
+    handleDownload(event, item, "webview-session");
+  });
   const enable1PasswordExtension = async () => {
     try {
       const extensionPath = await find1PasswordExtension();
@@ -1262,10 +1339,6 @@ function createBrowserWindow(isMain = false) {
     } else if (oauthProviders.some((provider) => navigationUrl.startsWith(provider))) {
       console.log("🔐 Allowing OAuth navigation to:", navigationUrl);
     }
-  });
-  newWindow.webContents.session.on("will-download", (event, item) => {
-    console.log("🚫 Blocking download attempt:", item.getFilename());
-    event.preventDefault();
   });
   if (VITE_DEV_SERVER_URL) {
     newWindow.loadURL(VITE_DEV_SERVER_URL);
@@ -1564,6 +1637,74 @@ ipcMain.handle("security-log-navigation", async (_event, url, allowed, accessLev
 });
 ipcMain.handle("security-prevent-download", async (_event, filename) => {
   console.log(`🚫 Download blocked: ${filename}`);
+});
+ipcMain.handle("shell-open-path", async (_event, filePath) => {
+  try {
+    console.log("📁 Opening file with system default application:", filePath);
+    const result = await shell.openPath(filePath);
+    if (result) {
+      console.error("❌ Failed to open file:", result);
+      return result;
+    } else {
+      console.log("✅ File opened successfully");
+      return null;
+    }
+  } catch (error) {
+    console.error("❌ Error opening file:", error);
+    return error instanceof Error ? error.message : "Unknown error";
+  }
+});
+ipcMain.handle("shell-show-item-in-folder", async (_event, filePath) => {
+  try {
+    console.log("📂 Revealing file in system file manager:", filePath);
+    shell.showItemInFolder(filePath);
+    console.log("✅ File revealed in explorer successfully");
+    return null;
+  } catch (error) {
+    console.error("❌ Error revealing file:", error);
+    return error instanceof Error ? error.message : "Unknown error";
+  }
+});
+ipcMain.handle("save-page-as-pdf", async (_event) => {
+  try {
+    const { dialog } = require("electron");
+    const fs2 = require("fs");
+    const focusedWindow = BrowserWindow.getFocusedWindow();
+    if (!focusedWindow) {
+      return { success: false, error: "No focused window found" };
+    }
+    const result = await dialog.showSaveDialog(focusedWindow, {
+      title: "Save page as PDF",
+      defaultPath: "page.pdf",
+      filters: [
+        { name: "PDF Files", extensions: ["pdf"] }
+      ]
+    });
+    if (result.canceled) {
+      return { success: false, error: "User canceled" };
+    }
+    const options = {
+      marginsType: 0,
+      // Default margins
+      pageSize: "A4",
+      printBackground: true,
+      printSelectionOnly: false,
+      landscape: false
+    };
+    const data = await focusedWindow.webContents.printToPDF(options);
+    fs2.writeFileSync(result.filePath, data);
+    console.log(`✅ PDF saved to: ${result.filePath}`);
+    return {
+      success: true,
+      filePath: result.filePath
+    };
+  } catch (error) {
+    console.error("❌ Error saving PDF:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error"
+    };
+  }
 });
 ipcMain.handle("extension-get-1password-status", async () => {
   try {
