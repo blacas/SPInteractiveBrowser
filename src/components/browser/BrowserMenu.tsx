@@ -33,6 +33,10 @@ interface BrowserMenuProps {
   onBookmarksClick: () => void;
   onSettingsClick: () => void;
   onLogout: () => void;
+  zoomLevel: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomReset: () => void;
   className?: string;
 }
 
@@ -43,6 +47,10 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onBookmarksClick,
   onSettingsClick,
   onLogout,
+  zoomLevel,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
   className = ""
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -138,16 +146,48 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
         <DropdownMenuSeparator className="my-2 bg-slate-100" />
 
         {/* Zoom Controls */}
-        <DropdownMenuItem 
-          className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => console.log('Zoom in'))}
-        >
-          <Zap className="w-4 h-4" />
-          <span>Zoom</span>
-          <div className="ml-auto flex items-center gap-1 text-xs text-slate-500">
-            <span>100%</span>
+        <DropdownMenuLabel className="px-3 py-1 text-xs font-medium text-slate-500 uppercase tracking-wide">
+          Zoom Controls
+        </DropdownMenuLabel>
+        
+        <div className="flex items-center justify-between px-3 py-2">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-slate-500" />
+            <span className="text-sm text-slate-700">Zoom</span>
           </div>
-        </DropdownMenuItem>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-slate-500 hover:text-slate-700"
+              onClick={() => handleMenuClick(onZoomOut)}
+              disabled={zoomLevel <= 25}
+            >
+              -
+            </Button>
+            <span className="text-xs text-slate-500 min-w-[3rem] text-center">
+              {zoomLevel}%
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-slate-500 hover:text-slate-700"
+              onClick={() => handleMenuClick(onZoomIn)}
+              disabled={zoomLevel >= 300}
+            >
+              +
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-slate-500 hover:text-slate-700"
+              onClick={() => handleMenuClick(onZoomReset)}
+              title="Reset zoom"
+            >
+              ⟲
+            </Button>
+          </div>
+        </div>
 
         <DropdownMenuSeparator className="my-2 bg-slate-100" />
 

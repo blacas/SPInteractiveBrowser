@@ -29,6 +29,7 @@ import { HistoryService } from "@/services/historyService";
 import SearchBar from "./SearchBar";
 import BrowserMenu from "./BrowserMenu";
 import HistoryModal from "./HistoryModal";
+import DownloadsModal from "./DownloadsModal";
 import VPNConnectionError from "@/components/ui/vpn-connection-error";
 
 interface Tab {
@@ -67,6 +68,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     getDefaultUrl(user?.accessLevel || 1)
   );
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isDownloadsModalOpen, setIsDownloadsModalOpen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(100);
   const webviewRefs = useRef<{ [key: string]: HTMLElement | null }>({});
   const webviewInitialized = useRef<{ [key: string]: boolean }>({});
 
@@ -160,8 +163,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   };
 
   const handleDownloadsClick = () => {
-    console.log('Downloads clicked');
-    // TODO: Implement downloads modal
+    setIsDownloadsModalOpen(true);
   };
 
   const handleBookmarksClick = () => {
@@ -172,6 +174,31 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   const handleSettingsClick = () => {
     console.log('Settings clicked');
     // TODO: Implement settings modal
+  };
+
+  const handleZoomIn = () => {
+    const newZoomLevel = Math.min(zoomLevel + 25, 300);
+    setZoomLevel(newZoomLevel);
+    applyZoomToActiveWebview(newZoomLevel);
+  };
+
+  const handleZoomOut = () => {
+    const newZoomLevel = Math.max(zoomLevel - 25, 25);
+    setZoomLevel(newZoomLevel);
+    applyZoomToActiveWebview(newZoomLevel);
+  };
+
+  const handleZoomReset = () => {
+    setZoomLevel(100);
+    applyZoomToActiveWebview(100);
+  };
+
+  const applyZoomToActiveWebview = (zoomPercent: number) => {
+    const webview = webviewRefs.current[activeTab] as any;
+    if (webview && webview.setZoomFactor) {
+      const zoomFactor = zoomPercent / 100;
+      webview.setZoomFactor(zoomFactor);
+    }
   };
 
   const handleLogout = () => {
@@ -1053,6 +1080,10 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             onBookmarksClick={handleBookmarksClick}
             onSettingsClick={handleSettingsClick}
             onLogout={handleLogout}
+            zoomLevel={zoomLevel}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onZoomReset={handleZoomReset}
             className="ml-2"
           />
         </div>
@@ -1237,6 +1268,12 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         isOpen={isHistoryModalOpen}
         onClose={() => setIsHistoryModalOpen(false)}
         onNavigate={navigateToUrl}
+      />
+
+      {/* Downloads Modal */}
+      <DownloadsModal
+        isOpen={isDownloadsModalOpen}
+        onClose={() => setIsDownloadsModalOpen(false)}
       />
     </div>
   );
