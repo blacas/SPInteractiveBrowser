@@ -16,6 +16,10 @@ interface ElectronVPNAPI {
 
 interface ElectronAPI {
   vpn: ElectronVPNAPI;
+  shell: {
+    openPath: (path: string) => Promise<string | null>;
+    showItemInFolder: (path: string) => Promise<string | null>;
+  };
 }
 
 declare global {

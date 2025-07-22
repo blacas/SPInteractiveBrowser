@@ -29,6 +29,10 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
     removeStatusListener: () => {
       electron.ipcRenderer.removeAllListeners("vpn-status-changed");
     }
+  },
+  shell: {
+    openPath: (path) => electron.ipcRenderer.invoke("shell-open-path", path),
+    showItemInFolder: (path) => electron.ipcRenderer.invoke("shell-show-item-in-folder", path)
   }
 });
 electron.contextBridge.exposeInMainWorld("secureBrowser", {
@@ -73,6 +77,26 @@ electron.contextBridge.exposeInMainWorld("secureBrowser", {
   extensions: {
     get1PasswordStatus: () => electron.ipcRenderer.invoke("extension-get-1password-status"),
     install1Password: () => electron.ipcRenderer.invoke("extension-install-1password")
+  },
+  // Browser Actions
+  savePageAsPDF: () => electron.ipcRenderer.invoke("save-page-as-pdf"),
+  // File System Operations
+  shell: {
+    openPath: (path) => electron.ipcRenderer.invoke("shell-open-path", path),
+    showItemInFolder: (path) => electron.ipcRenderer.invoke("shell-show-item-in-folder", path)
+  },
+  // Event listeners for download events
+  on: (channel, func) => {
+    const validChannels = ["download-started", "download-progress", "download-completed", "download-blocked"];
+    if (validChannels.includes(channel)) {
+      electron.ipcRenderer.on(channel, func);
+    }
+  },
+  removeListener: (channel, func) => {
+    const validChannels = ["download-started", "download-progress", "download-completed", "download-blocked"];
+    if (validChannels.includes(channel)) {
+      electron.ipcRenderer.removeListener(channel, func);
+    }
   },
   // Window Management
   window: {

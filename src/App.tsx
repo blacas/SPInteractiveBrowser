@@ -423,17 +423,29 @@ function AppContent() {
 
   // Show error screen if initialization failed
   if (errors.length > 0) {
+    // Check if errors are critical (require reload) or can be cleared
+    const hasCriticalErrors = errors.some(error => error.critical || error.type === 'config');
+    
     return (
       <ErrorDisplay
         errors={errors}
         vpnStatus={vpnStatusInfo || undefined}
         environmentStatus={envStatusInfo || undefined}
         onRetry={() => {
+          console.log('🔄 Retry clicked - clearing errors without reload for non-critical issues');
           setErrors([]);
-          setInitStage('auth');
-          setInitProgress(0);
-          // Trigger re-initialization
-          window.location.reload();
+          
+          // Only reload for critical errors, otherwise just retry initialization
+          if (hasCriticalErrors) {
+            console.log('⚠️ Critical error detected - performing full reload');
+            window.location.reload();
+          } else {
+            console.log('✅ Non-critical error - retrying without reload');
+            setInitStage('auth');
+            setInitProgress(0);
+            // Re-run initialization without reload
+            // The useEffect will handle re-initialization when initStage changes
+          }
         }}
         onOpenSettings={() => {
           console.log('Opening settings...');

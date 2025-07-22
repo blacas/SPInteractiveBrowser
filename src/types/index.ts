@@ -89,4 +89,36 @@ interface HTMLWebViewElement extends HTMLElement {
   goForward(): void;
   reload(): void;
   addEventListener(type: string, listener: EventListenerOrEventListenerObject): void;
-} 
+}
+
+// Download event types
+export interface DownloadStartedEvent {
+  id: string;
+  filename: string;
+  url: string;
+  totalBytes: number;
+}
+
+export interface DownloadProgressEvent {
+  id: string;
+  filename: string;
+  state: string;
+  receivedBytes: number;
+  totalBytes: number;
+  speed?: number;
+}
+
+export interface DownloadCompletedEvent {
+  id: string;
+  filename: string;
+  state: 'completed' | 'cancelled' | 'interrupted';
+  filePath?: string;
+}
+
+export interface DownloadBlockedEvent {
+  filename: string;
+  url: string;
+  size?: number;
+}
+
+// Download event types are exported above for use in components 
