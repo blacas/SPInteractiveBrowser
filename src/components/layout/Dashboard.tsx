@@ -96,7 +96,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Left Side - Logo and Title */}
         <div className="flex items-center space-x-3">
           <Shield className="h-6 w-6 text-blue-500" />
-          <h1 className="text-lg font-semibold">Secure Remote Browser</h1>
+          <h1 className="text-lg font-semibold">Aussie Vault Browser</h1>
           
           {/* Access Level Badge with Dropdown */}
           <DropdownMenu>

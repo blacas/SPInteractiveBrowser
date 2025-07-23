@@ -4,16 +4,17 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
-    name: 'Secure Remote Browser',
-    appBundleId: 'com.securebrowser.app',
+    name: 'Aussie Vault Browser',
+    appBundleId: 'com.aussievault.browser',
+    executableName: 'Aussie Vault Browser',
     // Support multiple architectures
     osxUniversal: {
       mergeASARs: false,
     },
-    // Disable code signing completely for development
+    // Disable code signing for now (enable for production with Apple Developer ID)
     osxSign: false,
     osxNotarize: false,
-    // Additional options for unsigned builds
+    // Additional options for builds
     ignore: [
       /\.DS_Store$/,
       /node_modules/
@@ -23,15 +24,22 @@ module.exports = {
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {
-        name: 'secure_remote_browser',
+              config: {
+        name: 'aussie_vault_browser',
         authors: 'Versatile Technologies',
-        description: 'Secure Remote Browser with VPN capabilities and 1Password integration'
+        description: 'Aussie Vault Browser with VPN capabilities and 1Password integration'
       }
     },
     {
       name: '@electron-forge/maker-zip',
-      platforms: ['darwin']
+      platforms: ['darwin'],
+      config: {
+        name: 'AussieVaultBrowser-{{version}}-{{arch}}.zip'
+      }
+    },
+    {
+      name: '@electron-forge/maker-dmg',
+      config: {}
     },
     {
       name: '@electron-forge/maker-deb',
@@ -51,8 +59,9 @@ module.exports = {
           name: 'AussieVaultBrowser',    
         },
         prerelease: false,
-        draft: true,
+        draft: false,
         generateReleaseNotes: true,
+        tagPrefix: 'v'
       }
     }
   ],

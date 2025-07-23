@@ -196,7 +196,7 @@ export const APP_CONFIG = {
 
   // Application Settings
   app: {
-    name: 'Secure Remote Browser',
+    name: 'Aussie Vault Browser',
     version: '1.0.0',
     
     // Environment settings

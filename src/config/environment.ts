@@ -163,7 +163,7 @@ export class EnvironmentValidator {
   private static getDefaultEnvironment(): Record<string, string | undefined> {
     return {
       NODE_ENV: 'development',
-      APP_NAME: 'Secure Remote Browser',
+      APP_NAME: 'Aussie Vault Browser',
       APP_VERSION: '1.0.0',
       VPN_PROVIDER: 'wireguard',
       VPN_SERVER_REGION: 'australia',
@@ -245,7 +245,7 @@ export class EnvironmentValidator {
     return {
       // Application settings
       nodeEnv: this.isValidNodeEnv(env.NODE_ENV) ? env.NODE_ENV : 'development',
-      appName: env.APP_NAME || 'Secure Remote Browser',
+      appName: env.APP_NAME || 'Aussie Vault Browser',
       appVersion: env.APP_VERSION || '1.0.0',
 
       // Security settings
@@ -348,7 +348,7 @@ const createConfigFromEnvironment = (env: Record<string, string | undefined>): E
   return {
     // Application settings
     nodeEnv: isValidNodeEnv(env.NODE_ENV) ? env.NODE_ENV : 'development',
-    appName: env.APP_NAME || 'Secure Remote Browser',
+    appName: env.APP_NAME || 'Aussie Vault Browser',
     appVersion: env.APP_VERSION || '1.0.0',
 
     // Security settings

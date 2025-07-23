@@ -208,7 +208,7 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
           </div>
           
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Secure Remote Browser</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Aussie Vault Browser</h1>
             <p className="text-gray-600 mt-1">
               Enterprise-grade browsing with VPN protection
             </p>

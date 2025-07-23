@@ -28,7 +28,10 @@
     "publish:mac": "electron-forge publish --platform=darwin --arch=universal",
     "publish:mac:intel": "electron-forge publish --platform=darwin --arch=x64",
     "publish:mac:silicon": "electron-forge publish --platform=darwin --arch=arm64",
-    "publish:linux": "electron-forge publish --platform=linux"
+    "publish:linux": "electron-forge publish --platform=linux",
+    "release:homebrew": "./scripts/release-with-homebrew.sh",
+    "update:homebrew": "./scripts/update-homebrew-formula.sh",
+    "create:installer": "./scripts/create-installer.sh"
   },
   "dependencies": {
     "@clerk/clerk-js": "^5.73.2",
@@ -57,6 +60,7 @@
   "devDependencies": {
     "@electron-forge/cli": "^7.8.1",
     "@electron-forge/maker-deb": "^7.8.1",
+    "@electron-forge/maker-dmg": "^7.8.1",
     "@electron-forge/maker-rpm": "^7.8.1",
     "@electron-forge/maker-squirrel": "^7.8.1",
     "@electron-forge/maker-zip": "^7.8.1",

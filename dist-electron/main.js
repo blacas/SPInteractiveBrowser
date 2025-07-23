@@ -1744,7 +1744,7 @@ ipcMain.handle("extension-install-1password", async () => {
       "2. Go to chrome://extensions/ or edge://extensions/",
       "3. Enable Developer mode",
       "4. Install 1Password extension from the web store",
-      "5. Restart the Secure Remote Browser"
+      "5. Restart the Aussie Vault Browser"
     ],
     webStoreUrl: "https://chromewebstore.google.com/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa"
   };
@@ -1882,7 +1882,7 @@ ipcMain.handle("window-close", async (_event, windowId) => {
   }
 });
 app.whenReady().then(async () => {
-  console.log("🚀 Initializing Secure Remote Browser...");
+  console.log("🚀 Initializing Aussie Vault Browser...");
   await loadEnvironmentVariables();
   configureSecureSession();
   console.log("🔌 Starting VPN connection...");
@@ -1912,7 +1912,7 @@ if (!gotTheLock) {
 }
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
-    console.log("🔐 Closing Secure Remote Browser");
+    console.log("🔐 Closing Aussie Vault Browser");
     app.quit();
   }
 });
