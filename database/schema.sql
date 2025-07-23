@@ -18,6 +18,7 @@ CREATE TABLE users (
     status user_status_enum NOT NULL DEFAULT 'active',
     device_id TEXT,
     vpn_required BOOLEAN NOT NULL DEFAULT true,
+    can_edit_access_level BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     last_login TIMESTAMP WITH TIME ZONE,

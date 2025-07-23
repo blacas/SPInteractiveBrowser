@@ -23,6 +23,7 @@ export interface User {
   status: 'active' | 'suspended' | 'inactive'
   device_id?: string
   vpn_required: boolean
+  can_edit_access_level: boolean
   created_at: string
   updated_at: string
   last_login?: string

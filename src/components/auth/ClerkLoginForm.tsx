@@ -6,6 +6,7 @@ import { Separator } from '../ui/separator';
 import { LoadingScreen } from '../ui/loading-screen';
 import { ErrorDisplay } from '../ui/error-display';
 import clerkAuth from '../../services/clerkService';
+import { SecureBrowserDatabaseService } from '../../services/databaseService';
 import type { AuthState } from '../../types/clerk';
 import { Shield, Users, Lock, Chrome, Globe } from 'lucide-react';
 
@@ -38,18 +39,51 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
         await clerkAuth.initialize();
 
         // Set up auth state listener
-        clerkAuth.onAuthStateChange((state) => {
+        clerkAuth.onAuthStateChange(async (state) => {
           setAuthState(state);
           
           // If user is signed in, notify parent
           if (state.isSignedIn && state.user) {
-            onAuthSuccess({
-              id: state.user.id,
-              name: clerkAuth.getUserDisplayName(),
-              email: clerkAuth.getUserEmail(),
-              accessLevel: clerkAuth.getUserAccessLevel(),
-              avatar: state.user.imageUrl
-            });
+            try {
+              const userEmail = clerkAuth.getUserEmail();
+              console.log('🔍 Fetching user data from database for:', userEmail);
+              
+              // Fetch user data from database with permissions
+              const dbUserData = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail);
+              
+              if (dbUserData) {
+                console.log('✅ Database user data loaded:', dbUserData);
+                onAuthSuccess({
+                  id: state.user.id,
+                  dbId: dbUserData.id,
+                  name: dbUserData.name,
+                  email: dbUserData.email,
+                  accessLevel: dbUserData.accessLevel,
+                  canEditAccessLevel: dbUserData.canEditAccessLevel,
+                });
+              } else {
+                console.warn('⚠️ User not found in database, using Clerk defaults');
+                onAuthSuccess({
+                  id: state.user.id,
+                  name: clerkAuth.getUserDisplayName(),
+                  email: clerkAuth.getUserEmail(),
+                  accessLevel: clerkAuth.getUserAccessLevel(),
+                  canEditAccessLevel: false, // Default to false if not in database
+                  avatar: state.user.imageUrl
+                });
+              }
+            } catch (error) {
+              console.error('❌ Error fetching user data from database:', error);
+              // Fallback to Clerk data if database fetch fails
+              onAuthSuccess({
+                id: state.user.id,
+                name: clerkAuth.getUserDisplayName(),
+                email: clerkAuth.getUserEmail(),
+                accessLevel: clerkAuth.getUserAccessLevel(),
+                canEditAccessLevel: false, // Default to false on error
+                avatar: state.user.imageUrl
+              });
+            }
           }
         });
 

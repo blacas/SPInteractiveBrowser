@@ -370,9 +370,25 @@ function AppContent() {
   const handleAccessLevelChange = async (newLevel: 1 | 2 | 3) => {
     if (user) {
       try {
+        // Check if user has permission to edit access level
+        if (user.canEditAccessLevel === false) {
+          console.error('❌ User does not have permission to edit access level');
+          alert('You do not have permission to change your access level. Please contact your administrator.');
+          return;
+        }
+
         // Show loading state while changing access level
         setInitStage('vpn');
         setInitProgress(50);
+        
+        console.log(`🔄 Changing access level from ${user.accessLevel} to ${newLevel}...`);
+        
+        // Update access level in database
+        const updateSuccess = await SecureBrowserDatabaseService.updateUserAccessLevel(user.email, newLevel);
+        
+        if (!updateSuccess) {
+          throw new Error('Failed to update access level in database');
+        }
         
         // Log access level change as security event
         await SecureBrowserDatabaseService.logSecurityEvent(
@@ -381,13 +397,11 @@ function AppContent() {
           'medium'
         );
         
-        // Update user access level
+        // Update user object with new access level
         const updatedUser = { ...user, accessLevel: newLevel };
         
         // Update localStorage with new access level
         localStorage.setItem("auth", JSON.stringify(updatedUser));
-        
-        console.log(`🔄 Changing access level to ${newLevel}...`);
         
         // Small delay to show loading state
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -402,9 +416,6 @@ function AppContent() {
         
         console.log(`✅ Access level changed to ${newLevel} successfully`);
         
-        // No page reload - let React handle the state update
-        // The browser component will automatically update based on the new user prop
-        
       } catch (error) {
         console.error('❌ Failed to change access level:', error);
         
@@ -414,6 +425,9 @@ function AppContent() {
           `Failed to change access level: ${error instanceof Error ? error.message : 'Unknown error'}`,
           'medium'
         );
+        
+        // Show error to user
+        alert(`Failed to change access level: ${error instanceof Error ? error.message : 'Unknown error'}`);
         
         setInitStage('ready');
         setInitProgress(100);

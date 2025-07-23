@@ -19,10 +19,12 @@ import {
 } from "lucide-react";
 
 interface User {
+  id?: number;
   name: string;
   email: string;
   accessLevel: 1 | 2 | 3;
   avatar?: string;
+  canEditAccessLevel?: boolean;
 }
 
 interface DashboardProps {
@@ -108,16 +110,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-64 bg-white border-gray-300 shadow-lg z-50" align="start">
               <div className="px-3 py-3">
-                <p className="text-sm font-semibold text-gray-900 mb-1">Change Access Level</p>
+                <p className="text-sm font-semibold text-gray-900 mb-1">
+                  {user.canEditAccessLevel !== false ? 'Change Access Level' : 'Access Level (Read Only)'}
+                </p>
                 <p className="text-xs text-gray-600 mb-3">Current: {accessConfig.description}</p>
+                
+                {user.canEditAccessLevel === false && (
+                  <div className="flex items-center gap-2 mb-3 p-2 bg-amber-50 border border-amber-200 rounded-md">
+                    <Lock className="w-3 h-3 text-amber-600" />
+                    <p className="text-xs text-amber-700">
+                      Access level editing is restricted by your administrator
+                    </p>
+                  </div>
+                )}
                 
                 {[1, 2, 3].map((level) => {
                   const levelConfig = ACCESS_LEVEL_CONFIG[level as 1 | 2 | 3];
+                  const isCurrentLevel = user.accessLevel === level;
+                  const canEdit = user.canEditAccessLevel !== false; // Default to true if undefined
+                  
                   return (
                     <DropdownMenuItem
                       key={level}
-                      className={`text-gray-900 hover:bg-gray-100 focus:bg-gray-100 mb-1 cursor-pointer rounded-md px-2 py-2 ${user.accessLevel === level ? 'bg-blue-50 border border-blue-200' : ''}`}
-                      onClick={() => onAccessLevelChange?.(level as 1 | 2 | 3)}
+                      className={`text-gray-900 mb-1 rounded-md px-2 py-2 ${
+                        isCurrentLevel ? 'bg-blue-50 border border-blue-200' : ''
+                      } ${
+                        canEdit ? 'hover:bg-gray-100 focus:bg-gray-100 cursor-pointer' : 'cursor-not-allowed opacity-60'
+                      }`}
+                      onClick={() => canEdit && onAccessLevelChange?.(level as 1 | 2 | 3)}
+                      disabled={!canEdit}
                     >
                       <div className="flex items-center space-x-3 w-full">
                         <div className={`w-3 h-3 rounded-full ${levelConfig.color}`} />
@@ -125,9 +146,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           <div className="font-medium text-gray-900">Level {level}</div>
                           <div className="text-xs text-gray-600">{levelConfig.description}</div>
                         </div>
-                        {user.accessLevel === level && (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        )}
+                        <div className="flex items-center gap-1">
+                          {isCurrentLevel && (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          )}
+                          {!canEdit && !isCurrentLevel && (
+                            <Lock className="w-3 h-3 text-gray-400" />
+                          )}
+                        </div>
                       </div>
                     </DropdownMenuItem>
                   );

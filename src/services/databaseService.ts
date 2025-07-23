@@ -423,4 +423,102 @@ export class SecureBrowserDatabaseService {
       console.error('❌ DEBUG: VPN connection logging test failed:', error)
     }
   }
+
+  // Get user data with access level permissions
+  static async getUserWithPermissions(email: string): Promise<{
+    id: number;
+    name: string;
+    email: string;
+    accessLevel: 1 | 2 | 3;
+    canEditAccessLevel: boolean;
+    vpnRequired: boolean;
+    status: 'active' | 'suspended' | 'inactive';
+  } | null> {
+    try {
+      console.log('🔍 Fetching user data with permissions for:', email)
+      
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .eq('status', 'active')
+        .single()
+
+      if (error) {
+        console.error('❌ Failed to fetch user data:', error)
+        return null
+      }
+
+      if (!data) {
+        console.log('⚠️ User not found in database:', email)
+        return null
+      }
+
+      const userData = {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        accessLevel: data.access_level as 1 | 2 | 3,
+        canEditAccessLevel: data.can_edit_access_level ?? false,
+        vpnRequired: data.vpn_required,
+        status: data.status as 'active' | 'suspended' | 'inactive'
+      }
+
+      console.log('✅ User data fetched successfully:', {
+        id: userData.id,
+        name: userData.name,
+        accessLevel: userData.accessLevel,
+        canEditAccessLevel: userData.canEditAccessLevel
+      })
+
+      return userData
+    } catch (error) {
+      console.error('❌ Error fetching user data:', error)
+      return null
+    }
+  }
+
+  // Update user access level if user has permission
+  static async updateUserAccessLevel(email: string, newAccessLevel: 1 | 2 | 3): Promise<boolean> {
+    try {
+      console.log('🔄 Attempting to update access level for:', email, 'to level:', newAccessLevel)
+      
+      // First check if user can edit their access level
+      const userData = await this.getUserWithPermissions(email)
+      if (!userData) {
+        console.error('❌ User not found for access level update')
+        return false
+      }
+
+      if (!userData.canEditAccessLevel) {
+        console.error('❌ User does not have permission to edit access level')
+        return false
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          access_level: newAccessLevel,
+          updated_at: new Date().toISOString()
+        })
+        .eq('email', email)
+
+      if (error) {
+        console.error('❌ Failed to update user access level:', error)
+        return false
+      }
+
+      console.log('✅ User access level updated successfully')
+      
+      // Update current user if it's the same user
+      if (this.currentUser && this.currentUser.email === email) {
+        this.currentUser.access_level = newAccessLevel
+      }
+
+      return true
+    } catch (error) {
+      console.error('❌ Error updating user access level:', error)
+      return false
+    }
+  }
 } 
