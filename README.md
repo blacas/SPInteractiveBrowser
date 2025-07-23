@@ -1,15 +1,14 @@
 # 🇦🇺 Aussie Vault Browser
 
-A secure remote browser with VPN capabilities and 1Password integration, designed for Australian users who need enterprise-grade browsing security.
+A secure, privacy-focused browser application with VPN capabilities and 1Password integration, specifically designed for Australian users.
 
 ## ✨ Features
 
-- 🔐 **Secure Browsing**: Isolated browser environment with enhanced security
-- 🌏 **VPN Integration**: Built-in Australian VPN support with WireGuard
-- 🔑 **1Password Integration**: Seamless password management
-- 🛡️ **Access Control**: Multi-level access control system
-- 📱 **Cross-Platform**: Available for macOS, Windows, and Linux
-- 🏢 **Enterprise Ready**: Admin dashboard and user management
+- **🔐 Enhanced Security**: Built-in VPN protection and secure browsing
+- **🔑 1Password Integration**: Seamless password management
+- **🇦🇺 Australian Focus**: Optimized for Australian users and services
+- **⚡ Fast Performance**: Electron-based with modern web technologies
+- **🎨 Modern UI**: Clean, intuitive interface built with React and Tailwind CSS
 
 ## 🚀 Quick Installation
 
@@ -79,6 +78,57 @@ npm run release:homebrew
 # Or update just the Homebrew formula
 npm run update:homebrew
 ```
+
+## 🚀 Release Management
+
+### Automated Release Process
+
+This project includes automated scripts to build and publish releases to the public repository while keeping the source code private.
+
+#### Quick Release Commands
+
+```bash
+# Build and release with version bump
+npm run release:version [version]
+
+# Build and release current version
+npm run release
+
+# Quick build and release (no prompts)
+npm run release:quick
+```
+
+#### Manual Release Process
+
+1. **Update Version** (if needed):
+   ```bash
+   npm version 1.0.2 --no-git-tag-version
+   ```
+
+2. **Run Release Script**:
+   ```bash
+   ./scripts/publish-release.sh
+   ```
+
+3. **Complete GitHub Release**:
+   - Go to: https://github.com/bilalmohib/aussie-vault-browser-releases/releases
+   - Edit the created release
+   - Upload the DMG file
+   - Publish the release
+
+#### Installation for Users
+
+Once released, users can install via Homebrew:
+
+```bash
+brew install --cask bilalmohib/aussievault/aussie-vault-browser
+```
+
+### Repository Structure
+
+- **Private Repo** (`AussieVaultBrowser/`): Contains source code (this repository)
+- **Public Releases** (`aussie-vault-browser-releases/`): Contains releases only
+- **Homebrew Tap** (`homebrew-aussievault/`): Contains Homebrew cask formula
 
 ## 📋 Admin Dashboard
 

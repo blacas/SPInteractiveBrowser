@@ -46,6 +46,10 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
           if (state.isSignedIn && state.user) {
             try {
               const userEmail = clerkAuth.getUserEmail();
+              if (!userEmail) {
+                onAuthError('No email address found for this user');
+                return;
+              }
               console.log('🔍 Fetching user data from database for:', userEmail);
               
               // Fetch user data from database with permissions
