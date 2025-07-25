@@ -34,6 +34,7 @@ import SearchBar from "./SearchBar";
 import BrowserMenu from "./BrowserMenu";
 import HistoryModal from "./HistoryModal";
 import DownloadsModal from "./DownloadsModal";
+import BookmarkButton from "./BookmarkButton";
 import VPNConnectionError from "@/components/ui/vpn-connection-error";
 
 interface Tab {
@@ -1915,6 +1916,15 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           >
             <Home className="h-4 w-4" />
           </Button>
+          
+          {/* Bookmark Button */}
+          <BookmarkButton
+            url={urlInput}
+            title={tabs.find(tab => tab.id === activeTab)?.title || urlInput}
+            userId={user?.id || 0}
+            accessLevel={user?.accessLevel || 1}
+            onNavigate={navigateToUrl}
+          />
         </div>
 
         <Button
