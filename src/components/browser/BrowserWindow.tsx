@@ -271,30 +271,30 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     // TODO: Implement settings modal
   };
 
-  const handleZoomIn = () => {
-    const newZoomLevel = Math.min(zoomLevel + 25, 300);
+  const handleZoomIn = useCallback(() => {
+    const newZoomLevel = Math.min(zoomLevel + 10, 300);
     setZoomLevel(newZoomLevel);
     applyZoomToActiveWebview(newZoomLevel);
-  };
+  }, [zoomLevel]);
 
-  const handleZoomOut = () => {
-    const newZoomLevel = Math.max(zoomLevel - 25, 25);
+  const handleZoomOut = useCallback(() => {
+    const newZoomLevel = Math.max(zoomLevel - 10, 25);
     setZoomLevel(newZoomLevel);
     applyZoomToActiveWebview(newZoomLevel);
-  };
+  }, [zoomLevel]);
 
-  const handleZoomReset = () => {
+  const handleZoomReset = useCallback(() => {
     setZoomLevel(100);
     applyZoomToActiveWebview(100);
-  };
+  }, []);
 
-  const applyZoomToActiveWebview = (zoomPercent: number) => {
+  const applyZoomToActiveWebview = useCallback((zoomPercent: number) => {
     const webview = webviewRefs.current[activeTab] as any;
     if (webview && webview.setZoomFactor) {
       const zoomFactor = zoomPercent / 100;
       webview.setZoomFactor(zoomFactor);
     }
-  };
+  }, [activeTab]);
 
   const handleLogout = () => {
     if (onLogout) {
@@ -1418,6 +1418,58 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   );
 
   const config = useMemo(() => getAccessLevelConfig(), [getAccessLevelConfig]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Ctrl/Cmd key
+      const isModifierPressed = event.ctrlKey || event.metaKey;
+      
+      if (isModifierPressed) {
+        switch (event.key) {
+          case '=':
+          case '+':
+            event.preventDefault();
+            handleZoomIn();
+            break;
+          case '-':
+            event.preventDefault();
+            handleZoomOut();
+            break;
+          case '0':
+            event.preventDefault();
+            handleZoomReset();
+            break;
+        }
+      }
+    };
+
+    // Add mouse wheel zoom support
+    const handleWheel = (event: WheelEvent) => {
+      const isModifierPressed = event.ctrlKey || event.metaKey;
+      
+      if (isModifierPressed) {
+        event.preventDefault();
+        
+        if (event.deltaY < 0) {
+          // Scroll up - zoom in
+          handleZoomIn();
+        } else {
+          // Scroll down - zoom out
+          handleZoomOut();
+        }
+      }
+    };
+
+    // Add event listeners
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('wheel', handleWheel, { passive: false });
+    
+    // Cleanup
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleZoomIn, handleZoomOut, handleZoomReset]);
 
   return (
     <div

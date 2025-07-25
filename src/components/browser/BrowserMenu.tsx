@@ -156,36 +156,32 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
             <span className="text-sm text-slate-700">Zoom</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-slate-500 hover:text-slate-700"
+            <button
               onClick={() => handleMenuClick(onZoomOut)}
-              disabled={zoomLevel <= 25}
+              disabled={zoomLevel <= 10}
+              className="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Zoom out"
             >
               -
-            </Button>
-            <span className="text-xs text-slate-500 min-w-[3rem] text-center">
+            </button>
+            <span className="text-sm text-slate-700 w-12 text-center">
               {zoomLevel}%
             </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-slate-500 hover:text-slate-700"
+            <button
               onClick={() => handleMenuClick(onZoomIn)}
-              disabled={zoomLevel >= 300}
+              disabled={zoomLevel >= 500}
+              className="p-2 rounded-md hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Zoom in"
             >
               +
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-slate-500 hover:text-slate-700"
+            </button>
+            <button
               onClick={() => handleMenuClick(onZoomReset)}
+              className="p-2 rounded-md hover:bg-slate-100 transition-colors text-xs"
               title="Reset zoom"
             >
-              ⟲
-            </Button>
+              Reset
+            </button>
           </div>
         </div>
 
