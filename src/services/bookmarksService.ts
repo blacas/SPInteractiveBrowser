@@ -29,6 +29,8 @@ export class BookmarksService {
   // Check if a URL is bookmarked
   async isBookmarked(url: string, userId: number): Promise<boolean> {
     try {
+      console.log('🔍 Checking bookmark status:', { url, userId });
+      
       const { data, error } = await supabase
         .from('bookmarks')
         .select('id')
@@ -37,13 +39,15 @@ export class BookmarksService {
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
-        console.error('Error checking bookmark status:', error);
+        console.error('❌ Error checking bookmark status:', error);
         return false;
       }
 
-      return !!data;
+      const isBookmarked = !!data;
+      console.log('✅ Bookmark status checked:', { url, userId, isBookmarked });
+      return isBookmarked;
     } catch (error) {
-      console.error('Error checking bookmark status:', error);
+      console.error('❌ Error checking bookmark status:', error);
       return false;
     }
   }
@@ -51,6 +55,8 @@ export class BookmarksService {
   // Add a bookmark
   async addBookmark(bookmark: Bookmark, userId: number): Promise<boolean> {
     try {
+      console.log('📌 Adding bookmark:', { bookmark, userId });
+      
       // Check if bookmark already exists
       const exists = await this.isBookmarked(bookmark.url, userId);
       if (exists) {
@@ -58,32 +64,42 @@ export class BookmarksService {
         return true;
       }
 
+      const bookmarkData = {
+        user_id: userId,
+        url: bookmark.url,
+        title: bookmark.title,
+        description: bookmark.description,
+        favicon_url: bookmark.favicon_url,
+        folder_name: bookmark.folder_name || 'General',
+        tags: bookmark.tags || [],
+        is_public: bookmark.is_public || false,
+        access_level: bookmark.access_level,
+        device_id: bookmark.device_id
+      };
+
+      console.log('📌 Inserting bookmark data:', bookmarkData);
+
       const { data, error } = await supabase
         .from('bookmarks')
-        .insert({
-          user_id: userId,
-          url: bookmark.url,
-          title: bookmark.title,
-          description: bookmark.description,
-          favicon_url: bookmark.favicon_url,
-          folder_name: bookmark.folder_name || 'General',
-          tags: bookmark.tags || [],
-          is_public: bookmark.is_public || false,
-          access_level: bookmark.access_level,
-          device_id: bookmark.device_id
-        })
+        .insert(bookmarkData)
         .select()
         .single();
 
       if (error) {
-        console.error('Error adding bookmark:', error);
+        console.error('❌ Error adding bookmark:', error);
+        console.error('❌ Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         return false;
       }
 
       console.log('✅ Bookmark added successfully:', data);
       return true;
     } catch (error) {
-      console.error('Error adding bookmark:', error);
+      console.error('❌ Error adding bookmark:', error);
       return false;
     }
   }
@@ -272,20 +288,30 @@ export class BookmarksService {
 
   // Toggle bookmark status
   async toggleBookmark(url: string, title: string, userId: number, accessLevel: number): Promise<boolean> {
-    const isCurrentlyBookmarked = await this.isBookmarked(url, userId);
+    console.log('🔄 Toggle bookmark called:', { url, title, userId, accessLevel });
     
-    if (isCurrentlyBookmarked) {
-      return await this.removeBookmark(url, userId);
-    } else {
-      const bookmark: Bookmark = {
-        url,
-        title,
-        folder_name: 'General',
-        tags: [],
-        is_public: false,
-        access_level: accessLevel
-      };
-      return await this.addBookmark(bookmark, userId);
+    try {
+      const isCurrentlyBookmarked = await this.isBookmarked(url, userId);
+      console.log('📊 Current bookmark status:', isCurrentlyBookmarked);
+      
+      if (isCurrentlyBookmarked) {
+        console.log('🗑️ Removing existing bookmark...');
+        return await this.removeBookmark(url, userId);
+      } else {
+        console.log('➕ Adding new bookmark...');
+        const bookmark: Bookmark = {
+          url,
+          title,
+          folder_name: 'General',
+          tags: [],
+          is_public: false,
+          access_level: accessLevel
+        };
+        return await this.addBookmark(bookmark, userId);
+      }
+    } catch (error) {
+      console.error('❌ Error in toggleBookmark:', error);
+      return false;
     }
   }
 

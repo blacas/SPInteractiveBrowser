@@ -42,7 +42,12 @@ const BookmarkButton: React.FC<BookmarkButtonProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
-    if (!url || !userId) return;
+    console.log('🔄 Toggle bookmark clicked:', { url, title, userId, accessLevel });
+    
+    if (!url || !userId) {
+      console.warn('⚠️ Missing required data for bookmark:', { url, userId });
+      return;
+    }
     
     setIsLoading(true);
     try {
@@ -54,10 +59,11 @@ const BookmarkButton: React.FC<BookmarkButtonProps> = ({
       );
       
       if (success) {
-        setIsBookmarked(!isBookmarked);
+        const newBookmarkState = !isBookmarked;
+        setIsBookmarked(newBookmarkState);
         
         // Show toast notification
-        if (!isBookmarked) {
+        if (newBookmarkState) {
           console.log('✅ Page bookmarked successfully');
           // You could add a toast notification here
         } else {
@@ -68,7 +74,7 @@ const BookmarkButton: React.FC<BookmarkButtonProps> = ({
         console.error('❌ Failed to toggle bookmark');
       }
     } catch (error) {
-      console.error('Error toggling bookmark:', error);
+      console.error('❌ Error toggling bookmark:', error);
     } finally {
       setIsLoading(false);
     }

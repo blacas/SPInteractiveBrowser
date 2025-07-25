@@ -11,8 +11,21 @@ console.log('Anon Key (first 20 chars):', supabaseKey?.substring(0, 20) + '...')
 console.log('URL is valid:', supabaseUrl?.startsWith('https://'))
 console.log('Key is valid:', supabaseKey?.startsWith('eyJ'))
 
-// Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseKey)
+// Validate environment variables
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Missing Supabase environment variables!')
+  console.error('URL:', supabaseUrl)
+  console.error('Key:', supabaseKey ? 'Present' : 'Missing')
+  throw new Error('Supabase configuration is incomplete')
+}
+
+// Create Supabase client with better error handling
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+})
 
 // TypeScript interfaces for database entities (using integer IDs)
 export interface User {

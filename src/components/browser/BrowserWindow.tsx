@@ -1518,6 +1518,15 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         // Log all navigation events for monitoring
         SecureBrowserDatabaseService.logNavigation(url, true);
 
+        // Update URL input if this is the active tab
+        const currentTabId = Object.keys(webviewRefs.current).find(
+          tabId => webviewRefs.current[tabId] === webview
+        );
+        if (currentTabId === activeTab) {
+          setUrlInput(url);
+          console.log('🔄 URL updated in navigation handler:', url);
+        }
+
         // Check if navigating to SharePoint/Office365
         if (
           url.includes("sharepoint.com") ||
