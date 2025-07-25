@@ -24,7 +24,6 @@ import {
   Copy,
   ExternalLink,
   Globe,
-
 } from "lucide-react";
 
 import { useVPN } from "@/hooks/useVPN";
@@ -88,7 +87,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     size: number;
     totalBytes: number;
     downloadedBytes: number;
-    status: 'downloading' | 'completed' | 'cancelled' | 'blocked';
+    status: "downloading" | "completed" | "cancelled" | "blocked";
     startTime: Date;
     endTime?: Date;
     speed?: number;
@@ -99,7 +98,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   // Downloads state with localStorage persistence
   const [downloads, setDownloads] = useState<DownloadItem[]>(() => {
     try {
-      const savedDownloads = localStorage.getItem('app-downloads');
+      const savedDownloads = localStorage.getItem("app-downloads");
       if (savedDownloads) {
         const parsed = JSON.parse(savedDownloads);
         // Convert date strings back to Date objects and handle interrupted downloads
@@ -107,24 +106,31 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           const restored = {
             ...download,
             startTime: new Date(download.startTime),
-            endTime: download.endTime ? new Date(download.endTime) : undefined
+            endTime: download.endTime ? new Date(download.endTime) : undefined,
           };
-          
+
           // Mark any downloads that were in progress as cancelled since they can't continue
-          if (restored.status === 'downloading') {
-            restored.status = 'cancelled';
+          if (restored.status === "downloading") {
+            restored.status = "cancelled";
             restored.endTime = new Date();
-            console.log('📋 Restored interrupted download as cancelled:', restored.filename);
+            console.log(
+              "📋 Restored interrupted download as cancelled:",
+              restored.filename
+            );
           }
-          
+
           return restored;
         });
-        
-        console.log('📥 Restored', restoredDownloads.length, 'downloads from localStorage');
+
+        console.log(
+          "📥 Restored",
+          restoredDownloads.length,
+          "downloads from localStorage"
+        );
         return restoredDownloads;
       }
     } catch (error) {
-      console.warn('⚠️ Failed to load downloads from localStorage:', error);
+      console.warn("⚠️ Failed to load downloads from localStorage:", error);
     }
     return [];
   });
@@ -133,36 +139,64 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
   // Debug downloads state changes
   useEffect(() => {
-    console.log('📊 Downloads state changed:', {
+    console.log("📊 Downloads state changed:", {
       total: downloads.length,
-      downloading: downloads.filter(d => d.status === 'downloading').length,
-      completed: downloads.filter(d => d.status === 'completed').length,
-      cancelled: downloads.filter(d => d.status === 'cancelled').length,
-      blocked: downloads.filter(d => d.status === 'blocked').length,
-      downloads: downloads.map(d => ({ id: d.id, filename: d.filename, status: d.status }))
+      downloading: downloads.filter((d) => d.status === "downloading").length,
+      completed: downloads.filter((d) => d.status === "completed").length,
+      cancelled: downloads.filter((d) => d.status === "cancelled").length,
+      blocked: downloads.filter((d) => d.status === "blocked").length,
+      downloads: downloads.map((d) => ({
+        id: d.id,
+        filename: d.filename,
+        status: d.status,
+      })),
     });
   }, [downloads]);
+
+  // Debug zoom level changes
+  useEffect(() => {
+    console.log("🔍 [ZOOM] Zoom level state changed:", zoomLevel + "%");
+    
+    // Force a re-render of the menu to ensure it shows the updated zoom level
+    const menuContainer = document.querySelector('[data-radix-dropdown-menu-content]');
+    if (menuContainer) {
+      console.log("🔄 [ZOOM] Menu is open, should update zoom display automatically");
+    }
+  }, [zoomLevel]);
 
   // Save downloads to localStorage whenever downloads change
   useEffect(() => {
     try {
-      localStorage.setItem('app-downloads', JSON.stringify(downloads));
-      console.log('💾 Downloads saved to localStorage:', downloads.length, 'items');
+      localStorage.setItem("app-downloads", JSON.stringify(downloads));
+      console.log(
+        "💾 Downloads saved to localStorage:",
+        downloads.length,
+        "items"
+      );
     } catch (error) {
-      console.error('❌ Failed to save downloads to localStorage:', error);
-      
+      console.error("❌ Failed to save downloads to localStorage:", error);
+
       // Handle quota exceeded error by clearing old downloads
-      if (error instanceof Error && error.name === 'QuotaExceededError') {
-        console.warn('⚠️ localStorage quota exceeded, clearing old downloads...');
+      if (error instanceof Error && error.name === "QuotaExceededError") {
+        console.warn(
+          "⚠️ localStorage quota exceeded, clearing old downloads..."
+        );
         try {
           // Keep only the last 50 downloads
           const recentDownloads = downloads.slice(-50);
-          localStorage.setItem('app-downloads', JSON.stringify(recentDownloads));
+          localStorage.setItem(
+            "app-downloads",
+            JSON.stringify(recentDownloads)
+          );
           setDownloads(recentDownloads);
-          console.log('✅ Cleared old downloads, keeping', recentDownloads.length, 'recent ones');
+          console.log(
+            "✅ Cleared old downloads, keeping",
+            recentDownloads.length,
+            "recent ones"
+          );
         } catch (retryError) {
-          console.error('❌ Failed to save even after cleanup:', retryError);
-          localStorage.removeItem('app-downloads');
+          console.error("❌ Failed to save even after cleanup:", retryError);
+          localStorage.removeItem("app-downloads");
         }
       }
     }
@@ -172,7 +206,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   useEffect(() => {
     if (user) {
       HistoryService.setCurrentUser(user);
-      console.log('✅ HistoryService initialized with user:', user.email);
+      console.log("✅ HistoryService initialized with user:", user.email);
     }
   }, [user]);
 
@@ -223,34 +257,39 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   // Add history tracking function
   const addToHistory = useCallback(async (url: string, title?: string) => {
     try {
-      if (url && url.startsWith('http')) {
-        await HistoryService.addHistoryEntry(url, title || 'Untitled');
-        console.log('✅ Added to history:', { url, title });
+      if (url && url.startsWith("http")) {
+        await HistoryService.addHistoryEntry(url, title || "Untitled");
+        console.log("✅ Added to history:", { url, title });
       }
     } catch (error) {
-      console.error('❌ Failed to add to history:', error);
+      console.error("❌ Failed to add to history:", error);
     }
   }, []);
 
   // Navigate to URL from history
-  const navigateToUrl = useCallback((url: string) => {
-    setUrlInput(url);
-    const webview = webviewRefs.current[activeTab] as HTMLElement & { 
-      src: string;
-    };
-    
-    if (webview) {
-      // Update tab state
-      setTabs(tabs => tabs.map(tab => 
-        tab.id === activeTab 
-          ? { ...tab, url, isLoading: true, title: 'Loading...' }
-          : tab
-      ));
-      
-      // Navigate webview
-      webview.src = url;
-    }
-  }, [activeTab]);
+  const navigateToUrl = useCallback(
+    (url: string) => {
+      setUrlInput(url);
+      const webview = webviewRefs.current[activeTab] as HTMLElement & {
+        src: string;
+      };
+
+      if (webview) {
+        // Update tab state
+        setTabs((tabs) =>
+          tabs.map((tab) =>
+            tab.id === activeTab
+              ? { ...tab, url, isLoading: true, title: "Loading..." }
+              : tab
+          )
+        );
+
+        // Navigate webview
+        webview.src = url;
+      }
+    },
+    [activeTab]
+  );
 
   // Menu handlers
   const handleHistoryClick = () => {
@@ -262,39 +301,232 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   };
 
   const handleBookmarksClick = () => {
-    console.log('Bookmarks clicked');
+    console.log("Bookmarks clicked");
     // TODO: Implement bookmarks modal
   };
 
   const handleSettingsClick = () => {
-    console.log('Settings clicked');
+    console.log("Settings clicked");
     // TODO: Implement settings modal
   };
 
+  const applyZoomToActiveWebview = useCallback(
+    (zoomPercent: number) => {
+      const webview = webviewRefs.current[activeTab] as any;
+      if (webview) {
+        const zoomFactor = zoomPercent / 100;
+        console.log(
+          `🔍 [ZOOM] Applying zoom: ${zoomPercent}% (factor: ${zoomFactor}) to tab ${activeTab}`
+        );
+
+        try {
+          let applied = false;
+
+          // Method 1: Standard Electron webview setZoomFactor
+          if (
+            webview.setZoomFactor &&
+            typeof webview.setZoomFactor === "function"
+          ) {
+            webview.setZoomFactor(zoomFactor);
+            console.log(`✅ [ZOOM] Applied via setZoomFactor: ${zoomPercent}%`);
+            applied = true;
+          }
+
+          // Method 2: Execute JavaScript to set CSS zoom
+          if (
+            webview.executeJavaScript &&
+            typeof webview.executeJavaScript === "function"
+          ) {
+            const jsCode = `
+             (function() {
+               try {
+                 // Remove any existing zoom CSS
+                 var existingZoom = document.getElementById('aussie-browser-zoom');
+                 if (existingZoom) existingZoom.remove();
+                 
+                 // Create zoom CSS
+                 var zoomCSS = document.createElement('style');
+                 zoomCSS.id = 'aussie-browser-zoom';
+                 zoomCSS.innerHTML = 
+                   'html { zoom: ${zoomPercent}% !important; transform-origin: top left !important; }' +
+                   'body { zoom: ${zoomPercent}% !important; transform-origin: top left !important; }';
+                 document.head.appendChild(zoomCSS);
+                 
+                 // Also try setting style directly
+                 document.documentElement.style.zoom = '${zoomPercent}%';
+                 document.body.style.zoom = '${zoomPercent}%';
+                 
+                 console.log('Zoom applied via JavaScript: ${zoomPercent}%');
+                 return true;
+               } catch (e) {
+                 console.error('Error applying zoom via JS:', e);
+                 return false;
+               }
+             })();
+           `;
+
+            webview
+              .executeJavaScript(jsCode)
+              .then((result:any) => {
+                console.log(`✅ [ZOOM] executeJavaScript result:`, result);
+              })
+              .catch((error:any) => {
+                console.error(`❌ [ZOOM] executeJavaScript failed:`, error);
+              });
+            applied = true;
+          }
+
+          // Method 3: Insert CSS directly
+          if (webview.insertCSS && typeof webview.insertCSS === "function") {
+            const zoomCSS = `
+             html, body { 
+               zoom: ${zoomPercent}% !important; 
+               transform-origin: top left !important;
+             }
+             * {
+               zoom: inherit !important;
+             }
+           `;
+            webview.insertCSS(zoomCSS);
+            console.log(`✅ [ZOOM] Applied via insertCSS: ${zoomPercent}%`);
+            applied = true;
+          }
+
+          if (!applied) {
+            console.warn(`⚠️ [ZOOM] No zoom method available for webview`);
+            console.log(`⚠️ [ZOOM] Available methods:`, {
+              setZoomFactor: !!webview.setZoomFactor,
+              executeJavaScript: !!webview.executeJavaScript,
+              insertCSS: !!webview.insertCSS,
+            });
+          }
+        } catch (error) {
+          console.error("❌ [ZOOM] Failed to apply zoom:", error);
+        }
+      } else {
+        console.warn("⚠️ [ZOOM] No webview found for active tab:", activeTab);
+        console.log(
+          "⚠️ [ZOOM] Available webviews:",
+          Object.keys(webviewRefs.current)
+        );
+      }
+    },
+    [activeTab]
+  );
+
   const handleZoomIn = useCallback(() => {
-    const newZoomLevel = Math.min(zoomLevel + 10, 300);
-    setZoomLevel(newZoomLevel);
-    applyZoomToActiveWebview(newZoomLevel);
-  }, [zoomLevel]);
+    console.log(`🔍 [ZOOM] Zoom In triggered (keyboard/menu)`);
+    setZoomLevel((prev) => {
+      // Use 5% increments for more natural feeling, similar to Chrome
+      const newLevel = Math.min(prev + 5, 300);
+      console.log(`📈 [ZOOM] Zooming in: ${prev}% -> ${newLevel}%`);
+      
+      // Apply zoom with slight delay to ensure clean state update
+      setTimeout(() => {
+        applyZoomToActiveWebview(newLevel);
+      }, 10);
+      
+      return newLevel;
+    });
+  }, [applyZoomToActiveWebview]);
 
   const handleZoomOut = useCallback(() => {
-    const newZoomLevel = Math.max(zoomLevel - 10, 25);
-    setZoomLevel(newZoomLevel);
-    applyZoomToActiveWebview(newZoomLevel);
-  }, [zoomLevel]);
+    console.log(`🔍 [ZOOM] Zoom Out triggered (keyboard/menu)`);
+    setZoomLevel((prev) => {
+      // Use 5% decrements for more natural feeling, similar to Chrome
+      const newLevel = Math.max(prev - 5, 25);
+      console.log(`📉 [ZOOM] Zooming out: ${prev}% -> ${newLevel}%`);
+      
+      // Apply zoom with slight delay to ensure clean state update
+      setTimeout(() => {
+        applyZoomToActiveWebview(newLevel);
+      }, 10);
+      
+      return newLevel;
+    });
+  }, [applyZoomToActiveWebview]);
 
   const handleZoomReset = useCallback(() => {
+    console.log(`🔄 [ZOOM] Reset triggered - forcing 100% zoom`);
+    
+    // Force reset with multiple attempts for reliability
+    const forceReset = () => {
+      const webview = webviewRefs.current[activeTab] as any;
+      if (webview) {
+        console.log(`🔧 [ZOOM] Force resetting webview zoom to 100%`);
+        
+        // Method 1: Electron setZoomFactor
+        if (webview.setZoomFactor) {
+          webview.setZoomFactor(1.0);
+        }
+        
+        // Method 2: Remove all zoom CSS and reset via JavaScript
+        if (webview.executeJavaScript) {
+          webview.executeJavaScript(`
+            (function() {
+              try {
+                // Remove any existing zoom CSS
+                var existingZoom = document.getElementById('aussie-browser-zoom');
+                if (existingZoom) existingZoom.remove();
+                
+                // Remove all zoom styles
+                document.documentElement.style.zoom = '';
+                document.body.style.zoom = '';
+                document.documentElement.style.transform = '';
+                document.body.style.transform = '';
+                
+                // Reset to 100%
+                document.documentElement.style.zoom = '100%';
+                document.body.style.zoom = '100%';
+                
+                console.log('Zoom reset to 100% via JavaScript');
+                return true;
+              } catch (e) {
+                console.error('Error resetting zoom via JS:', e);
+                return false;
+              }
+            })();
+          `);
+        }
+        
+        // Method 3: Insert CSS to force 100%
+        if (webview.insertCSS) {
+          webview.insertCSS(`
+            html, body { 
+              zoom: 100% !important; 
+              transform: none !important;
+              transform-origin: top left !important;
+            }
+          `);
+        }
+      }
+    };
+    
     setZoomLevel(100);
-    applyZoomToActiveWebview(100);
-  }, []);
+    
+    // Apply reset immediately and with multiple attempts
+    forceReset();
+    setTimeout(forceReset, 50);
+    setTimeout(forceReset, 200);
+  }, [applyZoomToActiveWebview, activeTab]);
 
-  const applyZoomToActiveWebview = useCallback((zoomPercent: number) => {
-    const webview = webviewRefs.current[activeTab] as any;
-    if (webview && webview.setZoomFactor) {
-      const zoomFactor = zoomPercent / 100;
-      webview.setZoomFactor(zoomFactor);
+  // Reapply zoom when pages finish loading on the active tab
+  useEffect(() => {
+    const currentTab = tabs.find((tab) => tab.id === activeTab);
+    if (currentTab && !currentTab.isLoading) {
+      setTimeout(() => {
+        console.log(
+          `🔧 Reapplying zoom (${zoomLevel}%) after page loaded for active tab: ${activeTab}`
+        );
+        applyZoomToActiveWebview(zoomLevel);
+      }, 300);
     }
-  }, [activeTab]);
+  }, [
+    tabs.find((tab) => tab.id === activeTab)?.isLoading,
+    activeTab,
+    zoomLevel,
+    applyZoomToActiveWebview,
+  ]);
 
   const handleLogout = () => {
     if (onLogout) {
@@ -317,28 +549,32 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   // Smart URL/Search detection helper function
   const isValidUrl = useCallback((input: string): boolean => {
     // Check if it looks like a URL
-    if (input.startsWith('http://') || input.startsWith('https://')) {
+    if (input.startsWith("http://") || input.startsWith("https://")) {
       return true;
     }
-    
+
     // Check if it has a domain-like structure (contains a dot and no spaces)
-    if (input.includes('.') && !input.includes(' ')) {
+    if (input.includes(".") && !input.includes(" ")) {
       // Simple domain pattern check
-      const domainPattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-      const parts = input.split('/');
+      const domainPattern =
+        /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+      const parts = input.split("/");
       const domain = parts[0];
-      
+
       // Check if the domain part looks valid
       if (domainPattern.test(domain)) {
         return true;
       }
     }
-    
+
     // Check for localhost or IP addresses
-    if (input.startsWith('localhost') || input.match(/^\d+\.\d+\.\d+\.\d+(:\d+)?/)) {
+    if (
+      input.startsWith("localhost") ||
+      input.match(/^\d+\.\d+\.\d+\.\d+(:\d+)?/)
+    ) {
       return true;
     }
-    
+
     return false;
   }, []);
 
@@ -617,14 +853,17 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   }, [activeTab]);
 
   // Context menu handlers
-  const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setContextMenu({
-      visible: true,
-      x: event.clientX,
-      y: event.clientY,
-    });
-  }, []);
+  const handleContextMenu = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setContextMenu({
+        visible: true,
+        x: event.clientX,
+        y: event.clientY,
+      });
+    },
+    []
+  );
 
   const hideContextMenu = useCallback(() => {
     setContextMenu({ visible: false, x: 0, y: 0 });
@@ -634,17 +873,17 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     try {
       const webview = webviewRefs.current[activeTab] as any;
       if (webview && webview.printToPDF) {
-        console.log('📄 Saving page as PDF...');
-        
+        console.log("📄 Saving page as PDF...");
+
         // Use Electron's IPC to handle PDF generation
         // const result = await window.electronAPI?.savePageAsPDF?.();
-        console.log('PDF save feature would be implemented here');
-        console.log('✅ PDF save triggered (functionality pending)');
+        console.log("PDF save feature would be implemented here");
+        console.log("✅ PDF save triggered (functionality pending)");
       } else {
-        console.error('❌ PDF functionality not available');
+        console.error("❌ PDF functionality not available");
       }
     } catch (error) {
-      console.error('❌ Error saving PDF:', error);
+      console.error("❌ Error saving PDF:", error);
     }
     hideContextMenu();
   }, [activeTab, hideContextMenu]);
@@ -658,10 +897,10 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   }, [activeTab, hideContextMenu]);
 
   const copyUrl = useCallback(() => {
-    const currentTab = tabs.find(tab => tab.id === activeTab);
+    const currentTab = tabs.find((tab) => tab.id === activeTab);
     if (currentTab) {
       navigator.clipboard.writeText(currentTab.url);
-      console.log('📋 URL copied to clipboard');
+      console.log("📋 URL copied to clipboard");
     }
     hideContextMenu();
   }, [activeTab, tabs, hideContextMenu]);
@@ -669,33 +908,36 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   const testDownload = useCallback(() => {
     // Create a test file download
     const testContent = `Test file downloaded at ${new Date().toISOString()}\n\nThis is a test download from the Aussie Vault Browser.\nDownload functionality is working correctly!`;
-    const blob = new Blob([testContent], { type: 'text/plain' });
+    const blob = new Blob([testContent], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
-    
+
     // Create a temporary link and trigger download
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `test-download-${Date.now()}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
-    console.log('🧪 Test download initiated');
+
+    console.log("🧪 Test download initiated");
     hideContextMenu();
   }, [hideContextMenu]);
 
   const openInNewTab = useCallback(() => {
-    const currentTab = tabs.find(tab => tab.id === activeTab);
+    const currentTab = tabs.find((tab) => tab.id === activeTab);
     if (currentTab) {
       // Create new tab functionality
       const newTabId = Date.now().toString();
-      setTabs(prev => [...prev, {
-        id: newTabId,
-        title: "New Tab",
-        url: currentTab.url,
-        isLoading: false,
-      }]);
+      setTabs((prev) => [
+        ...prev,
+        {
+          id: newTabId,
+          title: "New Tab",
+          url: currentTab.url,
+          isLoading: false,
+        },
+      ]);
       setActiveTab(newTabId);
     }
     hideContextMenu();
@@ -710,133 +952,162 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       size: downloadData.totalBytes || 0,
       totalBytes: downloadData.totalBytes || 0,
       downloadedBytes: 0,
-      status: 'downloading',
+      status: "downloading",
       startTime: new Date(),
       speed: 0,
       progress: 0,
     };
-    
-    setDownloads(prev => {
+
+    setDownloads((prev) => {
       // Check if download with this ID already exists
-      const existingDownload = prev.find(d => d.id === downloadData.id);
+      const existingDownload = prev.find((d) => d.id === downloadData.id);
       if (existingDownload) {
-        console.log('⚠️ Download with ID already exists, skipping duplicate:', downloadData.id);
+        console.log(
+          "⚠️ Download with ID already exists, skipping duplicate:",
+          downloadData.id
+        );
         return prev; // Don't add duplicate
       }
-      
-      console.log('📥 Added download to state:', newDownload.filename);
+
+      console.log("📥 Added download to state:", newDownload.filename);
       return [...prev, newDownload];
     });
-    
+
     return newDownload.id;
   }, []);
 
   const updateDownloadProgress = useCallback((progressData: any) => {
-    setDownloads(prev => prev.map(download => {
-      if (download.id === progressData.id) {
-        const progress = progressData.totalBytes > 0 
-          ? Math.round((progressData.receivedBytes / progressData.totalBytes) * 100)
-          : 0;
-        
-        const updatedDownload = {
-          ...download,
-          downloadedBytes: progressData.receivedBytes || 0,
-          totalBytes: progressData.totalBytes || download.totalBytes,
-          speed: progressData.speed || 0,
-          progress: progress
-        };
-        
-        console.log(`📊 Updated download progress: ${updatedDownload.filename} - ${progress}%`);
-        return updatedDownload;
-      }
-      return download;
-    }));
+    setDownloads((prev) =>
+      prev.map((download) => {
+        if (download.id === progressData.id) {
+          const progress =
+            progressData.totalBytes > 0
+              ? Math.round(
+                  (progressData.receivedBytes / progressData.totalBytes) * 100
+                )
+              : 0;
+
+          const updatedDownload = {
+            ...download,
+            downloadedBytes: progressData.receivedBytes || 0,
+            totalBytes: progressData.totalBytes || download.totalBytes,
+            speed: progressData.speed || 0,
+            progress: progress,
+          };
+
+          console.log(
+            `📊 Updated download progress: ${updatedDownload.filename} - ${progress}%`
+          );
+          return updatedDownload;
+        }
+        return download;
+      })
+    );
   }, []);
 
   const cancelDownload = useCallback((id: string) => {
-    console.log('🚫 Cancelling download:', id);
-    
+    console.log("🚫 Cancelling download:", id);
+
     // Update UI state to mark as cancelled
-    setDownloads(prev => prev.map(download => 
-      download.id === id 
-        ? { ...download, status: 'cancelled' as const, endTime: new Date() }
-        : download
-    ));
-    
-    console.log('✅ Download marked as cancelled in UI:', id);
+    setDownloads((prev) =>
+      prev.map((download) =>
+        download.id === id
+          ? { ...download, status: "cancelled" as const, endTime: new Date() }
+          : download
+      )
+    );
+
+    console.log("✅ Download marked as cancelled in UI:", id);
   }, []);
 
   const viewFile = useCallback(async (filePath: string, filename: string) => {
     try {
-      console.log('📁 Opening file:', { filePath, filename });
-      
+      console.log("📁 Opening file:", { filePath, filename });
+
       // Use Electron's shell to open the file with the system's default application
       if (window.electronAPI?.shell?.openPath) {
         const result = await window.electronAPI.shell.openPath(filePath);
         if (result) {
-          console.error('❌ Failed to open file:', result);
+          console.error("❌ Failed to open file:", result);
           alert(`Failed to open file: ${result}`);
         } else {
-          console.log('✅ File opened successfully');
+          console.log("✅ File opened successfully");
         }
       } else {
         // Fallback: try to open using the browser (for blob URLs, etc.)
-        console.log('⚠️ Electron shell not available, trying browser fallback');
-        if (filePath.startsWith('blob:') || filePath.startsWith('data:')) {
-          const link = document.createElement('a');
+        console.log("⚠️ Electron shell not available, trying browser fallback");
+        if (filePath.startsWith("blob:") || filePath.startsWith("data:")) {
+          const link = document.createElement("a");
           link.href = filePath;
           link.download = filename;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          console.log('✅ File downloaded via browser fallback');
+          console.log("✅ File downloaded via browser fallback");
         } else {
-          console.error('❌ Cannot open file: No suitable method available');
-          alert('Cannot open file: File opening is not supported in this environment');
+          console.error("❌ Cannot open file: No suitable method available");
+          alert(
+            "Cannot open file: File opening is not supported in this environment"
+          );
         }
       }
     } catch (error) {
-      console.error('❌ Error opening file:', error);
-      alert(`Error opening file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("❌ Error opening file:", error);
+      alert(
+        `Error opening file: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   }, []);
 
-  const revealInExplorer = useCallback(async (filePath: string, filename: string) => {
-    try {
-      console.log('📂 Revealing file in explorer:', { filePath, filename });
-      
-      // Use Electron's shell to show the file in the system's file manager
-      if (window.electronAPI?.shell?.showItemInFolder) {
-        const result = await window.electronAPI.shell.showItemInFolder(filePath);
-        if (result) {
-          console.error('❌ Failed to reveal file:', result);
-          alert(`Failed to show file in folder: ${result}`);
+  const revealInExplorer = useCallback(
+    async (filePath: string, filename: string) => {
+      try {
+        console.log("📂 Revealing file in explorer:", { filePath, filename });
+
+        // Use Electron's shell to show the file in the system's file manager
+        if (window.electronAPI?.shell?.showItemInFolder) {
+          const result = await window.electronAPI.shell.showItemInFolder(
+            filePath
+          );
+          if (result) {
+            console.error("❌ Failed to reveal file:", result);
+            alert(`Failed to show file in folder: ${result}`);
+          } else {
+            console.log("✅ File revealed in explorer successfully");
+          }
         } else {
-          console.log('✅ File revealed in explorer successfully');
+          console.error("❌ Cannot reveal file: Shell API not available");
+          alert(
+            "Cannot show file in folder: This feature is not supported in this environment"
+          );
         }
-      } else {
-        console.error('❌ Cannot reveal file: Shell API not available');
-        alert('Cannot show file in folder: This feature is not supported in this environment');
+      } catch (error) {
+        console.error("❌ Error revealing file:", error);
+        alert(
+          `Error showing file in folder: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
       }
-    } catch (error) {
-      console.error('❌ Error revealing file:', error);
-      alert(`Error showing file in folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Clear downloads history
   const clearDownloads = useCallback(() => {
     try {
       setDownloads([]);
-      localStorage.removeItem('app-downloads');
-      console.log('🗑️ Downloads history cleared');
+      localStorage.removeItem("app-downloads");
+      console.log("🗑️ Downloads history cleared");
     } catch (error) {
-      console.error('❌ Failed to clear downloads:', error);
+      console.error("❌ Failed to clear downloads:", error);
     }
   }, []);
 
   const getActiveDownloads = useCallback(() => {
-    return downloads.filter(d => d.status === 'downloading');
+    return downloads.filter((d) => d.status === "downloading");
   }, [downloads]);
 
   // Click handler to hide context menu
@@ -844,10 +1115,10 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     const handleClick = () => {
       hideContextMenu();
     };
-    
+
     if (contextMenu.visible) {
-      document.addEventListener('click', handleClick);
-      return () => document.removeEventListener('click', handleClick);
+      document.addEventListener("click", handleClick);
+      return () => document.removeEventListener("click", handleClick);
     }
   }, [contextMenu.visible, hideContextMenu]);
 
@@ -855,161 +1126,243 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   useEffect(() => {
     const handleDownloadStarted = (_event: any, downloadData: any) => {
       try {
-        console.log('🎯 [REACT] Download started event received:', downloadData);
-        console.log('🎯 [REACT] Current downloads state before adding:', {
+        console.log(
+          "🎯 [REACT] Download started event received:",
+          downloadData
+        );
+        console.log("🎯 [REACT] Current downloads state before adding:", {
           total: downloads.length,
-          byId: downloads.map(d => ({ id: d.id, filename: d.filename, status: d.status }))
+          byId: downloads.map((d) => ({
+            id: d.id,
+            filename: d.filename,
+            status: d.status,
+          })),
         });
-        
+
         if (downloadData && downloadData.id && downloadData.filename) {
           addDownloadToState(downloadData);
         } else {
-          console.warn('⚠️ [REACT] Invalid download started data:', downloadData);
+          console.warn(
+            "⚠️ [REACT] Invalid download started data:",
+            downloadData
+          );
         }
       } catch (error) {
-        console.error('❌ [REACT] Error handling download started event:', error);
+        console.error(
+          "❌ [REACT] Error handling download started event:",
+          error
+        );
       }
     };
 
     const handleDownloadProgress = (_event: any, progressData: any) => {
       try {
-        const percent = progressData.totalBytes > 0 
-          ? Math.round((progressData.receivedBytes / progressData.totalBytes) * 100)
-          : 0;
-        console.log('🎯 [REACT] Download progress event received:', {
+        const percent =
+          progressData.totalBytes > 0
+            ? Math.round(
+                (progressData.receivedBytes / progressData.totalBytes) * 100
+              )
+            : 0;
+        console.log("🎯 [REACT] Download progress event received:", {
           id: progressData.id,
-          progress: progressData.receivedBytes + '/' + progressData.totalBytes,
-          percent: percent + '%'
+          progress: progressData.receivedBytes + "/" + progressData.totalBytes,
+          percent: percent + "%",
         });
-        
+
         if (progressData && progressData.id) {
           updateDownloadProgress(progressData);
         } else {
-          console.warn('⚠️ [REACT] Invalid download progress data:', progressData);
+          console.warn(
+            "⚠️ [REACT] Invalid download progress data:",
+            progressData
+          );
         }
       } catch (error) {
-        console.error('❌ [REACT] Error handling download progress event:', error);
+        console.error(
+          "❌ [REACT] Error handling download progress event:",
+          error
+        );
       }
     };
 
     const handleDownloadCompleted = (_event: any, completedData: any) => {
       try {
-        console.log('🎯 [REACT] Download completed event received:', completedData);
-        
+        console.log(
+          "🎯 [REACT] Download completed event received:",
+          completedData
+        );
+
         if (completedData && completedData.id) {
-          setDownloads(prev => prev.map(download => {
-            if (download.id === completedData.id) {
-              const finalStatus = completedData.state === 'completed' ? 'completed' : 
-                                completedData.state === 'cancelled' ? 'cancelled' : 'blocked';
-              
-              return {
-                ...download,
-                status: finalStatus as 'completed' | 'cancelled' | 'blocked',
-                endTime: new Date(),
-                progress: completedData.state === 'completed' ? 100 : download.progress,
-                filePath: completedData.filePath
-              };
-            }
-            return download;
-          }));
+          setDownloads((prev) =>
+            prev.map((download) => {
+              if (download.id === completedData.id) {
+                const finalStatus =
+                  completedData.state === "completed"
+                    ? "completed"
+                    : completedData.state === "cancelled"
+                    ? "cancelled"
+                    : "blocked";
+
+                return {
+                  ...download,
+                  status: finalStatus as "completed" | "cancelled" | "blocked",
+                  endTime: new Date(),
+                  progress:
+                    completedData.state === "completed"
+                      ? 100
+                      : download.progress,
+                  filePath: completedData.filePath,
+                };
+              }
+              return download;
+            })
+          );
         } else {
-          console.warn('⚠️ [REACT] Invalid download completed data:', completedData);
+          console.warn(
+            "⚠️ [REACT] Invalid download completed data:",
+            completedData
+          );
         }
       } catch (error) {
-        console.error('❌ [REACT] Error handling download completed event:', error);
+        console.error(
+          "❌ [REACT] Error handling download completed event:",
+          error
+        );
       }
     };
 
     const handleDownloadBlocked = (_event: any, blockedData: any) => {
       try {
-        console.log('🎯 [REACT] Download blocked event received:', blockedData);
-        
+        console.log("🎯 [REACT] Download blocked event received:", blockedData);
+
         if (blockedData && blockedData.filename) {
           // First check if this is an existing download that got blocked
-          setDownloads(prev => {
-            const existingDownload = prev.find(d => 
-              d.filename === blockedData.filename && 
-              d.url === blockedData.url &&
-              d.status === 'downloading'
+          setDownloads((prev) => {
+            const existingDownload = prev.find(
+              (d) =>
+                d.filename === blockedData.filename &&
+                d.url === blockedData.url &&
+                d.status === "downloading"
             );
-            
+
             if (existingDownload) {
               // Update existing download to blocked status
-              console.log('📋 Updating existing download to blocked status:', blockedData.filename);
-              return prev.map(download => 
-                download.id === existingDownload.id 
-                  ? { ...download, status: 'blocked' as const, endTime: new Date() }
+              console.log(
+                "📋 Updating existing download to blocked status:",
+                blockedData.filename
+              );
+              return prev.map((download) =>
+                download.id === existingDownload.id
+                  ? {
+                      ...download,
+                      status: "blocked" as const,
+                      endTime: new Date(),
+                    }
                   : download
               );
             } else {
               // Create new blocked download entry (only if no existing download found)
               const blockedDownload = {
-                id: `blocked-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                id: `blocked-${Date.now()}-${Math.random()
+                  .toString(36)
+                  .substr(2, 9)}`,
                 filename: blockedData.filename,
                 url: blockedData.url,
                 size: blockedData.size || 0,
                 totalBytes: blockedData.size || 0,
                 downloadedBytes: 0,
-                status: 'blocked' as const,
+                status: "blocked" as const,
                 startTime: new Date(),
                 progress: 0,
               };
-              console.log('📥 Created new blocked download entry:', blockedData.filename);
+              console.log(
+                "📥 Created new blocked download entry:",
+                blockedData.filename
+              );
               return [...prev, blockedDownload];
             }
           });
         } else {
-          console.warn('⚠️ [REACT] Invalid download blocked data:', blockedData);
+          console.warn(
+            "⚠️ [REACT] Invalid download blocked data:",
+            blockedData
+          );
         }
       } catch (error) {
-        console.error('❌ [REACT] Error handling download blocked event:', error);
+        console.error(
+          "❌ [REACT] Error handling download blocked event:",
+          error
+        );
       }
     };
 
     // Set up actual download IPC listeners with error handling
     try {
-      console.log('🔧 [REACT] Setting up download IPC listeners...');
-      console.log('🔧 [REACT] secureBrowser availability:', {
+      console.log("🔧 [REACT] Setting up download IPC listeners...");
+      console.log("🔧 [REACT] secureBrowser availability:", {
         exists: !!window.secureBrowser,
         onMethod: !!window.secureBrowser?.on,
-        removeListenerMethod: !!window.secureBrowser?.removeListener
+        removeListenerMethod: !!window.secureBrowser?.removeListener,
       });
-      
+
       if (window.secureBrowser?.on) {
-        console.log('🔧 [REACT] Attaching download event listeners...');
-        window.secureBrowser.on('download-started', handleDownloadStarted);
-        window.secureBrowser.on('download-progress', handleDownloadProgress);
-        window.secureBrowser.on('download-completed', handleDownloadCompleted);
-        window.secureBrowser.on('download-blocked', handleDownloadBlocked);
-        console.log('✅ [REACT] Download IPC listeners attached successfully');
-        
+        console.log("🔧 [REACT] Attaching download event listeners...");
+        window.secureBrowser.on("download-started", handleDownloadStarted);
+        window.secureBrowser.on("download-progress", handleDownloadProgress);
+        window.secureBrowser.on("download-completed", handleDownloadCompleted);
+        window.secureBrowser.on("download-blocked", handleDownloadBlocked);
+        console.log("✅ [REACT] Download IPC listeners attached successfully");
+
         // Test connection with a simple IPC call
-        window.secureBrowser.system?.getEnvironment?.()
-          .then(() => console.log('✅ [REACT] IPC connection test successful'))
-          .catch((err) => console.warn('⚠️ [REACT] IPC connection test failed:', err));
+        window.secureBrowser.system
+          ?.getEnvironment?.()
+          .then(() => console.log("✅ [REACT] IPC connection test successful"))
+          .catch((err) =>
+            console.warn("⚠️ [REACT] IPC connection test failed:", err)
+          );
       } else {
-        console.warn('⚠️ [REACT] secureBrowser.on not available - download events will not work');
-        console.warn('⚠️ [REACT] Available methods:', Object.keys(window.secureBrowser || {}));
+        console.warn(
+          "⚠️ [REACT] secureBrowser.on not available - download events will not work"
+        );
+        console.warn(
+          "⚠️ [REACT] Available methods:",
+          Object.keys(window.secureBrowser || {})
+        );
       }
     } catch (error) {
-      console.error('❌ [REACT] Failed to set up download listeners:', error);
+      console.error("❌ [REACT] Failed to set up download listeners:", error);
     }
 
     return () => {
       // Cleanup listeners with error handling
       try {
         if (window.secureBrowser?.removeListener) {
-          window.secureBrowser.removeListener('download-started', handleDownloadStarted);
-          window.secureBrowser.removeListener('download-progress', handleDownloadProgress);
-          window.secureBrowser.removeListener('download-completed', handleDownloadCompleted);
-          window.secureBrowser.removeListener('download-blocked', handleDownloadBlocked);
-          console.log('🧹 [REACT] Download listeners cleaned up successfully');
+          window.secureBrowser.removeListener(
+            "download-started",
+            handleDownloadStarted
+          );
+          window.secureBrowser.removeListener(
+            "download-progress",
+            handleDownloadProgress
+          );
+          window.secureBrowser.removeListener(
+            "download-completed",
+            handleDownloadCompleted
+          );
+          window.secureBrowser.removeListener(
+            "download-blocked",
+            handleDownloadBlocked
+          );
+          console.log("🧹 [REACT] Download listeners cleaned up successfully");
         }
       } catch (error) {
-        console.error('❌ [REACT] Error during download listener cleanup:', error);
+        console.error(
+          "❌ [REACT] Error during download listener cleanup:",
+          error
+        );
       }
     };
-    }, [addDownloadToState, updateDownloadProgress]);
+  }, [addDownloadToState, updateDownloadProgress]);
 
   const goHome = useCallback(() => {
     const homeUrl = getHomeUrl();
@@ -1138,13 +1491,20 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     }
   }, [allowBrowsing, vpnStatus]);
 
-  // Update URL input when switching tabs
+  // Update URL input when switching tabs and apply current zoom
   useEffect(() => {
     const currentTab = tabs.find((tab) => tab.id === activeTab);
     if (currentTab) {
       setUrlInput(currentTab.url);
+      // Apply the current zoom level to the newly active tab
+      setTimeout(() => {
+        console.log(
+          `🔄 Applying current zoom (${zoomLevel}%) to newly active tab: ${activeTab}`
+        );
+        applyZoomToActiveWebview(zoomLevel);
+      }, 100); // Small delay to ensure webview is ready
     }
-  }, [activeTab, tabs]);
+  }, [activeTab, tabs, zoomLevel, applyZoomToActiveWebview]);
 
   // Webview event handlers
   // Auto-inject SharePoint credentials when navigating to SharePoint
@@ -1279,7 +1639,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       webview.addEventListener("page-title-updated", (event: Event) => {
         const webviewEvent = event as WebviewEvent;
         const newTitle = webviewEvent.title || "Untitled";
-        
+
         setTabs((tabs) =>
           tabs.map((tab) => {
             if (tab.id === tabId) {
@@ -1357,25 +1717,29 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         const mouseEvent = event as MouseEvent;
         mouseEvent.preventDefault();
         mouseEvent.stopPropagation();
-        
-        console.log('🖱️ Webview context menu triggered at:', mouseEvent.clientX, mouseEvent.clientY);
-        
+
+        console.log(
+          "🖱️ Webview context menu triggered at:",
+          mouseEvent.clientX,
+          mouseEvent.clientY
+        );
+
         setContextMenu({
           visible: true,
           x: mouseEvent.clientX,
           y: mouseEvent.clientY,
         });
       };
-      
+
       // Listen to context menu events from the webview
       webview.addEventListener("contextmenu", webviewContextMenu, true);
-      
+
       // Also handle the Electron webview's context-menu event
       if ((webview as any).addEventListener) {
         (webview as any).addEventListener("context-menu", (e: any) => {
-          console.log('🖱️ Electron webview context-menu event:', e);
+          console.log("🖱️ Electron webview context-menu event:", e);
           e.preventDefault();
-          
+
           setContextMenu({
             visible: true,
             x: e.params?.x || 100,
@@ -1383,14 +1747,19 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           });
         });
       }
-      
+
       // Fallback: Listen for right-click using mousedown events
       const handleMouseDown = (event: Event) => {
         const mouseEvent = event as MouseEvent;
-        if (mouseEvent.button === 2) { // Right mouse button
-          console.log('🖱️ Right mouse button detected on webview at:', mouseEvent.clientX, mouseEvent.clientY);
+        if (mouseEvent.button === 2) {
+          // Right mouse button
+          console.log(
+            "🖱️ Right mouse button detected on webview at:",
+            mouseEvent.clientX,
+            mouseEvent.clientY
+          );
           mouseEvent.preventDefault();
-          
+
           setContextMenu({
             visible: true,
             x: mouseEvent.clientX,
@@ -1398,7 +1767,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           });
         }
       };
-      
+
       webview.addEventListener("mousedown", handleMouseDown, true);
     },
     [activeTab]
@@ -1423,22 +1792,44 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Check for Ctrl/Cmd key
       const isModifierPressed = event.ctrlKey || event.metaKey;
-      
+
       if (isModifierPressed) {
+        let handled = false;
+
         switch (event.key) {
-          case '=':
-          case '+':
+          case "=":
+          case "+":
             event.preventDefault();
+            event.stopPropagation();
+            console.log("⌨️ [ZOOM] Keyboard zoom in triggered");
             handleZoomIn();
+            handled = true;
             break;
-          case '-':
+          case "-":
+          case "_":
             event.preventDefault();
+            event.stopPropagation();
+            console.log("⌨️ [ZOOM] Keyboard zoom out triggered");
             handleZoomOut();
+            handled = true;
             break;
-          case '0':
+          case "0":
             event.preventDefault();
+            event.stopPropagation();
+            console.log("⌨️ [ZOOM] Keyboard zoom reset triggered");
             handleZoomReset();
+            handled = true;
             break;
+        }
+
+        if (handled) {
+          // Force focus back to the browser window to ensure subsequent key events work
+          setTimeout(() => {
+            const browserWindow = document.querySelector('.browser-window-container');
+            if (browserWindow) {
+              (browserWindow as HTMLElement).focus();
+            }
+          }, 10);
         }
       }
     };
@@ -1446,10 +1837,13 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     // Add mouse wheel zoom support
     const handleWheel = (event: WheelEvent) => {
       const isModifierPressed = event.ctrlKey || event.metaKey;
-      
+
       if (isModifierPressed) {
         event.preventDefault();
-        
+        event.stopPropagation();
+
+        console.log("🖱️ [ZOOM] Mouse wheel zoom triggered");
+
         if (event.deltaY < 0) {
           // Scroll up - zoom in
           handleZoomIn();
@@ -1460,21 +1854,35 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       }
     };
 
-    // Add event listeners
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('wheel', handleWheel, { passive: false });
-    
-    // Cleanup
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('wheel', handleWheel);
+    // Add event listeners to both document and window for maximum coverage
+    const addListeners = () => {
+      document.addEventListener("keydown", handleKeyDown, true);
+      window.addEventListener("keydown", handleKeyDown, true);
+      document.addEventListener("wheel", handleWheel, { passive: false, capture: true });
+      window.addEventListener("wheel", handleWheel, { passive: false, capture: true });
+      console.log("🔧 [ZOOM] Zoom keyboard/mouse listeners attached");
     };
+
+    const removeListeners = () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("wheel", handleWheel, true);
+      window.removeEventListener("wheel", handleWheel, true);
+      console.log("🧹 [ZOOM] Zoom keyboard/mouse listeners removed");
+    };
+
+    addListeners();
+
+    // Cleanup
+    return removeListeners;
   }, [handleZoomIn, handleZoomOut, handleZoomReset]);
 
   return (
     <div
-      className="flex flex-col h-full bg-white"
+      className="flex flex-col h-full bg-white browser-window-container"
       onContextMenu={handleContextMenu}
+      tabIndex={-1}
+      style={{ outline: 'none' }}
     >
       {/* Browser Controls - Fixed/Sticky */}
       <div className="flex items-center gap-3 p-3 border-b bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg flex-shrink-0">
@@ -1565,6 +1973,15 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             {config.name}
           </Badge>
 
+          {/* Temporary Zoom Debug Badge - Remove after testing */}
+          <Badge
+            variant="outline"
+            className="px-2 py-1 text-xs font-mono bg-green-100 text-green-800 border-green-300 h-8 flex items-center"
+            title="Current zoom level (debug indicator)"
+          >
+            🔍 {zoomLevel}%
+          </Badge>
+
           {/* SharePoint Vault Auth Indicator */}
           {(urlInput.includes("sharepoint.com") ||
             urlInput.includes("office.com") ||
@@ -1602,53 +2019,69 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                 {/* Enhanced download icon with professional progress indicator */}
                 <div className="relative w-4 h-4 group">
                   <FileDown className="w-4 h-4 transition-transform group-hover:scale-110" />
-                  
+
                   {/* Enhanced circular progress indicator for active downloads */}
-                  {getActiveDownloads().length > 0 && (() => {
-                    const activeDownloads = getActiveDownloads();
-                    const totalProgress = activeDownloads.reduce((sum, d) => sum + d.progress, 0) / activeDownloads.length;
-                    const strokeDasharray = 2 * Math.PI * 8; // radius = 8
-                    const strokeDashoffset = strokeDasharray - (strokeDasharray * totalProgress) / 100;
-                    
-                    return (
-                      <svg 
-                        className="absolute -top-1 -left-1 w-6 h-6 transform -rotate-90" 
-                        viewBox="0 0 20 20"
-                      >
-                        {/* Background circle with subtle glow */}
-                        <circle
-                          cx="10"
-                          cy="10"
-                          r="8"
-                          stroke="rgba(59, 130, 246, 0.2)"
-                          strokeWidth="1.5"
-                          fill="none"
-                        />
-                        {/* Progress circle with gradient */}
-                        <circle
-                          cx="10"
-                          cy="10"
-                          r="8"
-                          stroke="url(#navProgressGradient)"
-                          strokeWidth="2.5"
-                          fill="none"
-                          strokeDasharray={strokeDasharray}
-                          strokeDashoffset={strokeDashoffset}
-                          strokeLinecap="round"
-                          className="transition-all duration-500 ease-out"
-                          style={{ filter: 'drop-shadow(0 0 3px rgba(59, 130, 246, 0.6))' }}
-                        />
-                        <defs>
-                          <linearGradient id="navProgressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor="#3b82f6" />
-                            <stop offset="50%" stopColor="#8b5cf6" />
-                            <stop offset="100%" stopColor="#3b82f6" />
-                          </linearGradient>
-                        </defs>
-                      </svg>
-                    );
-                  })()}
-                  
+                  {getActiveDownloads().length > 0 &&
+                    (() => {
+                      const activeDownloads = getActiveDownloads();
+                      const totalProgress =
+                        activeDownloads.reduce(
+                          (sum, d) => sum + d.progress,
+                          0
+                        ) / activeDownloads.length;
+                      const strokeDasharray = 2 * Math.PI * 8; // radius = 8
+                      const strokeDashoffset =
+                        strokeDasharray -
+                        (strokeDasharray * totalProgress) / 100;
+
+                      return (
+                        <svg
+                          className="absolute -top-1 -left-1 w-6 h-6 transform -rotate-90"
+                          viewBox="0 0 20 20"
+                        >
+                          {/* Background circle with subtle glow */}
+                          <circle
+                            cx="10"
+                            cy="10"
+                            r="8"
+                            stroke="rgba(59, 130, 246, 0.2)"
+                            strokeWidth="1.5"
+                            fill="none"
+                          />
+                          {/* Progress circle with gradient */}
+                          <circle
+                            cx="10"
+                            cy="10"
+                            r="8"
+                            stroke="url(#navProgressGradient)"
+                            strokeWidth="2.5"
+                            fill="none"
+                            strokeDasharray={strokeDasharray}
+                            strokeDashoffset={strokeDashoffset}
+                            strokeLinecap="round"
+                            className="transition-all duration-500 ease-out"
+                            style={{
+                              filter:
+                                "drop-shadow(0 0 3px rgba(59, 130, 246, 0.6))",
+                            }}
+                          />
+                          <defs>
+                            <linearGradient
+                              id="navProgressGradient"
+                              x1="0%"
+                              y1="0%"
+                              x2="100%"
+                              y2="100%"
+                            >
+                              <stop offset="0%" stopColor="#3b82f6" />
+                              <stop offset="50%" stopColor="#8b5cf6" />
+                              <stop offset="100%" stopColor="#3b82f6" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+                      );
+                    })()}
+
                   {/* Enhanced download count badge */}
                   {getActiveDownloads().length > 0 && (
                     <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center z-10 shadow-lg ring-2 ring-white animate-pulse">
@@ -1657,55 +2090,70 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                       </span>
                     </div>
                   )}
-                  
+
                   {/* Enhanced completed downloads indicator */}
-                  {downloads.filter(d => d.status === 'completed').length > 0 && getActiveDownloads().length === 0 && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full shadow-md ring-1 ring-white"></div>
-                  )}
+                  {downloads.filter((d) => d.status === "completed").length >
+                    0 &&
+                    getActiveDownloads().length === 0 && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full shadow-md ring-1 ring-white"></div>
+                    )}
                 </div>
               </div>
             </Button>
-            
+
             {/* Download Progress Tooltip - Shows on Hover When Active Downloads */}
             {getActiveDownloads().length > 0 && (
               <div className="absolute top-full right-0 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50 opacity-0 hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                 <div className="text-xs font-medium text-gray-700 mb-2">
                   Active Downloads ({getActiveDownloads().length})
                 </div>
-                
-                {getActiveDownloads().slice(0, 3).map((download) => (
-                  <div key={download.id} className="mb-3 last:mb-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-gray-700 truncate flex-1">
-                        {download.filename}
-                      </span>
-                      <span className="text-xs text-gray-500 ml-2">
-                        {download.progress}%
-                      </span>
-                    </div>
-                    
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1">
-                      <div 
-                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
-                        style={{ width: `${download.progress}%` }}
-                      ></div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>
-                        {download.downloadedBytes > 0 && download.totalBytes > 0 
-                          ? `${Math.round((download.downloadedBytes / 1024 / 1024) * 100) / 100} MB / ${Math.round((download.totalBytes / 1024 / 1024) * 100) / 100} MB`
-                          : 'Calculating...'}
-                      </span>
-                      {download.speed && download.speed > 0 && (
-                        <span>
-                          {Math.round((download.speed / 1024 / 1024) * 100) / 100} MB/s
+
+                {getActiveDownloads()
+                  .slice(0, 3)
+                  .map((download) => (
+                    <div key={download.id} className="mb-3 last:mb-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-gray-700 truncate flex-1">
+                          {download.filename}
                         </span>
-                      )}
+                        <span className="text-xs text-gray-500 ml-2">
+                          {download.progress}%
+                        </span>
+                      </div>
+
+                      <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1">
+                        <div
+                          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                          style={{ width: `${download.progress}%` }}
+                        ></div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>
+                          {download.downloadedBytes > 0 &&
+                          download.totalBytes > 0
+                            ? `${
+                                Math.round(
+                                  (download.downloadedBytes / 1024 / 1024) * 100
+                                ) / 100
+                              } MB / ${
+                                Math.round(
+                                  (download.totalBytes / 1024 / 1024) * 100
+                                ) / 100
+                              } MB`
+                            : "Calculating..."}
+                        </span>
+                        {download.speed && download.speed > 0 && (
+                          <span>
+                            {Math.round((download.speed / 1024 / 1024) * 100) /
+                              100}{" "}
+                            MB/s
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-                
+                  ))}
+
                 {getActiveDownloads().length > 3 && (
                   <div className="text-xs text-gray-500 text-center mt-2 pt-2 border-t">
                     +{getActiveDownloads().length - 3} more downloads
@@ -1802,7 +2250,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                     }
                   />
                 </div>
-              ) : isCheckingStatus || (tab.isLoading && !tab.url.startsWith('http')) ? (
+              ) : isCheckingStatus ||
+                (tab.isLoading && !tab.url.startsWith("http")) ? (
                 /* Show beautiful loader while determining permissions or loading */
                 <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 min-h-full">
                   <div className="text-center">
@@ -1817,20 +2266,21 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                         <div className="w-3 h-3 bg-blue-600 rounded-full animate-pulse"></div>
                       </div>
                     </div>
-                    
+
                     {/* Loading text */}
                     <div className="space-y-2">
                       <h3 className="text-lg font-semibold text-slate-700">
-                        {isCheckingStatus ? 'Verifying Access Permissions' : 'Securing Connection'}
+                        {isCheckingStatus
+                          ? "Verifying Access Permissions"
+                          : "Securing Connection"}
                       </h3>
                       <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
-                        {isCheckingStatus 
-                          ? 'Checking your access level and domain permissions...'
-                          : 'Establishing secure browsing session through Australian VPN...'
-                        }
+                        {isCheckingStatus
+                          ? "Checking your access level and domain permissions..."
+                          : "Establishing secure browsing session through Australian VPN..."}
                       </p>
                     </div>
-                    
+
                     {/* Progress indicator */}
                     <div className="mt-6 w-48 mx-auto">
                       <div className="flex items-center space-x-2 text-xs text-slate-400">
@@ -1840,20 +2290,30 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                       </div>
                       <div className="mt-2 flex items-center justify-center space-x-2">
                         <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div
+                          className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                          style={{ animationDelay: "0.1s" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                          style={{ animationDelay: "0.2s" }}
+                        ></div>
                       </div>
                     </div>
-                    
+
                     {/* Security badges */}
                     <div className="mt-8 flex items-center justify-center space-x-4">
                       <div className="flex items-center space-x-2 px-3 py-1.5 bg-white/70 rounded-full border border-emerald-200">
                         <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                        <span className="text-xs font-medium text-emerald-700">VPN Secured</span>
+                        <span className="text-xs font-medium text-emerald-700">
+                          VPN Secured
+                        </span>
                       </div>
                       <div className="flex items-center space-x-2 px-3 py-1.5 bg-white/70 rounded-full border border-blue-200">
                         <Shield className="w-3 h-3 text-blue-600" />
-                        <span className="text-xs font-medium text-blue-700">Level {user?.accessLevel || 1} Access</span>
+                        <span className="text-xs font-medium text-blue-700">
+                          Level {user?.accessLevel || 1} Access
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1937,7 +2397,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           <div className="text-xs text-gray-600 px-3 py-1 border-b border-gray-200 font-medium">
             Browser Actions
           </div>
-          
+
           <button
             onClick={saveAsPDF}
             className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-900 transition-colors"
@@ -1945,7 +2405,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             <FileDown className="w-4 h-4 text-gray-700" />
             Save as PDF
           </button>
-          
+
           <button
             onClick={printPage}
             className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-900 transition-colors"
@@ -1953,9 +2413,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             <Printer className="w-4 h-4 text-gray-700" />
             Print
           </button>
-          
+
           <div className="border-t border-gray-200 my-1"></div>
-          
+
           <button
             onClick={copyUrl}
             className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-900 transition-colors"
@@ -1963,7 +2423,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             <Copy className="w-4 h-4 text-gray-700" />
             Copy URL
           </button>
-          
+
           <button
             onClick={openInNewTab}
             className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-900 transition-colors"
@@ -1971,9 +2431,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             <ExternalLink className="w-4 h-4 text-gray-700" />
             Open in New Tab
           </button>
-          
+
           <div className="border-t border-gray-200 my-1"></div>
-          
+
           <button
             onClick={reload}
             className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-900 transition-colors"
@@ -1981,9 +2441,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             <RotateCcw className="w-4 h-4 text-gray-700" />
             Reload Page
           </button>
-          
+
           <div className="border-t border-gray-200 my-1"></div>
-          
+
           <button
             onClick={testDownload}
             className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center gap-2 text-sm text-blue-700 transition-colors font-medium"
