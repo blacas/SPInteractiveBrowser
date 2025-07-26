@@ -1930,7 +1930,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           <BookmarkButton
             url={urlInput}
             title={tabs.find(tab => tab.id === activeTab)?.title || urlInput}
-            userId={user?.id || 0}
+            userId={user?.dbId || 0}
             accessLevel={user?.accessLevel || 1}
             onNavigate={navigateToUrl}
           />

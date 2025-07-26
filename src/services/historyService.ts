@@ -115,7 +115,7 @@ export class HistoryService {
     faviconUrl?: string
   ): Promise<void> {
     try {
-      if (!this.currentUser?.id) return;
+      if (!this.currentUser?.dbId) return;
 
       const deviceId = this.getDeviceId();
       const now = new Date().toISOString();
@@ -124,7 +124,7 @@ export class HistoryService {
       const { error } = await supabase
         .from('browsing_history')
         .upsert({
-          user_id: this.currentUser.id,
+          user_id: this.currentUser.dbId,
           device_id: deviceId,
           url,
           domain,
@@ -162,7 +162,7 @@ export class HistoryService {
       const { data: existing } = await supabase
         .from('browsing_history')
         .select('*')
-        .eq('user_id', this.currentUser.id)
+        .eq('user_id', this.currentUser.dbId)
         .eq('url', url)
         .single();
 
@@ -176,14 +176,14 @@ export class HistoryService {
             last_visit: now,
             favicon_url: faviconUrl || existing.favicon_url
           })
-          .eq('user_id', this.currentUser.id)
+          .eq('user_id', this.currentUser.dbId)
           .eq('url', url);
       } else {
         // Insert new entry
         await supabase
           .from('browsing_history')
           .insert({
-            user_id: this.currentUser.id,
+            user_id: this.currentUser.dbId,
             device_id: deviceId,
             url,
             domain,
@@ -214,12 +214,12 @@ export class HistoryService {
   // Get database history
   static async getDatabaseHistory(limit: number = 100): Promise<HistoryEntry[]> {
     try {
-      if (!this.currentUser?.id) return [];
+      if (!this.currentUser?.dbId) return [];
 
       const { data, error } = await supabase
         .from('browsing_history')
         .select('*')
-        .eq('user_id', this.currentUser.id)
+        .eq('user_id', this.currentUser.dbId)
         .order('last_visit', { ascending: false })
         .limit(limit);
 
@@ -335,11 +335,11 @@ export class HistoryService {
       }
       
       // Clear database history
-      if (this.currentUser?.id) {
+      if (this.currentUser?.dbId) {
         let query = supabase
           .from('browsing_history')
           .delete()
-          .eq('user_id', this.currentUser.id);
+          .eq('user_id', this.currentUser.dbId);
           
         if (timeRange !== 'all') {
           query = query.gte('last_visit', cutoffDate.toISOString());
