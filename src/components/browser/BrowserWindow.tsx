@@ -2270,16 +2270,6 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           >
             🔍 {zoomLevel}%
             <button 
-              onClick={() => {
-                console.log('🧪 [TEST] Direct state update test - setting zoom to 150%');
-                setZoomLevel(150);
-              }}
-              className="ml-1 px-1 bg-blue-200 hover:bg-blue-300 rounded text-xs"
-              title="Test direct state update"
-            >
-              150
-            </button>
-            <button 
               onClick={handleZoomIn}
               className="ml-1 px-1 bg-green-200 hover:bg-green-300 rounded text-xs"
               title="Test zoom in"
