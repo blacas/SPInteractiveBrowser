@@ -6,7 +6,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { 
-  Shield, 
   Globe, 
   User, 
   Settings, 
@@ -95,7 +94,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <header className="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between flex-shrink-0">
         {/* Left Side - Logo and Title */}
         <div className="flex items-center space-x-3">
-          <Shield className="h-6 w-6 text-blue-500" />
+          <img 
+            src="/assets/aussie-browser-logo.png" 
+            alt="Aussie Vault Browser" 
+            className="h-8 w-8 rounded-lg"
+          />
           <h1 className="text-lg font-semibold">Aussie Vault Browser</h1>
           
           {/* Access Level Badge with Dropdown */}

@@ -1021,7 +1021,7 @@ function createBrowserWindow(isMain: boolean = false): BrowserWindow {
     height: 900,
     minWidth: 1200,
     minHeight: 700,
-    icon: path.join(process.env.VITE_PUBLIC || '', 'electron-vite.svg'),
+    icon: path.join(__dirname, '../build/icon.png'),
     titleBarStyle: 'default',
     show: false, // Don't show until ready
     webPreferences: {
@@ -1844,6 +1844,11 @@ ipcMain.handle('window-close', async (_event, windowId?: number) => {
 // Initialize security configuration
 app.whenReady().then(async () => {
   console.log('🚀 Initializing Aussie Vault Browser...')
+  
+  // Set app icon for dock/taskbar
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(path.join(__dirname, '../build/icon.png'))
+  }
   
   // Load environment variables first
   await loadEnvironmentVariables()

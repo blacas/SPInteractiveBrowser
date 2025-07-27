@@ -28,6 +28,47 @@ declare global {
   }
 }
 
+// Function to check actual IP geolocation - optimized for speed
+const checkIPGeolocation = async (): Promise<{ country: string; ip: string; isAustralia: boolean }> => {
+  try {
+    // Use fastest service with short timeout for speed
+    const response = await Promise.race([
+      fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(2000) }),
+      fetch('https://ip-api.com/json/', { signal: AbortSignal.timeout(2000) })
+    ]);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    let country = '';
+    let ip = '';
+    
+    // Parse response based on service URL
+    if (response.url.includes('ipapi.co')) {
+      country = data.country_name || data.country || '';
+      ip = data.ip || '';
+    } else if (response.url.includes('ip-api.com')) {
+      country = data.country || '';
+      ip = data.query || '';
+    }
+    
+    const isAustralia = country.toLowerCase().includes('australia') || 
+                       country.toLowerCase() === 'au' ||
+                       country.toLowerCase() === 'aus';
+    
+    console.log(`🌍 Fast IP Check: IP=${ip}, Country=${country}, IsAustralia=${isAustralia}`);
+    
+    return { country, ip, isAustralia };
+  } catch (error) {
+    console.warn('⚠️ IP check failed, allowing WireGuard status to determine connection:', error);
+    // If IP check fails, rely on WireGuard status
+    return { country: 'Checking...', ip: 'Checking...', isAustralia: true };
+  }
+};
+
 export const useVPN = () => {
   const [vpnStatus, setVpnStatus] = useState<VPNStatus>("disconnected");
   const [connection, setConnection] = useState<VPNConnection>({
@@ -36,9 +77,12 @@ export const useVPN = () => {
   });
   const [retryCount, setRetryCount] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true); // Start as checking
   const [autoReconnectAttempts, setAutoReconnectAttempts] = useState(0);
   const [isAutoReconnecting, setIsAutoReconnecting] = useState(false);
+  const [actualIP, setActualIP] = useState<string>('');
+  const [actualCountry, setActualCountry] = useState<string>('');
+  const [ipVerified, setIPVerified] = useState<boolean>(false);
 
   const connectVPN = async (): Promise<void> => {
     setVpnStatus("connecting");
@@ -46,28 +90,33 @@ export const useVPN = () => {
     setIsAutoReconnecting(false);
     
     try {
-      // Use IPC to connect VPN via main process
-      console.log(`🔌 Requesting VPN connection via main process...`);
+      console.log("🔌 Fast VPN connection attempt...");
       const success = await window.electronAPI?.vpn?.connect('wireguard');
       
       if (success) {
         setVpnStatus("connected");
         setRetryCount(0);
         setAutoReconnectAttempts(0);
-        console.log("✅ VPN Connected successfully via main process");
+        console.log("✅ VPN Connected successfully - browsing enabled");
         
-        // Update connection info
-        setConnection(prev => ({
-          ...prev,
-          ipAddress: "134.199.169.102", // Your actual Australian IP
-          latency: Math.floor(Math.random() * 30) + 15
-        }));
+        // Do IP check in background for display info
+        checkIPGeolocation().then(ipInfo => {
+          setActualIP(ipInfo.ip);
+          setActualCountry(ipInfo.country);
+          setIPVerified(ipInfo.isAustralia);
+          
+          setConnection(prev => ({
+            ...prev,
+            ipAddress: ipInfo.ip,
+            latency: Math.floor(Math.random() * 30) + 15
+          }));
+        });
       } else {
-        throw new Error("VPN connection failed via main process");
+        throw new Error("VPN connection failed");
       }
     } catch (error) {
       console.error("❌ VPN connection failed:", error);
-      setLastError("Failed to establish WireGuard VPN connection to Australia");
+      setLastError("Failed to connect to Australian VPN via WireGuard");
       setVpnStatus("failed");
     }
   };
@@ -127,189 +176,194 @@ export const useVPN = () => {
     }
   }, [isAutoReconnecting, vpnStatus, autoReconnectAttempts]);
 
-  // Check VPN status function with better error handling and more reliable status detection
+  // Fast VPN status check - prioritizes WireGuard status over IP geolocation
   const checkVPNStatus = useCallback(async (): Promise<void> => {
     setIsCheckingStatus(true);
     try {
-      console.log("🔍 Checking VPN status via main process...");
+      console.log("🔍 Fast VPN status check...");
+      
+      // Check WireGuard status first (faster and more reliable)
       const status = await window.electronAPI?.vpn?.getStatus();
-      console.log(`📊 VPN status received from main process: ${status}`);
+      console.log(`📊 WireGuard status: ${status}`);
       
       if (status === 'connected') {
-        // Only update if currently not connected to prevent unnecessary re-renders
-        if (vpnStatus !== "connected") {
-          setVpnStatus("connected");
-          setLastError(null);
-          setAutoReconnectAttempts(0);
-          setIsAutoReconnecting(false);
+        // If WireGuard says connected, trust it immediately for speed
+        setVpnStatus("connected");
+        setLastError(null);
+        setAutoReconnectAttempts(0);
+        setIsAutoReconnecting(false);
+        
+        // Do IP check in background (non-blocking for speed)
+        checkIPGeolocation().then(ipInfo => {
+          setActualIP(ipInfo.ip);
+          setActualCountry(ipInfo.country);
+          setIPVerified(ipInfo.isAustralia);
           
-          // Update connection info
+          // Update connection info with actual IP
           setConnection(prev => ({
             ...prev,
-            ipAddress: "134.199.169.102", // Your actual Australian IP
+            ipAddress: ipInfo.ip,
             latency: Math.floor(Math.random() * 30) + 15
           }));
           
-          console.log("✅ VPN is connected to Australia");
-        }
-      } else if (status === 'disconnected') {
-        // Only update if currently connected and trigger auto-reconnect
-        if (vpnStatus === "connected") {
-          console.warn("⚠️ VPN disconnection detected, triggering auto-reconnect...");
-          setVpnStatus("disconnected");
-          setLastError("WireGuard VPN disconnected unexpectedly");
-          
-          // Trigger auto-reconnect if not already reconnecting
-          if (!isAutoReconnecting && autoReconnectAttempts < 5) {
-            setTimeout(() => {
-              autoReconnectVPN();
-            }, 5000); // Wait 5 seconds before auto-reconnect
-          }
-        } else if (vpnStatus !== "disconnected" && vpnStatus !== "connecting") {
-          setVpnStatus("disconnected");
-          setLastError("WireGuard VPN is not connected to Australia");
-        }
-        console.log("❌ VPN is disconnected");
-      } else if (status === undefined || status === null) {
-        // Handle undefined/null status - likely means IPC is not working
-        console.warn("⚠️ VPN status is undefined - checking if main process is ready...");
+          console.log(`✅ VPN Connected: ${ipInfo.country} (${ipInfo.ip})`);
+        });
         
-        // Don't immediately fail, give it more time
-        if (vpnStatus !== "failed") {
-          // Wait a bit and try again
-          setTimeout(() => {
-            checkVPNStatus();
-          }, 5000); // Increased timeout
-        }
-        
-        return; // Don't change status yet
-      } else {
-        console.log(`❌ Unknown VPN status: ${status}`);
-        // Don't immediately set to failed, could be a temporary issue
-        if (vpnStatus === "connected") {
-          console.warn("⚠️ Unknown status but was connected, will retry status check");
-          setTimeout(() => {
-            checkVPNStatus();
-          }, 10000); // Retry in 10 seconds
-        } else {
-          setVpnStatus("failed");
-          setLastError(`Unknown VPN status: ${status}`);
-        }
+        console.log("✅ WireGuard VPN Connected - allowing browsing immediately");
+        return;
       }
-    } catch (error) {
-      console.error("❌ Failed to check VPN status:", error);
       
-      // Don't immediately fail if we were connected, could be a temporary IPC issue
-      if (vpnStatus === "connected") {
-        console.warn("⚠️ Status check failed but was connected, will retry");
-        setTimeout(() => {
-          checkVPNStatus();
-        }, 15000); // Retry in 15 seconds
+      // If not connected, check IP location to confirm
+      const ipInfo = await checkIPGeolocation();
+      setActualIP(ipInfo.ip);
+      setActualCountry(ipInfo.country);
+      setIPVerified(ipInfo.isAustralia);
+      
+      if (status === 'disconnected' || !ipInfo.isAustralia) {
+        setVpnStatus("disconnected");
+        setLastError(ipInfo.isAustralia ? 
+          "WireGuard VPN disconnected" : 
+          `Not connected to Australian VPN. Current location: ${ipInfo.country}`);
+        
+        setConnection(prev => ({
+          ...prev,
+          ipAddress: ipInfo.ip,
+          latency: undefined
+        }));
+        
+        // Fast auto-reconnect for better UX
+        if (!isAutoReconnecting && autoReconnectAttempts < 3) {
+          setTimeout(() => {
+            autoReconnectVPN();
+          }, 2000); // Faster reconnect - 2 seconds
+        }
+        
+        console.log(`❌ VPN disconnected: ${ipInfo.country} (${ipInfo.ip})`);
+      } else if (status === 'connecting') {
+        setVpnStatus("connecting");
+        console.log("🔄 VPN connecting...");
       } else {
         setVpnStatus("failed");
-        setLastError("Failed to check VPN connection status");
+        setLastError(`VPN status error: ${status}`);
+        console.log(`❌ VPN failed: ${status}`);
       }
+    } catch (error) {
+      console.error("❌ VPN status check failed:", error);
+      setVpnStatus("failed");
+      setLastError("Failed to check VPN status");
     } finally {
       setIsCheckingStatus(false);
     }
   }, [vpnStatus, isAutoReconnecting, autoReconnectAttempts, autoReconnectVPN]);
 
-  // Check VPN status on mount with retry logic
+  // Fast initial VPN check on mount
   useEffect(() => {
     let mounted = true;
-    let retryAttempts = 0;
-    const maxRetries = 5;
 
     const checkInitialStatus = async () => {
       if (!mounted) return;
       
       try {
-        console.log(`🔍 Checking initial VPN status (attempt ${retryAttempts + 1})...`);
+        console.log("🔍 Fast initial VPN check...");
         
-        // Wait for electronAPI to be ready
+        // Quick check if electronAPI is ready
         if (!window.electronAPI?.vpn?.getStatus) {
-          console.log("⏳ Waiting for electronAPI to be ready...");
-          if (retryAttempts < maxRetries) {
-            retryAttempts++;
-            setTimeout(checkInitialStatus, 2000); // Increased from 1000ms
-          } else {
-            console.error("❌ electronAPI not ready after max retries");
-            setVpnStatus("failed");
-            setLastError("Unable to communicate with VPN service");
-          }
+          console.log("⏳ Waiting for electronAPI...");
+          setTimeout(checkInitialStatus, 500); // Quick retry
           return;
         }
 
+        // Prioritize WireGuard status for speed
         const status = await window.electronAPI?.vpn?.getStatus();
-        console.log(`🔍 Initial VPN status received: ${status}`);
+        console.log(`🔍 Initial WireGuard status: ${status}`);
         
         if (status === 'connected') {
+          // Allow browsing immediately if WireGuard is connected
           setVpnStatus("connected");
-          setConnection(prev => ({
-            ...prev,
-            ipAddress: "134.199.169.102", // Your actual Australian IP
-            latency: Math.floor(Math.random() * 30) + 15
-          }));
-          console.log("✅ Initial VPN check: Connected to Australia");
-        } else if (status === 'disconnected') {
-          setVpnStatus("disconnected");
-          console.log("❌ Initial VPN check: Disconnected");
-        } else if (status === undefined || status === null) {
-          console.warn("⚠️ Initial VPN status is undefined - retrying...");
-          if (retryAttempts < maxRetries) {
-            retryAttempts++;
-            setTimeout(checkInitialStatus, 3000); // Increased timeout
-          } else {
-            console.error("❌ VPN status still undefined after max retries");
-            setVpnStatus("failed");
-            setLastError("VPN status check timed out");
-          }
+          setLastError(null);
+          
+          // Do IP check in background for display purposes
+          checkIPGeolocation().then(ipInfo => {
+            setActualIP(ipInfo.ip);
+            setActualCountry(ipInfo.country);
+            setIPVerified(ipInfo.isAustralia);
+            
+            setConnection(prev => ({
+              ...prev,
+              ipAddress: ipInfo.ip,
+              latency: Math.floor(Math.random() * 30) + 15
+            }));
+            
+            console.log(`✅ Initial check complete: ${ipInfo.country} (${ipInfo.ip})`);
+          });
+          
+          console.log("✅ Initial check: WireGuard connected - browsing allowed");
+        } else if (status === 'connecting') {
+          setVpnStatus("connecting");
+          console.log("🔄 Initial check: WireGuard connecting...");
+          
+          // Check again soon
+          setTimeout(() => {
+            if (mounted) checkVPNStatus();
+          }, 2000);
         } else {
-          setVpnStatus("failed");
-          setLastError(`Unknown VPN status: ${status}`);
-          console.log(`❌ Unknown initial VPN status: ${status}`);
+          // If not connected, do a quick IP check
+          setVpnStatus("disconnected");
+          setLastError("WireGuard VPN not connected");
+          
+          // Quick IP check for current location
+          checkIPGeolocation().then(ipInfo => {
+            setActualIP(ipInfo.ip);
+            setActualCountry(ipInfo.country);
+            setIPVerified(ipInfo.isAustralia);
+            
+            setConnection(prev => ({
+              ...prev,
+              ipAddress: ipInfo.ip,
+              latency: undefined
+            }));
+            
+            console.log(`❌ Initial check: Disconnected from ${ipInfo.country} (${ipInfo.ip})`);
+          });
         }
       } catch (error) {
-        console.error("❌ Failed to check initial VPN status:", error);
-        if (retryAttempts < maxRetries) {
-          retryAttempts++;
-          setTimeout(checkInitialStatus, 3000); // Increased timeout
-        } else {
-          setVpnStatus("failed");
-          setLastError("Failed to initialize VPN status");
-        }
+        console.error("❌ Initial VPN check failed:", error);
+        setVpnStatus("failed");
+        setLastError("Failed to check initial VPN status");
+      } finally {
+        setIsCheckingStatus(false);
       }
     };
 
-    // Start checking after a longer delay to ensure everything is loaded
-    setTimeout(checkInitialStatus, 1000); // Increased from 500ms
+    // Start checking immediately
+    setTimeout(checkInitialStatus, 200); // Very quick start
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  // Periodic VPN status check with more conservative timing
+  // Faster periodic VPN status check
   useEffect(() => {
     const interval = setInterval(() => {
-      // Only check status if we think we're connected or if we're not auto-reconnecting
+      // Check more frequently for better responsiveness
       if (vpnStatus === "connected" || (vpnStatus === "disconnected" && !isAutoReconnecting)) {
         checkVPNStatus();
       }
-    }, 45000); // Increased from 30 seconds to 45 seconds to reduce frequent checks
+    }, 15000); // Check every 15 seconds instead of 45
 
     return () => clearInterval(interval);
   }, [vpnStatus, checkVPNStatus, isAutoReconnecting]);
 
-  // Auto-reconnect logic for when VPN unexpectedly disconnects
+  // Fast auto-reconnect logic
   useEffect(() => {
     let autoReconnectTimeout: NodeJS.Timeout;
 
-    if (vpnStatus === "disconnected" && autoReconnectAttempts < 5 && !isAutoReconnecting) {
-      console.log(`⏰ Scheduling auto-reconnect attempt ${autoReconnectAttempts + 1} in 30 seconds...`);
+    if (vpnStatus === "disconnected" && autoReconnectAttempts < 3 && !isAutoReconnecting) {
+      console.log(`⏰ Fast auto-reconnect attempt ${autoReconnectAttempts + 1} in 5 seconds...`);
       autoReconnectTimeout = setTimeout(() => {
         autoReconnectVPN();
-      }, 30000); // Auto-reconnect every 30 seconds
+      }, 5000); // Much faster reconnect - 5 seconds instead of 30
     }
 
     return () => {
@@ -333,7 +387,10 @@ export const useVPN = () => {
     hasFailed: vpnStatus === "failed",
     autoReconnectAttempts,
     isAutoReconnecting,
-    // Allow browsing only if VPN is connected
+    actualIP,
+    actualCountry,
+    ipVerified,
+    // Allow browsing if WireGuard is connected (trust WireGuard status for speed)
     allowBrowsing: vpnStatus === "connected",
   };
 }; 

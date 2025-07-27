@@ -63,6 +63,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     isConnecting,
     isCheckingStatus,
     lastError,
+    actualIP,
+    actualCountry,
   } = useVPN();
   const [tabs, setTabs] = useState<Tab[]>([
     {
@@ -2168,6 +2170,15 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     >
       {/* Browser Controls - Fixed/Sticky */}
       <div className="flex items-center gap-3 p-3 border-b bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg flex-shrink-0">
+        {/* App Logo */}
+        <div className="flex items-center gap-2 mr-2">
+          <img 
+            src="/assets/aussie-browser-logo-32.png" 
+            alt="Aussie Vault Browser" 
+            className="h-7 w-7 rounded-md"
+          />
+        </div>
+        
         <div className="flex items-center gap-0.5 bg-slate-700/50 rounded-lg p-1">
           <Button
             variant="ghost"
@@ -2557,6 +2568,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                     errorDetails={
                       lastError || `WireGuard endpoint: ${connection.endpoint}`
                     }
+                    actualIP={actualIP}
+                    actualCountry={actualCountry}
                   />
                 </div>
               ) : isCheckingStatus ||

@@ -1329,7 +1329,7 @@ function createBrowserWindow(isMain = false) {
     height: 900,
     minWidth: 1200,
     minHeight: 700,
-    icon: path.join(process.env.VITE_PUBLIC || "", "electron-vite.svg"),
+    icon: path.join(__dirname, "../build/icon.png"),
     titleBarStyle: "default",
     show: false,
     // Don't show until ready
@@ -2010,6 +2010,9 @@ ipcMain.handle("window-close", async (_event, windowId) => {
 });
 app.whenReady().then(async () => {
   console.log("🚀 Initializing Aussie Vault Browser...");
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(path.join(__dirname, "../build/icon.png"));
+  }
   await loadEnvironmentVariables();
   configureSecureSession();
   console.log("🔌 Starting VPN connection...");

@@ -7,6 +7,7 @@ module.exports = {
     name: 'Aussie Vault Browser',
     appBundleId: 'com.aussievault.browser',
     executableName: 'Aussie Vault Browser',
+    icon: 'build/icon', // This will automatically pick .icns for macOS, .ico for Windows, .png for Linux
     // Support multiple architectures
     osxUniversal: {
       mergeASARs: false,
