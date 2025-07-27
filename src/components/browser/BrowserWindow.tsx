@@ -34,6 +34,7 @@ import SearchBar from "./SearchBar";
 import BrowserMenu from "./BrowserMenu";
 import HistoryModal from "./HistoryModal";
 import DownloadsModal from "./DownloadsModal";
+import BookmarksModal from "./BookmarksModal";
 import BookmarkButton from "./BookmarkButton";
 import VPNConnectionError from "@/components/ui/vpn-connection-error";
 
@@ -74,6 +75,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   );
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isDownloadsModalOpen, setIsDownloadsModalOpen] = useState(false);
+  const [isBookmarksModalOpen, setIsBookmarksModalOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
@@ -302,8 +304,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   };
 
   const handleBookmarksClick = () => {
-    console.log("Bookmarks clicked");
-    // TODO: Implement bookmarks modal
+    setIsBookmarksModalOpen(true);
   };
 
   const handleSettingsClick = () => {
@@ -2190,6 +2191,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             onBookmarksClick={handleBookmarksClick}
             onSettingsClick={handleSettingsClick}
             onLogout={handleLogout}
+            onNewTabClick={createNewTab}
+            onNewWindowClick={createNewWindow}
             zoomLevel={zoomLevel}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
@@ -2401,6 +2404,14 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         onViewFile={viewFile}
         onRevealInExplorer={revealInExplorer}
         onClearDownloads={clearDownloads}
+      />
+
+      {/* Bookmarks Modal */}
+      <BookmarksModal
+        isOpen={isBookmarksModalOpen}
+        onClose={() => setIsBookmarksModalOpen(false)}
+        onNavigate={navigateToUrl}
+        userId={user?.dbId || 0}
       />
 
       {/* Context Menu */}

@@ -33,6 +33,8 @@ interface BrowserMenuProps {
   onBookmarksClick: () => void;
   onSettingsClick: () => void;
   onLogout: () => void;
+  onNewTabClick: () => void;
+  onNewWindowClick: () => void;
   zoomLevel: number;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -47,6 +49,8 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onBookmarksClick,
   onSettingsClick,
   onLogout,
+  onNewTabClick,
+  onNewWindowClick,
   zoomLevel,
   onZoomIn,
   onZoomOut,
@@ -170,7 +174,7 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
 
         {/* New Tab / Window */}
         <DropdownMenuItem 
-          onClick={() => handleMenuClick(() => console.log('New tab - should be handled by browser window'))}
+          onClick={() => handleMenuClick(onNewTabClick)}
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
         >
           <RefreshCw className="w-4 h-4" />
@@ -179,7 +183,7 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
         </DropdownMenuItem>
 
         <DropdownMenuItem 
-          onClick={() => handleMenuClick(() => console.log('New window'))}
+          onClick={() => handleMenuClick(onNewWindowClick)}
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
         >
           <Globe className="w-4 h-4" />
@@ -287,6 +291,21 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
         >
           <Archive className="w-4 h-4" />
           <span>Task manager</span>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem 
+          className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
+          onClick={() => handleMenuClick(() => {
+            console.log('🔧 Debug: localStorage keys:', Object.keys(localStorage));
+            console.log('🔧 Debug: Clerk tokens found:', {
+              clerk_db_jwt: !!localStorage.getItem('__clerk_db_jwt'),
+              clerk_client_jwt: !!localStorage.getItem('__clerk_client_jwt'),
+              clerk_session: !!localStorage.getItem('__clerk_session')
+            });
+          })}
+        >
+          <Settings className="w-4 h-4" />
+          <span>Debug Auth State</span>
         </DropdownMenuItem>
 
         <DropdownMenuItem 

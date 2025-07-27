@@ -659,6 +659,71 @@ const disconnectWireGuardWindows = async (): Promise<boolean> => {
 // Security: Configure session for secure browsing
 const configureSecureSession = (): void => {
   const defaultSession = session.defaultSession
+  
+  // 🔐 SHARED AUTHENTICATION SESSION: Configure shared session for authentication
+  // This ensures all windows share the same authentication state (Clerk tokens, localStorage)
+  const sharedAuthSession = session.fromPartition('persist:shared-auth')
+  
+  // Configure the shared auth session with the same security settings as default
+  sharedAuthSession.webRequest.onBeforeRequest((details, callback) => {
+    const url = details.url.toLowerCase()
+    
+    // Allow extension requests
+    if (url.startsWith('chrome-extension://') || url.startsWith('moz-extension://') || url.startsWith('extension://')) {
+      callback({ cancel: false });
+      return;
+    }
+    
+    // Allow development and internal requests
+    if (url.includes('localhost') || url.includes('127.0.0.1') || url.startsWith('file://') || url.startsWith('data:')) {
+      callback({ cancel: false });
+      return;
+    }
+    
+    // Allow Clerk authentication domains
+    if (url.includes('clerk.dev') || url.includes('clerk.com') || url.includes('clerk.accounts.dev')) {
+      console.log('✅ Allowing Clerk auth request:', details.url)
+      callback({ cancel: false });
+      return;
+    }
+    
+    // Allow only HTTPS connections for external requests
+    if (url.startsWith('http://')) {
+      console.log('🚫 Blocking insecure HTTP request:', details.url)
+      callback({ cancel: true })
+      return
+    }
+
+    // Allow HTTPS requests for authentication
+    if (url.startsWith('https://')) {
+      console.log('✅ Allowing HTTPS auth request:', details.url)
+      callback({ cancel: false });
+      return;
+    }
+
+    callback({ cancel: false });
+  })
+
+  // Set User-Agent for shared session to support OAuth flows
+  sharedAuthSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    let userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    
+    // Use Edge user agent for better Microsoft OAuth compatibility
+    if (details.url.includes('accounts.google.com') || details.url.includes('googleapis.com')) {
+      userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0'
+    }
+    
+    callback({
+      requestHeaders: {
+        ...details.requestHeaders,
+        'User-Agent': userAgent,
+        // Add additional headers for OAuth compatibility
+        'Sec-Fetch-Site': 'cross-site',
+        'Sec-Fetch-Mode': 'navigate', 
+        'Sec-Fetch-Dest': 'document'
+      }
+    })
+  })
 
   // 🔥 DOWNLOAD HANDLING: Create a centralized download handler
   const handleDownload = (event: any, item: any, sessionName: string) => {
@@ -752,6 +817,11 @@ const configureSecureSession = (): void => {
     handleDownload(event, item, 'default-session');
   });
 
+  // Apply download handler to shared auth session (for new windows)
+  sharedAuthSession.on('will-download', (event, item) => {
+    handleDownload(event, item, 'shared-auth-session');
+  });
+
   // Apply download handler to webview session (for webview downloads)
   const webviewSession = session.fromPartition('persist:main');
   webviewSession.on('will-download', (event, item) => {
@@ -765,12 +835,29 @@ const configureSecureSession = (): void => {
       const extensionPath = await find1PasswordExtension();
       if (extensionPath) {
         await defaultSession.loadExtension(extensionPath);
-        console.log('✅ 1Password extension loaded successfully');
+        console.log('✅ 1Password extension loaded successfully on default session');
       } else {
         console.log('📝 1Password extension not found - users can install it manually');
       }
     } catch (error) {
-      console.warn('⚠️ Could not load 1Password extension:', error);
+      console.warn('⚠️ Could not load 1Password extension on default session:', error);
+      console.log('📝 Users can install 1Password extension manually from their browser');
+    }
+  };
+
+  // Enable 1Password extension for a specific session
+  const enable1PasswordExtensionForSession = async (targetSession: Electron.Session) => {
+    try {
+      // Load 1Password extension if available
+      const extensionPath = await find1PasswordExtension();
+      if (extensionPath) {
+        await targetSession.loadExtension(extensionPath);
+        console.log('✅ 1Password extension loaded successfully on shared auth session');
+      } else {
+        console.log('📝 1Password extension not found for shared session - users can install it manually');
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not load 1Password extension on shared session:', error);
       console.log('📝 Users can install 1Password extension manually from their browser');
     }
   };
@@ -920,8 +1007,12 @@ const configureSecureSession = (): void => {
     })
   })
 
-  // Load 1Password extension after session configuration
-  setTimeout(enable1PasswordExtension, 1000);
+  // Load 1Password extension after session configuration for both default and shared sessions
+  setTimeout(async () => {
+    await enable1PasswordExtension();
+    // Also enable for shared auth session
+    await enable1PasswordExtensionForSession(sharedAuthSession);
+  }, 1000);
 }
 
 function createBrowserWindow(isMain: boolean = false): BrowserWindow {
@@ -953,6 +1044,10 @@ function createBrowserWindow(isMain: boolean = false): BrowserWindow {
       
       // Security: Disable node integration in subframes  
       nodeIntegrationInSubFrames: false,
+      
+      // 🔐 SHARED SESSION: All windows use the same session partition
+      // This ensures authentication state (Clerk tokens, localStorage) is shared
+      partition: 'persist:shared-auth',
       
       // Security: Enable sandbox mode
       sandbox: false, // Keep false to allow webview
@@ -1564,10 +1659,14 @@ ipcMain.handle('window-create-new', async () => {
   console.log('🪟 Creating new browser window...')
   try {
     const newWindow = createBrowserWindow(false)
+    
+    // 🔐 Inform user about shared authentication
+    console.log('✅ New window shares authentication state - no need to sign in again!')
+    
     return {
       success: true,
       windowId: newWindow.id,
-      message: 'New browser window created successfully'
+      message: 'New browser window created successfully with shared authentication'
     }
   } catch (error) {
     console.error('❌ Error creating new window:', error)
