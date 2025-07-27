@@ -37,6 +37,7 @@ import DownloadsModal from "./DownloadsModal";
 import BookmarksModal from "./BookmarksModal";
 import TaskManagerModal from "./TaskManagerModal";
 import DebugAuthModal from "./DebugAuthModal";
+import SettingsModal from "./SettingsModal";
 import BookmarkButton from "./BookmarkButton";
 import VPNConnectionError from "@/components/ui/vpn-connection-error";
 
@@ -80,6 +81,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   const [isBookmarksModalOpen, setIsBookmarksModalOpen] = useState(false);
   const [isTaskManagerModalOpen, setIsTaskManagerModalOpen] = useState(false);
   const [isDebugAuthModalOpen, setIsDebugAuthModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
@@ -322,7 +324,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
   const handleSettingsClick = () => {
     console.log("Settings clicked");
-    // TODO: Implement settings modal
+    setIsSettingsModalOpen(true);
   };
 
   const applyZoomToActiveWebview = useCallback(
@@ -2709,6 +2711,12 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       <DebugAuthModal
         isOpen={isDebugAuthModalOpen}
         onClose={() => setIsDebugAuthModalOpen(false)}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
       />
 
       {/* Context Menu */}
