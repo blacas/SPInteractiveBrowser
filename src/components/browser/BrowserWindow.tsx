@@ -35,6 +35,8 @@ import BrowserMenu from "./BrowserMenu";
 import HistoryModal from "./HistoryModal";
 import DownloadsModal from "./DownloadsModal";
 import BookmarksModal from "./BookmarksModal";
+import TaskManagerModal from "./TaskManagerModal";
+import DebugAuthModal from "./DebugAuthModal";
 import BookmarkButton from "./BookmarkButton";
 import VPNConnectionError from "@/components/ui/vpn-connection-error";
 
@@ -76,6 +78,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isDownloadsModalOpen, setIsDownloadsModalOpen] = useState(false);
   const [isBookmarksModalOpen, setIsBookmarksModalOpen] = useState(false);
+  const [isTaskManagerModalOpen, setIsTaskManagerModalOpen] = useState(false);
+  const [isDebugAuthModalOpen, setIsDebugAuthModalOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
@@ -158,7 +162,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
   // Debug zoom level changes
   useEffect(() => {
-    console.log("🔍 [ZOOM] Zoom level state changed:", zoomLevel + "%");
+    console.log("🔍 [ZOOM STATE] Zoom level state changed:", zoomLevel + "%");
+    console.log("🔍 [ZOOM STATE] This should trigger UI updates in BrowserMenu");
     
     // Force a re-render of the menu to ensure it shows the updated zoom level
     const menuContainer = document.querySelector('[data-radix-dropdown-menu-content]');
@@ -307,6 +312,14 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     setIsBookmarksModalOpen(true);
   };
 
+  const handleTaskManagerClick = () => {
+    setIsTaskManagerModalOpen(true);
+  };
+
+  const handleDebugAuthClick = () => {
+    setIsDebugAuthModalOpen(true);
+  };
+
   const handleSettingsClick = () => {
     console.log("Settings clicked");
     // TODO: Implement settings modal
@@ -417,39 +430,46 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   );
 
   const handleZoomIn = useCallback(() => {
-    console.log(`🔍 [ZOOM] Zoom In triggered (keyboard/menu)`);
+    console.log(`🔍 [ZOOM] === ZOOM IN FUNCTION CALLED ===`);
+    console.log(`🔍 [ZOOM] Current zoom level before change: ${zoomLevel}%`);
+    
     setZoomLevel((prev) => {
-      // Use 5% increments for more natural feeling, similar to Chrome
       const newLevel = Math.min(prev + 5, 300);
-      console.log(`📈 [ZOOM] Zooming in: ${prev}% -> ${newLevel}%`);
+      console.log(`📈 [ZOOM] State update: ${prev}% -> ${newLevel}%`);
       
-      // Apply zoom with slight delay to ensure clean state update
-      setTimeout(() => {
-        applyZoomToActiveWebview(newLevel);
-      }, 10);
+      // Apply zoom immediately, not with setTimeout
+      console.log(`⏰ [ZOOM] Applying zoom level ${newLevel}% to active webview immediately`);
+      setTimeout(() => applyZoomToActiveWebview(newLevel), 10);
       
       return newLevel;
     });
-  }, [applyZoomToActiveWebview]);
+    
+    console.log(`🔍 [ZOOM] === ZOOM IN FUNCTION COMPLETED ===`);
+  }, [applyZoomToActiveWebview]); // Remove zoomLevel from dependencies to avoid stale closures
 
   const handleZoomOut = useCallback(() => {
-    console.log(`🔍 [ZOOM] Zoom Out triggered (keyboard/menu)`);
+    console.log(`🔍 [ZOOM] === ZOOM OUT FUNCTION CALLED ===`);
+    console.log(`🔍 [ZOOM] Current zoom level before change: ${zoomLevel}%`);
+    
     setZoomLevel((prev) => {
-      // Use 5% decrements for more natural feeling, similar to Chrome
       const newLevel = Math.max(prev - 5, 25);
-      console.log(`📉 [ZOOM] Zooming out: ${prev}% -> ${newLevel}%`);
+      console.log(`📉 [ZOOM] State update: ${prev}% -> ${newLevel}%`);
       
-      // Apply zoom with slight delay to ensure clean state update
-      setTimeout(() => {
-        applyZoomToActiveWebview(newLevel);
-      }, 10);
+      // Apply zoom immediately, not with setTimeout
+      console.log(`⏰ [ZOOM] Applying zoom level ${newLevel}% to active webview immediately`);
+      setTimeout(() => applyZoomToActiveWebview(newLevel), 10);
       
       return newLevel;
     });
-  }, [applyZoomToActiveWebview]);
+    
+    console.log(`🔍 [ZOOM] === ZOOM OUT FUNCTION COMPLETED ===`);
+  }, [applyZoomToActiveWebview]); // Remove zoomLevel from dependencies to avoid stale closures
 
   const handleZoomReset = useCallback(() => {
-    console.log(`🔄 [ZOOM] Reset triggered - forcing 100% zoom`);
+    console.log(`🔄 [ZOOM] Reset triggered - forcing 100% zoom (current: ${zoomLevel}%)`);
+    
+    // Set zoom level to 100% first
+    setZoomLevel(100);
     
     // Force reset with multiple attempts for reliability
     const forceReset = () => {
@@ -457,9 +477,10 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       if (webview) {
         console.log(`🔧 [ZOOM] Force resetting webview zoom to 100%`);
         
-        // Method 1: Electron setZoomFactor
+        // Method 1: Electron setZoomFactor (most reliable)
         if (webview.setZoomFactor) {
           webview.setZoomFactor(1.0);
+          console.log('✅ [ZOOM] setZoomFactor(1.0) applied');
         }
         
         // Method 2: Remove all zoom CSS and reset via JavaScript
@@ -467,28 +488,42 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           webview.executeJavaScript(`
             (function() {
               try {
+                console.log('🔧 [ZOOM] JavaScript zoom reset starting...');
+                
                 // Remove any existing zoom CSS
                 var existingZoom = document.getElementById('aussie-browser-zoom');
-                if (existingZoom) existingZoom.remove();
+                if (existingZoom) {
+                  existingZoom.remove();
+                  console.log('🗑️ Removed existing zoom CSS');
+                }
                 
-                // Remove all zoom styles
-                document.documentElement.style.zoom = '';
-                document.body.style.zoom = '';
-                document.documentElement.style.transform = '';
-                document.body.style.transform = '';
+                // Remove all zoom styles from all elements
+                const allElements = document.querySelectorAll('*');
+                allElements.forEach(el => {
+                  if (el.style) {
+                    el.style.zoom = '';
+                    el.style.transform = '';
+                  }
+                });
                 
-                // Reset to 100%
+                // Reset root elements specifically
                 document.documentElement.style.zoom = '100%';
                 document.body.style.zoom = '100%';
+                document.documentElement.style.transform = 'none';
+                document.body.style.transform = 'none';
                 
-                console.log('Zoom reset to 100% via JavaScript');
+                console.log('✅ [ZOOM] JavaScript zoom reset completed - 100%');
                 return true;
               } catch (e) {
-                console.error('Error resetting zoom via JS:', e);
+                console.error('❌ [ZOOM] Error resetting zoom via JS:', e);
                 return false;
               }
             })();
-          `);
+          `).then((result: any) => {
+            console.log('✅ [ZOOM] JavaScript execution result:', result);
+          }).catch((error: any) => {
+            console.error('❌ [ZOOM] JavaScript execution failed:', error);
+          });
         }
         
         // Method 3: Insert CSS to force 100%
@@ -499,29 +534,44 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
               transform: none !important;
               transform-origin: top left !important;
             }
+            * {
+              zoom: inherit !important;
+            }
           `);
+          console.log('✅ [ZOOM] CSS reset applied');
         }
+      } else {
+        console.warn('⚠️ [ZOOM] No webview found for zoom reset');
       }
     };
     
-    setZoomLevel(100);
-    
     // Apply reset immediately and with multiple attempts
+    console.log('🔄 [ZOOM] Starting zoom reset sequence...');
     forceReset();
-    setTimeout(forceReset, 50);
-    setTimeout(forceReset, 200);
-  }, [applyZoomToActiveWebview, activeTab]);
+    setTimeout(() => {
+      console.log('🔄 [ZOOM] Retry zoom reset (50ms)');
+      forceReset();
+    }, 50);
+    setTimeout(() => {
+      console.log('🔄 [ZOOM] Final zoom reset (200ms)');
+      forceReset();
+    }, 200);
+    
+    console.log('✅ [ZOOM] Zoom reset sequence initiated');
+  }, [activeTab]);
 
-  // Reapply zoom when pages finish loading on the active tab
+  // Reapply zoom when pages finish loading on the active tab (but only if not 100%)
   useEffect(() => {
     const currentTab = tabs.find((tab) => tab.id === activeTab);
-    if (currentTab && !currentTab.isLoading) {
+    if (currentTab && !currentTab.isLoading && zoomLevel !== 100) {
       setTimeout(() => {
         console.log(
           `🔧 Reapplying zoom (${zoomLevel}%) after page loaded for active tab: ${activeTab}`
         );
         applyZoomToActiveWebview(zoomLevel);
       }, 300);
+    } else if (currentTab && !currentTab.isLoading && zoomLevel === 100) {
+      console.log('🔧 Page loaded with 100% zoom - no reapplication needed');
     }
   }, [
     tabs.find((tab) => tab.id === activeTab)?.isLoading,
@@ -1593,6 +1643,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
       webviewInitialized.current[tabId] = true;
 
+      // 🔐 SIMPLE WEBVIEW SETUP: No complex focus management needed with global shortcuts
+      console.log('🔧 Setting up webview for tab:', tabId);
+
       type WebviewEvent = Event & {
         url: string;
         title?: string;
@@ -1799,20 +1852,128 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
   const config = useMemo(() => getAccessLevelConfig(), [getAccessLevelConfig]);
 
+  // 🔐 IPC KEYBOARD HANDLER: Set up global keyboard shortcuts via main process
+  const lastShortcutTime = useRef<{ [key: string]: number }>({});
+  
   useEffect(() => {
+    const handleIPCKeyboardShortcut = (_event: any, shortcut: string) => {
+      console.log('⌨️ [IPC] Received keyboard shortcut from main process:', shortcut);
+      
+      // Debounce: prevent duplicate shortcuts within 100ms
+      const now = Date.now();
+      const lastTime = lastShortcutTime.current[shortcut] || 0;
+      if (now - lastTime < 100) {
+        console.log('⚠️ [IPC] Debouncing duplicate shortcut:', shortcut);
+        return;
+      }
+      lastShortcutTime.current[shortcut] = now;
+      
+      switch (shortcut) {
+        case 'zoom-in':
+          handleZoomIn();
+          break;
+        case 'zoom-out':
+          handleZoomOut();
+          break;
+        case 'zoom-reset':
+          console.log('⌨️ [IPC] Zoom reset via IPC');
+          handleZoomReset();
+          break;
+        case 'new-tab':
+          console.log('⌨️ [IPC] Creating new tab via IPC');
+          createNewTab();
+          break;
+        case 'new-window':
+          createNewWindow();
+          break;
+        case 'close-tab':
+          if (tabs.length > 1) {
+            closeTab(activeTab);
+          }
+          break;
+        case 'reload':
+          reload();
+          break;
+        case 'history':
+          handleHistoryClick();
+          break;
+        case 'downloads':
+          handleDownloadsClick();
+          break;
+        case 'bookmarks':
+          handleBookmarksClick();
+          break;
+        case 'task-manager':
+          handleTaskManagerClick();
+          break;
+        default:
+          console.log('⚠️ [IPC] Unknown shortcut:', shortcut);
+      }
+    };
+
+    // Listen for IPC keyboard shortcuts from main process
+    if (window.ipcRenderer?.on) {
+      window.ipcRenderer.on('keyboard-shortcut', handleIPCKeyboardShortcut);
+      console.log('✅ [IPC] Keyboard shortcut listener attached');
+    } else {
+      console.warn('⚠️ [IPC] ipcRenderer not available, using fallback');
+    }
+
+    return () => {
+      if (window.ipcRenderer?.off) {
+        window.ipcRenderer.off('keyboard-shortcut', handleIPCKeyboardShortcut);
+        console.log('🧹 [IPC] Keyboard shortcut listener removed');
+      }
+    };
+  }, [
+    handleZoomIn, 
+    handleZoomOut, 
+    handleZoomReset, 
+    createNewTab, 
+    createNewWindow, 
+    tabs.length, 
+    activeTab, 
+    closeTab, 
+    reload,
+    handleHistoryClick,
+    handleDownloadsClick,
+    handleBookmarksClick,
+    handleTaskManagerClick
+  ]);
+
+  useEffect(() => {
+    // 🔐 FALLBACK KEYBOARD HANDLER: Only active if IPC is not available
+    const hasIPCSupport = !!(window.ipcRenderer?.on);
+    
+    if (hasIPCSupport) {
+      console.log('⌨️ [FALLBACK] IPC is available, using IPC for all shortcuts - no fallback needed');
+      return; // Don't set up any keyboard listeners if IPC is available
+    }
+    
+    console.log('⌨️ [FALLBACK] IPC not available, setting up fallback keyboard handlers');
+    
     const handleKeyDown = (event: KeyboardEvent) => {
+      console.log('⌨️ [FALLBACK] Keyboard event:', {
+        key: event.key,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        target: (event.target as HTMLElement)?.tagName,
+        activeElement: (document.activeElement as HTMLElement)?.tagName
+      });
+
       // Check for Ctrl/Cmd key
       const isModifierPressed = event.ctrlKey || event.metaKey;
 
       if (isModifierPressed) {
         let handled = false;
 
-        switch (event.key) {
+        switch (event.key.toLowerCase()) {
+          // Zoom controls
           case "=":
           case "+":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [ZOOM] Keyboard zoom in triggered");
+            console.log("⌨️ [FALLBACK] Keyboard zoom in triggered");
             handleZoomIn();
             handled = true;
             break;
@@ -1820,17 +1981,90 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           case "_":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [ZOOM] Keyboard zoom out triggered");
+            console.log("⌨️ [FALLBACK] Keyboard zoom out triggered");
             handleZoomOut();
             handled = true;
             break;
           case "0":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [ZOOM] Keyboard zoom reset triggered");
+            console.log("⌨️ [FALLBACK] Keyboard zoom reset triggered");
             handleZoomReset();
             handled = true;
             break;
+          
+          // Navigation shortcuts
+          case "t":
+            event.preventDefault();
+            event.stopPropagation();
+            console.log("⌨️ [FALLBACK] New tab triggered (Ctrl+T)");
+            createNewTab();
+            handled = true;
+            break;
+          case "n":
+            event.preventDefault();
+            event.stopPropagation();
+            console.log("⌨️ [FALLBACK] New window triggered (Ctrl+N)");
+            createNewWindow();
+            handled = true;
+            break;
+          case "h":
+            event.preventDefault();
+            event.stopPropagation();
+            console.log("⌨️ [FALLBACK] History triggered (Ctrl+H)");
+            handleHistoryClick();
+            handled = true;
+            break;
+          case "j":
+            event.preventDefault();
+            event.stopPropagation();
+            console.log("⌨️ [FALLBACK] Downloads triggered (Ctrl+J)");
+            handleDownloadsClick();
+            handled = true;
+            break;
+          case "w":
+            event.preventDefault();
+            event.stopPropagation();
+            console.log("⌨️ [FALLBACK] Close tab triggered (Ctrl+W)");
+            if (tabs.length > 1) {
+              closeTab(activeTab);
+            }
+            handled = true;
+            break;
+          case "r":
+            event.preventDefault();
+            event.stopPropagation();
+            console.log("⌨️ [FALLBACK] Reload triggered (Ctrl+R)");
+            reload();
+            handled = true;
+            break;
+        }
+        
+        // Handle Ctrl+Shift combinations
+        if (event.shiftKey) {
+          switch (event.key.toLowerCase()) {
+            case "o":
+              event.preventDefault();
+              event.stopPropagation();
+              console.log("⌨️ [FALLBACK] Bookmarks triggered (Ctrl+Shift+O)");
+              handleBookmarksClick();
+              handled = true;
+              break;
+            case "i":
+              event.preventDefault();
+              event.stopPropagation();
+              console.log("⌨️ [FALLBACK] Developer tools triggered (Ctrl+Shift+I)");
+              // TODO: Implement developer tools
+              handled = true;
+              break;
+            case "t":
+              event.preventDefault();
+              event.stopPropagation();
+              console.log("⌨️ [FALLBACK] Task manager triggered (Ctrl+Shift+T)");
+              handleTaskManagerClick();
+              handled = true;
+              break;
+          }
         }
 
         if (handled) {
@@ -1842,6 +2076,14 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             }
           }, 10);
         }
+      }
+      
+      // Handle function keys (no modifier needed)
+      if (event.key === 'F12') {
+        event.preventDefault();
+        event.stopPropagation();
+        console.log("⌨️ [FALLBACK] Developer tools triggered (F12)");
+        // TODO: Implement developer tools
       }
     };
 
@@ -1865,13 +2107,14 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       }
     };
 
-    // Add event listeners to both document and window for maximum coverage
+    // Add event listeners - simple and reliable
     const addListeners = () => {
       document.addEventListener("keydown", handleKeyDown, true);
       window.addEventListener("keydown", handleKeyDown, true);
       document.addEventListener("wheel", handleWheel, { passive: false, capture: true });
       window.addEventListener("wheel", handleWheel, { passive: false, capture: true });
-      console.log("🔧 [ZOOM] Zoom keyboard/mouse listeners attached");
+      
+             console.log("🔧 [KEYBOARD] Event listeners attached, IPC support:", !!(window.secureBrowser?.on));
     };
 
     const removeListeners = () => {
@@ -1879,21 +2122,47 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       window.removeEventListener("keydown", handleKeyDown, true);
       document.removeEventListener("wheel", handleWheel, true);
       window.removeEventListener("wheel", handleWheel, true);
-      console.log("🧹 [ZOOM] Zoom keyboard/mouse listeners removed");
+      
+      console.log("🧹 [KEYBOARD] All keyboard/mouse listeners removed");
     };
 
     addListeners();
 
     // Cleanup
     return removeListeners;
-  }, [handleZoomIn, handleZoomOut, handleZoomReset]);
+  }, [
+    handleZoomIn, 
+    handleZoomOut, 
+    handleZoomReset, 
+    createNewTab, 
+    createNewWindow, 
+    handleHistoryClick, 
+    handleDownloadsClick, 
+    handleBookmarksClick, 
+    handleTaskManagerClick,
+    tabs.length, 
+    activeTab, 
+    closeTab, 
+    reload
+  ]);
+
+  // 🔐 SIMPLE CONTEXT MENU CLOSER: Only handle context menu closing
+  useEffect(() => {
+    const handleClick = () => {
+      hideContextMenu();
+    };
+    
+    document.addEventListener('click', handleClick);
+    
+    return () => {
+      document.removeEventListener('click', handleClick);
+    };
+  }, [hideContextMenu]);
 
   return (
     <div
       className="flex flex-col h-full bg-white browser-window-container"
       onContextMenu={handleContextMenu}
-      tabIndex={-1}
-      style={{ outline: 'none' }}
     >
       {/* Browser Controls - Fixed/Sticky */}
       <div className="flex items-center gap-3 p-3 border-b bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg flex-shrink-0">
@@ -1996,10 +2265,34 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           {/* Temporary Zoom Debug Badge - Remove after testing */}
           <Badge
             variant="outline"
-            className="px-2 py-1 text-xs font-mono bg-green-100 text-green-800 border-green-300 h-8 flex items-center"
+            className="px-2 py-1 text-xs font-mono bg-green-100 text-green-800 border-green-300 h-8 flex items-center gap-1"
             title="Current zoom level (debug indicator)"
           >
             🔍 {zoomLevel}%
+            <button 
+              onClick={() => {
+                console.log('🧪 [TEST] Direct state update test - setting zoom to 150%');
+                setZoomLevel(150);
+              }}
+              className="ml-1 px-1 bg-blue-200 hover:bg-blue-300 rounded text-xs"
+              title="Test direct state update"
+            >
+              150
+            </button>
+            <button 
+              onClick={handleZoomIn}
+              className="ml-1 px-1 bg-green-200 hover:bg-green-300 rounded text-xs"
+              title="Test zoom in"
+            >
+              +
+            </button>
+            <button 
+              onClick={handleZoomOut}
+              className="ml-1 px-1 bg-green-200 hover:bg-green-300 rounded text-xs"
+              title="Test zoom out"
+            >
+              −
+            </button>
           </Badge>
 
           {/* SharePoint Vault Auth Indicator */}
@@ -2193,6 +2486,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             onLogout={handleLogout}
             onNewTabClick={createNewTab}
             onNewWindowClick={createNewWindow}
+            onTaskManagerClick={handleTaskManagerClick}
+            onDebugAuthClick={handleDebugAuthClick}
             zoomLevel={zoomLevel}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
@@ -2412,6 +2707,18 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         onClose={() => setIsBookmarksModalOpen(false)}
         onNavigate={navigateToUrl}
         userId={user?.dbId || 0}
+      />
+
+      {/* Task Manager Modal */}
+      <TaskManagerModal
+        isOpen={isTaskManagerModalOpen}
+        onClose={() => setIsTaskManagerModalOpen(false)}
+      />
+
+      {/* Debug Auth Modal */}
+      <DebugAuthModal
+        isOpen={isDebugAuthModalOpen}
+        onClose={() => setIsDebugAuthModalOpen(false)}
       />
 
       {/* Context Menu */}

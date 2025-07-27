@@ -35,6 +35,8 @@ interface BrowserMenuProps {
   onLogout: () => void;
   onNewTabClick: () => void;
   onNewWindowClick: () => void;
+  onTaskManagerClick: () => void;
+  onDebugAuthClick: () => void;
   zoomLevel: number;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -51,6 +53,8 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onLogout,
   onNewTabClick,
   onNewWindowClick,
+  onTaskManagerClick,
+  onDebugAuthClick,
   zoomLevel,
   onZoomIn,
   onZoomOut,
@@ -129,7 +133,9 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
   const handleZoomClick = (action: () => void, event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
+    console.log('🔍 [MENU] Zoom control clicked, calling action function');
     action();
+    console.log('🔍 [MENU] Zoom action function completed');
     // Keep the menu open by preventing the dropdown from closing
   };
 
@@ -287,7 +293,7 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
 
         <DropdownMenuItem 
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => console.log('Task manager'))}
+          onClick={() => handleMenuClick(onTaskManagerClick)}
         >
           <Archive className="w-4 h-4" />
           <span>Task manager</span>
@@ -295,14 +301,7 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
 
         <DropdownMenuItem 
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => {
-            console.log('🔧 Debug: localStorage keys:', Object.keys(localStorage));
-            console.log('🔧 Debug: Clerk tokens found:', {
-              clerk_db_jwt: !!localStorage.getItem('__clerk_db_jwt'),
-              clerk_client_jwt: !!localStorage.getItem('__clerk_client_jwt'),
-              clerk_session: !!localStorage.getItem('__clerk_session')
-            });
-          })}
+          onClick={() => handleMenuClick(onDebugAuthClick)}
         >
           <Settings className="w-4 h-4" />
           <span>Debug Auth State</span>

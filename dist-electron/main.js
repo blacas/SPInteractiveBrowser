@@ -1380,6 +1380,65 @@ function createBrowserWindow(isMain = false) {
     }
     return { action: "deny" };
   });
+  newWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.type === "keyDown" && (input.modifiers.includes("control") || input.modifiers.includes("meta"))) {
+      const key = input.key.toLowerCase();
+      console.log("⌨️ [MAIN] Intercepting keyboard shortcut:", key, input.modifiers);
+      const criticalShortcuts = ["t", "n", "w", "r", "h", "j", "=", "+", "-", "_", "0"];
+      const isShiftShortcut = input.modifiers.includes("shift") && ["o", "i", "t"].includes(key);
+      if (criticalShortcuts.includes(key) || isShiftShortcut) {
+        console.log("⌨️ [MAIN] Preventing webview from handling critical shortcut:", key);
+        event.preventDefault();
+        let shortcutAction = "";
+        switch (key) {
+          case "t":
+            if (input.modifiers.includes("shift")) {
+              shortcutAction = "task-manager";
+            } else {
+              shortcutAction = "new-tab";
+            }
+            break;
+          case "n":
+            shortcutAction = "new-window";
+            break;
+          case "w":
+            shortcutAction = "close-tab";
+            break;
+          case "r":
+            shortcutAction = "reload";
+            break;
+          case "h":
+            shortcutAction = "history";
+            break;
+          case "j":
+            shortcutAction = "downloads";
+            break;
+          case "=":
+          case "+":
+            shortcutAction = "zoom-in";
+            break;
+          case "-":
+          case "_":
+            shortcutAction = "zoom-out";
+            break;
+          case "0":
+            shortcutAction = "zoom-reset";
+            break;
+          case "o":
+            if (input.modifiers.includes("shift")) {
+              shortcutAction = "bookmarks";
+            }
+            break;
+        }
+        if (shortcutAction) {
+          console.log("⌨️ [MAIN] Sending shortcut action to renderer:", shortcutAction);
+          setTimeout(() => {
+            newWindow.webContents.send("keyboard-shortcut", shortcutAction);
+          }, 10);
+        }
+      }
+    }
+  });
   newWindow.webContents.on("will-navigate", (event, navigationUrl) => {
     const allowedOrigins = [
       VITE_DEV_SERVER_URL,
