@@ -40,6 +40,7 @@ import DebugAuthModal from "./DebugAuthModal";
 import SettingsModal from "./SettingsModal";
 import BookmarkButton from "./BookmarkButton";
 import VPNConnectionError from "@/components/ui/vpn-connection-error";
+import { SharePointSidebar } from "./SharePointSidebar";
 
 interface Tab {
   id: string;
@@ -84,6 +85,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   const [isTaskManagerModalOpen, setIsTaskManagerModalOpen] = useState(false);
   const [isDebugAuthModalOpen, setIsDebugAuthModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isSharePointSidebarOpen, setIsSharePointSidebarOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
@@ -327,6 +329,10 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   const handleSettingsClick = () => {
     console.log("Settings clicked");
     setIsSettingsModalOpen(true);
+  };
+
+  const handleSharePointClick = () => {
+    setIsSharePointSidebarOpen(true);
   };
 
   const applyZoomToActiveWebview = useCallback(
@@ -2491,6 +2497,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             onNewWindowClick={createNewWindow}
             onTaskManagerClick={handleTaskManagerClick}
             onDebugAuthClick={handleDebugAuthClick}
+            onSharePointClick={handleSharePointClick}
             zoomLevel={zoomLevel}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
@@ -2730,6 +2737,16 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
+      />
+
+      {/* SharePoint Sidebar */}
+      <SharePointSidebar
+        isOpen={isSharePointSidebarOpen}
+        onClose={() => setIsSharePointSidebarOpen(false)}
+        onFileSelect={(file) => {
+          console.log('Selected SharePoint file:', file);
+          // Could navigate to file or perform other actions
+        }}
       />
 
       {/* Context Menu */}

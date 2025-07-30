@@ -23,7 +23,8 @@ import {
   Zap,
   Globe,
   RefreshCw,
-  Archive
+  Archive,
+  File
 } from 'lucide-react';
 
 interface BrowserMenuProps {
@@ -37,6 +38,7 @@ interface BrowserMenuProps {
   onNewWindowClick: () => void;
   onTaskManagerClick: () => void;
   onDebugAuthClick: () => void;
+  onSharePointClick?: () => void;
   zoomLevel: number;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -55,6 +57,7 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onNewWindowClick,
   onTaskManagerClick,
   onDebugAuthClick,
+  onSharePointClick,
   zoomLevel,
   onZoomIn,
   onZoomOut,
@@ -228,6 +231,17 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
           <span>Bookmarks</span>
           <DropdownMenuShortcut>Ctrl+Shift+O</DropdownMenuShortcut>
         </DropdownMenuItem>
+
+        {/* SharePoint Files */}
+        {onSharePointClick && (
+          <DropdownMenuItem 
+            onClick={() => handleMenuClick(onSharePointClick)}
+            className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-blue-50 rounded-md cursor-pointer"
+          >
+            <File className="w-4 h-4 text-blue-600" />
+            <span className="text-blue-700 font-medium">SharePoint Files</span>
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuSeparator className="my-2 bg-slate-100" />
 

@@ -43,6 +43,7 @@
     "create:installer": "./scripts/create-installer.sh"
   },
   "dependencies": {
+    "@azure/msal-node": "^3.6.4",
     "@clerk/clerk-js": "^5.73.2",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.14",

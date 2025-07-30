@@ -76,7 +76,10 @@ contextBridge.exposeInMainWorld('secureBrowser', {
     injectCredentials: (webviewId: string) => 
       ipcRenderer.invoke('sharepoint-inject-credentials', webviewId),
     getLibraryConfig: () => ipcRenderer.invoke('sharepoint-get-config'),
-    validateAccess: (url: string) => ipcRenderer.invoke('sharepoint-validate-access', url)
+    validateAccess: (url: string) => ipcRenderer.invoke('sharepoint-validate-access', url),
+    getOAuthToken: () => ipcRenderer.invoke('sharepoint-get-oauth-token'),
+    graphRequest: (endpoint: string, accessToken: string) => 
+      ipcRenderer.invoke('sharepoint-graph-request', { endpoint, accessToken })
   },
 
   // System Information
@@ -177,6 +180,8 @@ export interface SecureBrowserAPI {
     injectCredentials: (webviewId: string) => Promise<boolean>;
     getLibraryConfig: () => Promise<{tenantUrl: string, libraryPath: string}>;
     validateAccess: (url: string) => Promise<boolean>;
+    getOAuthToken: () => Promise<{success: boolean, accessToken?: string, error?: string}>;
+    graphRequest: (endpoint: string, accessToken: string) => Promise<{success: boolean, data?: any, error?: string}>;
   };
   system: {
     getVersion: () => Promise<string>;

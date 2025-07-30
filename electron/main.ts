@@ -1268,6 +1268,120 @@ function createWindow(): void {
 
 // IPC Handlers for secure communication
 
+// SharePoint OAuth handlers
+ipcMain.handle('sharepoint-get-oauth-token', async () => {
+  try {
+    console.log('🔄 Acquiring SharePoint OAuth token in main process...');
+    
+    const clientId = process.env.MSAL_CLIENT_ID;
+    const tenantId = process.env.MSAL_TENANT_ID;
+    const clientSecret = process.env.MSAL_CLIENT_SECRET;
+
+    if (!clientId || !tenantId || !clientSecret) {
+      throw new Error('MSAL configuration missing in environment variables');
+    }
+
+    const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+    const params = new URLSearchParams();
+    params.append('client_id', clientId);
+    params.append('client_secret', clientSecret);
+    params.append('scope', 'https://graph.microsoft.com/.default');
+    params.append('grant_type', 'client_credentials');
+
+    console.log('📡 Making OAuth request to:', tokenUrl);
+    console.log('🔑 Client ID:', clientId.substring(0, 8) + '...');
+
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    const responseText = await response.text();
+    console.log('📊 OAuth Response Status:', response.status);
+    
+    if (response.ok) {
+      const tokenData = JSON.parse(responseText);
+      if (tokenData.access_token) {
+        console.log('✅ OAuth token acquired successfully in main process');
+        console.log('⏱ Token expires in:', tokenData.expires_in, 'seconds');
+        return {
+          success: true,
+          accessToken: tokenData.access_token,
+          expiresIn: tokenData.expires_in,
+          tokenType: tokenData.token_type
+        };
+      } else {
+        throw new Error('No access token in response');
+      }
+    } else {
+      let errorDetails = responseText;
+      try {
+        const errorData = JSON.parse(responseText);
+        errorDetails = `${errorData.error}: ${errorData.error_description}`;
+      } catch {
+        // Keep original response text if not JSON
+      }
+      console.error('❌ OAuth failed:', response.status, response.statusText);
+      console.error('📄 Error details:', errorDetails);
+      throw new Error(`OAuth failed: ${response.status} ${response.statusText} - ${errorDetails}`);
+    }
+  } catch (error) {
+    console.error('❌ Error in sharepoint-get-oauth-token:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+});
+
+ipcMain.handle('sharepoint-graph-request', async (_, { endpoint, accessToken }) => {
+  try {
+    console.log('📡 Making Graph API request to:', endpoint);
+    
+    const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+      headers: { 
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json'
+      },
+    });
+
+    const responseText = await response.text();
+    console.log('📊 Graph API Response Status:', response.status);
+
+    if (response.ok) {
+      const data = JSON.parse(responseText);
+      console.log('✅ Graph API request successful');
+      return {
+        success: true,
+        data: data
+      };
+    } else {
+      let errorDetails = responseText;
+      try {
+        const errorData = JSON.parse(responseText);
+        errorDetails = `${errorData.error?.code}: ${errorData.error?.message}`;
+      } catch {
+        // Keep original response text if not JSON
+      }
+      console.error('❌ Graph API failed:', response.status, response.statusText);
+      console.error('📄 Error details:', errorDetails);
+      return {
+        success: false,
+        error: `Graph API failed: ${response.status} ${response.statusText} - ${errorDetails}`
+      };
+    }
+  } catch (error) {
+    console.error('❌ Error in sharepoint-graph-request:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error'
+    };
+  }
+});
+
 // System information handlers
 ipcMain.handle('system-get-version', () => {
   return app.getVersion()
@@ -1300,9 +1414,13 @@ ipcMain.handle('system-get-environment', () => {
     OP_CONNECT_HOST: process.env.OP_CONNECT_HOST,
     OP_CONNECT_TOKEN: process.env.OP_CONNECT_TOKEN,
     SHAREPOINT_TENANT_URL: process.env.SHAREPOINT_TENANT_URL,
+    SHAREPOINT_BASE_URL: process.env.SHAREPOINT_BASE_URL,
     SHAREPOINT_AUTO_LOGIN: process.env.SHAREPOINT_AUTO_LOGIN,
     SHAREPOINT_DEFAULT_ACCESS_LEVEL: process.env.SHAREPOINT_DEFAULT_ACCESS_LEVEL,
     SHAREPOINT_DOCUMENT_LIBRARIES: process.env.SHAREPOINT_DOCUMENT_LIBRARIES,
+    MSAL_CLIENT_ID: process.env.MSAL_CLIENT_ID,
+    MSAL_TENANT_ID: process.env.MSAL_TENANT_ID,
+    MSAL_CLIENT_SECRET: process.env.MSAL_CLIENT_SECRET,
     SECURITY_BLOCK_DOWNLOADS: process.env.SECURITY_BLOCK_DOWNLOADS,
     SECURITY_HTTPS_ONLY: process.env.SECURITY_HTTPS_ONLY,
     SECURITY_FAIL_CLOSED_VPN: process.env.SECURITY_FAIL_CLOSED_VPN,

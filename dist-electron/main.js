@@ -1,21 +1,21 @@
-import ce, { app as y, ipcMain as m, shell as $, BrowserWindow as R, session as W, Menu as le } from "electron";
-import { fileURLToPath as ue } from "node:url";
-import w from "node:path";
-import de, { spawn as _ } from "child_process";
-import fe, { promises as A } from "fs";
-import { homedir as S } from "os";
-import pe from "path";
-import ge from "tty";
-import he from "util";
-import we from "net";
-const me = () => {
-  if (typeof window < "u") {
-    const o = navigator.userAgent.toLowerCase();
-    if (o.includes("win")) return "windows";
-    if (o.includes("mac")) return "macos";
-    if (o.includes("linux")) return "linux";
+import require$$3$1, { app, ipcMain, shell, BrowserWindow, session, Menu } from "electron";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import require$$1$1, { spawn } from "child_process";
+import require$$3, { promises } from "fs";
+import { homedir } from "os";
+import require$$0$1 from "path";
+import require$$0 from "tty";
+import require$$1 from "util";
+import require$$4 from "net";
+const detectPlatform = () => {
+  if (typeof window !== "undefined") {
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.includes("win")) return "windows";
+    if (userAgent.includes("mac")) return "macos";
+    if (userAgent.includes("linux")) return "linux";
   }
-  if (typeof process < "u")
+  if (typeof process !== "undefined") {
     switch (process.platform) {
       case "win32":
         return "windows";
@@ -26,16 +26,19 @@ const me = () => {
       default:
         return "unknown";
     }
+  }
   return "unknown";
-}, Q = (o) => {
-  switch (me()) {
+};
+const getPlatformInfo = (platform) => {
+  const currentPlatform = detectPlatform();
+  switch (currentPlatform) {
     case "windows":
       return {
         platform: "windows",
         displayName: "Windows",
         emoji: "🪟",
-        canAutoConnect: !1,
-        requiresManualSetup: !0,
+        canAutoConnect: false,
+        requiresManualSetup: true,
         installInstructions: [
           "Download WireGuard from: https://www.wireguard.com/install/",
           "Install and open WireGuard GUI application",
@@ -49,8 +52,8 @@ const me = () => {
         platform: "macos",
         displayName: "macOS",
         emoji: "🍎",
-        canAutoConnect: !0,
-        requiresManualSetup: !1,
+        canAutoConnect: true,
+        requiresManualSetup: false,
         installInstructions: [
           "Install WireGuard from App Store or: brew install wireguard-tools",
           "Use: sudo wg-quick up <config-file>",
@@ -62,8 +65,8 @@ const me = () => {
         platform: "linux",
         displayName: "Linux",
         emoji: "🐧",
-        canAutoConnect: !0,
-        requiresManualSetup: !1,
+        canAutoConnect: true,
+        requiresManualSetup: false,
         installInstructions: [
           "Install WireGuard: sudo apt install wireguard (Ubuntu/Debian)",
           "Or: sudo yum install wireguard-tools (RHEL/CentOS)",
@@ -76,162 +79,257 @@ const me = () => {
         platform: "unknown",
         displayName: "Unknown Platform",
         emoji: "❓",
-        canAutoConnect: !1,
-        requiresManualSetup: !0,
+        canAutoConnect: false,
+        requiresManualSetup: true,
         installInstructions: [
           "Platform not supported",
           "Please use WireGuard manually"
         ]
       };
   }
-}, ve = (o) => {
-  const e = Q();
-  console.log(`${e.emoji} ${e.displayName} Instructions:`), console.log(`   Config file: ${o}`), console.log(""), e.installInstructions.forEach((n, t) => {
-    console.log(`   ${t + 1}. ${n}`);
-  }), e.requiresManualSetup && (console.log(""), console.log("🔄 After connecting, restart this application to verify the connection."));
 };
-function Ee(o) {
-  return o && o.__esModule && Object.prototype.hasOwnProperty.call(o, "default") ? o.default : o;
+const printPlatformInstructions = (configPath) => {
+  const info = getPlatformInfo();
+  console.log(`${info.emoji} ${info.displayName} Instructions:`);
+  console.log(`   Config file: ${configPath}`);
+  console.log("");
+  info.installInstructions.forEach((instruction, index) => {
+    console.log(`   ${index + 1}. ${instruction}`);
+  });
+  if (info.requiresManualSetup) {
+    console.log("");
+    console.log("🔄 After connecting, restart this application to verify the connection.");
+  }
+};
+function getDefaultExportFromCjs(x) {
+  return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
 }
-var T = { exports: {} }, D = { exports: {} }, k = { exports: {} }, x, j;
-function ye() {
-  if (j) return x;
-  j = 1;
-  var o = 1e3, e = o * 60, n = e * 60, t = n * 24, a = t * 365.25;
-  x = function(s, l) {
-    l = l || {};
-    var d = typeof s;
-    if (d === "string" && s.length > 0)
-      return c(s);
-    if (d === "number" && isNaN(s) === !1)
-      return l.long ? i(s) : f(s);
+var src = { exports: {} };
+var browser = { exports: {} };
+var debug = { exports: {} };
+var ms;
+var hasRequiredMs;
+function requireMs() {
+  if (hasRequiredMs) return ms;
+  hasRequiredMs = 1;
+  var s = 1e3;
+  var m = s * 60;
+  var h = m * 60;
+  var d = h * 24;
+  var y = d * 365.25;
+  ms = function(val, options) {
+    options = options || {};
+    var type = typeof val;
+    if (type === "string" && val.length > 0) {
+      return parse(val);
+    } else if (type === "number" && isNaN(val) === false) {
+      return options.long ? fmtLong(val) : fmtShort(val);
+    }
     throw new Error(
-      "val is not a non-empty string or a valid number. val=" + JSON.stringify(s)
+      "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
     );
   };
-  function c(s) {
-    if (s = String(s), !(s.length > 100)) {
-      var l = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(
-        s
-      );
-      if (l) {
-        var d = parseFloat(l[1]), g = (l[2] || "ms").toLowerCase();
-        switch (g) {
-          case "years":
-          case "year":
-          case "yrs":
-          case "yr":
-          case "y":
-            return d * a;
-          case "days":
-          case "day":
-          case "d":
-            return d * t;
-          case "hours":
-          case "hour":
-          case "hrs":
-          case "hr":
-          case "h":
-            return d * n;
-          case "minutes":
-          case "minute":
-          case "mins":
-          case "min":
-          case "m":
-            return d * e;
-          case "seconds":
-          case "second":
-          case "secs":
-          case "sec":
-          case "s":
-            return d * o;
-          case "milliseconds":
-          case "millisecond":
-          case "msecs":
-          case "msec":
-          case "ms":
-            return d;
-          default:
-            return;
+  function parse(str) {
+    str = String(str);
+    if (str.length > 100) {
+      return;
+    }
+    var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(
+      str
+    );
+    if (!match) {
+      return;
+    }
+    var n = parseFloat(match[1]);
+    var type = (match[2] || "ms").toLowerCase();
+    switch (type) {
+      case "years":
+      case "year":
+      case "yrs":
+      case "yr":
+      case "y":
+        return n * y;
+      case "days":
+      case "day":
+      case "d":
+        return n * d;
+      case "hours":
+      case "hour":
+      case "hrs":
+      case "hr":
+      case "h":
+        return n * h;
+      case "minutes":
+      case "minute":
+      case "mins":
+      case "min":
+      case "m":
+        return n * m;
+      case "seconds":
+      case "second":
+      case "secs":
+      case "sec":
+      case "s":
+        return n * s;
+      case "milliseconds":
+      case "millisecond":
+      case "msecs":
+      case "msec":
+      case "ms":
+        return n;
+      default:
+        return void 0;
+    }
+  }
+  function fmtShort(ms2) {
+    if (ms2 >= d) {
+      return Math.round(ms2 / d) + "d";
+    }
+    if (ms2 >= h) {
+      return Math.round(ms2 / h) + "h";
+    }
+    if (ms2 >= m) {
+      return Math.round(ms2 / m) + "m";
+    }
+    if (ms2 >= s) {
+      return Math.round(ms2 / s) + "s";
+    }
+    return ms2 + "ms";
+  }
+  function fmtLong(ms2) {
+    return plural(ms2, d, "day") || plural(ms2, h, "hour") || plural(ms2, m, "minute") || plural(ms2, s, "second") || ms2 + " ms";
+  }
+  function plural(ms2, n, name) {
+    if (ms2 < n) {
+      return;
+    }
+    if (ms2 < n * 1.5) {
+      return Math.floor(ms2 / n) + " " + name;
+    }
+    return Math.ceil(ms2 / n) + " " + name + "s";
+  }
+  return ms;
+}
+var hasRequiredDebug;
+function requireDebug() {
+  if (hasRequiredDebug) return debug.exports;
+  hasRequiredDebug = 1;
+  (function(module, exports) {
+    exports = module.exports = createDebug.debug = createDebug["default"] = createDebug;
+    exports.coerce = coerce;
+    exports.disable = disable;
+    exports.enable = enable;
+    exports.enabled = enabled;
+    exports.humanize = requireMs();
+    exports.names = [];
+    exports.skips = [];
+    exports.formatters = {};
+    var prevTime;
+    function selectColor(namespace) {
+      var hash = 0, i;
+      for (i in namespace) {
+        hash = (hash << 5) - hash + namespace.charCodeAt(i);
+        hash |= 0;
+      }
+      return exports.colors[Math.abs(hash) % exports.colors.length];
+    }
+    function createDebug(namespace) {
+      function debug2() {
+        if (!debug2.enabled) return;
+        var self = debug2;
+        var curr = +/* @__PURE__ */ new Date();
+        var ms2 = curr - (prevTime || curr);
+        self.diff = ms2;
+        self.prev = prevTime;
+        self.curr = curr;
+        prevTime = curr;
+        var args = new Array(arguments.length);
+        for (var i = 0; i < args.length; i++) {
+          args[i] = arguments[i];
+        }
+        args[0] = exports.coerce(args[0]);
+        if ("string" !== typeof args[0]) {
+          args.unshift("%O");
+        }
+        var index = 0;
+        args[0] = args[0].replace(/%([a-zA-Z%])/g, function(match, format) {
+          if (match === "%%") return match;
+          index++;
+          var formatter = exports.formatters[format];
+          if ("function" === typeof formatter) {
+            var val = args[index];
+            match = formatter.call(self, val);
+            args.splice(index, 1);
+            index--;
+          }
+          return match;
+        });
+        exports.formatArgs.call(self, args);
+        var logFn = debug2.log || exports.log || console.log.bind(console);
+        logFn.apply(self, args);
+      }
+      debug2.namespace = namespace;
+      debug2.enabled = exports.enabled(namespace);
+      debug2.useColors = exports.useColors();
+      debug2.color = selectColor(namespace);
+      if ("function" === typeof exports.init) {
+        exports.init(debug2);
+      }
+      return debug2;
+    }
+    function enable(namespaces) {
+      exports.save(namespaces);
+      exports.names = [];
+      exports.skips = [];
+      var split = (typeof namespaces === "string" ? namespaces : "").split(/[\s,]+/);
+      var len = split.length;
+      for (var i = 0; i < len; i++) {
+        if (!split[i]) continue;
+        namespaces = split[i].replace(/\*/g, ".*?");
+        if (namespaces[0] === "-") {
+          exports.skips.push(new RegExp("^" + namespaces.substr(1) + "$"));
+        } else {
+          exports.names.push(new RegExp("^" + namespaces + "$"));
         }
       }
     }
-  }
-  function f(s) {
-    return s >= t ? Math.round(s / t) + "d" : s >= n ? Math.round(s / n) + "h" : s >= e ? Math.round(s / e) + "m" : s >= o ? Math.round(s / o) + "s" : s + "ms";
-  }
-  function i(s) {
-    return r(s, t, "day") || r(s, n, "hour") || r(s, e, "minute") || r(s, o, "second") || s + " ms";
-  }
-  function r(s, l, d) {
-    if (!(s < l))
-      return s < l * 1.5 ? Math.floor(s / l) + " " + d : Math.ceil(s / l) + " " + d + "s";
-  }
-  return x;
-}
-var M;
-function ee() {
-  return M || (M = 1, function(o, e) {
-    e = o.exports = a.debug = a.default = a, e.coerce = r, e.disable = f, e.enable = c, e.enabled = i, e.humanize = ye(), e.names = [], e.skips = [], e.formatters = {};
-    var n;
-    function t(s) {
-      var l = 0, d;
-      for (d in s)
-        l = (l << 5) - l + s.charCodeAt(d), l |= 0;
-      return e.colors[Math.abs(l) % e.colors.length];
+    function disable() {
+      exports.enable("");
     }
-    function a(s) {
-      function l() {
-        if (l.enabled) {
-          var d = l, g = +/* @__PURE__ */ new Date(), p = g - (n || g);
-          d.diff = p, d.prev = n, d.curr = g, n = g;
-          for (var u = new Array(arguments.length), h = 0; h < u.length; h++)
-            u[h] = arguments[h];
-          u[0] = e.coerce(u[0]), typeof u[0] != "string" && u.unshift("%O");
-          var v = 0;
-          u[0] = u[0].replace(/%([a-zA-Z%])/g, function(N, ie) {
-            if (N === "%%") return N;
-            v++;
-            var F = e.formatters[ie];
-            if (typeof F == "function") {
-              var ae = u[v];
-              N = F.call(d, ae), u.splice(v, 1), v--;
-            }
-            return N;
-          }), e.formatArgs.call(d, u);
-          var b = l.log || e.log || console.log.bind(console);
-          b.apply(d, u);
+    function enabled(name) {
+      var i, len;
+      for (i = 0, len = exports.skips.length; i < len; i++) {
+        if (exports.skips[i].test(name)) {
+          return false;
         }
       }
-      return l.namespace = s, l.enabled = e.enabled(s), l.useColors = e.useColors(), l.color = t(s), typeof e.init == "function" && e.init(l), l;
+      for (i = 0, len = exports.names.length; i < len; i++) {
+        if (exports.names[i].test(name)) {
+          return true;
+        }
+      }
+      return false;
     }
-    function c(s) {
-      e.save(s), e.names = [], e.skips = [];
-      for (var l = (typeof s == "string" ? s : "").split(/[\s,]+/), d = l.length, g = 0; g < d; g++)
-        l[g] && (s = l[g].replace(/\*/g, ".*?"), s[0] === "-" ? e.skips.push(new RegExp("^" + s.substr(1) + "$")) : e.names.push(new RegExp("^" + s + "$")));
+    function coerce(val) {
+      if (val instanceof Error) return val.stack || val.message;
+      return val;
     }
-    function f() {
-      e.enable("");
-    }
-    function i(s) {
-      var l, d;
-      for (l = 0, d = e.skips.length; l < d; l++)
-        if (e.skips[l].test(s))
-          return !1;
-      for (l = 0, d = e.names.length; l < d; l++)
-        if (e.names[l].test(s))
-          return !0;
-      return !1;
-    }
-    function r(s) {
-      return s instanceof Error ? s.stack || s.message : s;
-    }
-  }(k, k.exports)), k.exports;
+  })(debug, debug.exports);
+  return debug.exports;
 }
-var B;
-function Pe() {
-  return B || (B = 1, function(o, e) {
-    e = o.exports = ee(), e.log = a, e.formatArgs = t, e.save = c, e.load = f, e.useColors = n, e.storage = typeof chrome < "u" && typeof chrome.storage < "u" ? chrome.storage.local : i(), e.colors = [
+var hasRequiredBrowser;
+function requireBrowser() {
+  if (hasRequiredBrowser) return browser.exports;
+  hasRequiredBrowser = 1;
+  (function(module, exports) {
+    exports = module.exports = requireDebug();
+    exports.log = log;
+    exports.formatArgs = formatArgs;
+    exports.save = save;
+    exports.load = load;
+    exports.useColors = useColors;
+    exports.storage = "undefined" != typeof chrome && "undefined" != typeof chrome.storage ? chrome.storage.local : localstorage();
+    exports.colors = [
       "lightseagreen",
       "forestgreen",
       "goldenrod",
@@ -239,463 +337,775 @@ function Pe() {
       "darkorchid",
       "crimson"
     ];
-    function n() {
-      return typeof window < "u" && window.process && window.process.type === "renderer" ? !0 : typeof document < "u" && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance || // is firebug? http://stackoverflow.com/a/398120/376773
-      typeof window < "u" && window.console && (window.console.firebug || window.console.exception && window.console.table) || // is firefox >= v31?
+    function useColors() {
+      if (typeof window !== "undefined" && window.process && window.process.type === "renderer") {
+        return true;
+      }
+      return typeof document !== "undefined" && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance || // is firebug? http://stackoverflow.com/a/398120/376773
+      typeof window !== "undefined" && window.console && (window.console.firebug || window.console.exception && window.console.table) || // is firefox >= v31?
       // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-      typeof navigator < "u" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31 || // double check webkit in userAgent just in case we are in a worker
-      typeof navigator < "u" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
+      typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31 || // double check webkit in userAgent just in case we are in a worker
+      typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
     }
-    e.formatters.j = function(r) {
+    exports.formatters.j = function(v) {
       try {
-        return JSON.stringify(r);
-      } catch (s) {
-        return "[UnexpectedJSONParseError]: " + s.message;
+        return JSON.stringify(v);
+      } catch (err) {
+        return "[UnexpectedJSONParseError]: " + err.message;
       }
     };
-    function t(r) {
-      var s = this.useColors;
-      if (r[0] = (s ? "%c" : "") + this.namespace + (s ? " %c" : " ") + r[0] + (s ? "%c " : " ") + "+" + e.humanize(this.diff), !!s) {
-        var l = "color: " + this.color;
-        r.splice(1, 0, l, "color: inherit");
-        var d = 0, g = 0;
-        r[0].replace(/%[a-zA-Z%]/g, function(p) {
-          p !== "%%" && (d++, p === "%c" && (g = d));
-        }), r.splice(g, 0, l);
-      }
+    function formatArgs(args) {
+      var useColors2 = this.useColors;
+      args[0] = (useColors2 ? "%c" : "") + this.namespace + (useColors2 ? " %c" : " ") + args[0] + (useColors2 ? "%c " : " ") + "+" + exports.humanize(this.diff);
+      if (!useColors2) return;
+      var c = "color: " + this.color;
+      args.splice(1, 0, c, "color: inherit");
+      var index = 0;
+      var lastC = 0;
+      args[0].replace(/%[a-zA-Z%]/g, function(match) {
+        if ("%%" === match) return;
+        index++;
+        if ("%c" === match) {
+          lastC = index;
+        }
+      });
+      args.splice(lastC, 0, c);
     }
-    function a() {
-      return typeof console == "object" && console.log && Function.prototype.apply.call(console.log, console, arguments);
+    function log() {
+      return "object" === typeof console && console.log && Function.prototype.apply.call(console.log, console, arguments);
     }
-    function c(r) {
+    function save(namespaces) {
       try {
-        r == null ? e.storage.removeItem("debug") : e.storage.debug = r;
-      } catch {
+        if (null == namespaces) {
+          exports.storage.removeItem("debug");
+        } else {
+          exports.storage.debug = namespaces;
+        }
+      } catch (e) {
       }
     }
-    function f() {
+    function load() {
       var r;
       try {
-        r = e.storage.debug;
-      } catch {
+        r = exports.storage.debug;
+      } catch (e) {
       }
-      return !r && typeof process < "u" && "env" in process && (r = process.env.DEBUG), r;
+      if (!r && typeof process !== "undefined" && "env" in process) {
+        r = process.env.DEBUG;
+      }
+      return r;
     }
-    e.enable(f());
-    function i() {
+    exports.enable(load());
+    function localstorage() {
       try {
         return window.localStorage;
-      } catch {
+      } catch (e) {
       }
     }
-  }(D, D.exports)), D.exports;
+  })(browser, browser.exports);
+  return browser.exports;
 }
-var L = { exports: {} }, H;
-function _e() {
-  return H || (H = 1, function(o, e) {
-    var n = ge, t = he;
-    e = o.exports = ee(), e.init = g, e.log = r, e.formatArgs = i, e.save = s, e.load = l, e.useColors = f, e.colors = [6, 2, 3, 4, 5, 1], e.inspectOpts = Object.keys(process.env).filter(function(p) {
-      return /^debug_/i.test(p);
-    }).reduce(function(p, u) {
-      var h = u.substring(6).toLowerCase().replace(/_([a-z])/g, function(b, N) {
-        return N.toUpperCase();
-      }), v = process.env[u];
-      return /^(yes|on|true|enabled)$/i.test(v) ? v = !0 : /^(no|off|false|disabled)$/i.test(v) ? v = !1 : v === "null" ? v = null : v = Number(v), p[h] = v, p;
+var node = { exports: {} };
+var hasRequiredNode;
+function requireNode() {
+  if (hasRequiredNode) return node.exports;
+  hasRequiredNode = 1;
+  (function(module, exports) {
+    var tty = require$$0;
+    var util = require$$1;
+    exports = module.exports = requireDebug();
+    exports.init = init;
+    exports.log = log;
+    exports.formatArgs = formatArgs;
+    exports.save = save;
+    exports.load = load;
+    exports.useColors = useColors;
+    exports.colors = [6, 2, 3, 4, 5, 1];
+    exports.inspectOpts = Object.keys(process.env).filter(function(key) {
+      return /^debug_/i.test(key);
+    }).reduce(function(obj, key) {
+      var prop = key.substring(6).toLowerCase().replace(/_([a-z])/g, function(_, k) {
+        return k.toUpperCase();
+      });
+      var val = process.env[key];
+      if (/^(yes|on|true|enabled)$/i.test(val)) val = true;
+      else if (/^(no|off|false|disabled)$/i.test(val)) val = false;
+      else if (val === "null") val = null;
+      else val = Number(val);
+      obj[prop] = val;
+      return obj;
     }, {});
-    var a = parseInt(process.env.DEBUG_FD, 10) || 2;
-    a !== 1 && a !== 2 && t.deprecate(function() {
-    }, "except for stderr(2) and stdout(1), any other usage of DEBUG_FD is deprecated. Override debug.log if you want to use a different log function (https://git.io/debug_fd)")();
-    var c = a === 1 ? process.stdout : a === 2 ? process.stderr : d(a);
-    function f() {
-      return "colors" in e.inspectOpts ? !!e.inspectOpts.colors : n.isatty(a);
+    var fd = parseInt(process.env.DEBUG_FD, 10) || 2;
+    if (1 !== fd && 2 !== fd) {
+      util.deprecate(function() {
+      }, "except for stderr(2) and stdout(1), any other usage of DEBUG_FD is deprecated. Override debug.log if you want to use a different log function (https://git.io/debug_fd)")();
     }
-    e.formatters.o = function(p) {
-      return this.inspectOpts.colors = this.useColors, t.inspect(p, this.inspectOpts).split(`
-`).map(function(u) {
-        return u.trim();
+    var stream = 1 === fd ? process.stdout : 2 === fd ? process.stderr : createWritableStdioStream(fd);
+    function useColors() {
+      return "colors" in exports.inspectOpts ? Boolean(exports.inspectOpts.colors) : tty.isatty(fd);
+    }
+    exports.formatters.o = function(v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts).split("\n").map(function(str) {
+        return str.trim();
       }).join(" ");
-    }, e.formatters.O = function(p) {
-      return this.inspectOpts.colors = this.useColors, t.inspect(p, this.inspectOpts);
     };
-    function i(p) {
-      var u = this.namespace, h = this.useColors;
-      if (h) {
-        var v = this.color, b = "  \x1B[3" + v + ";1m" + u + " \x1B[0m";
-        p[0] = b + p[0].split(`
-`).join(`
-` + b), p.push("\x1B[3" + v + "m+" + e.humanize(this.diff) + "\x1B[0m");
-      } else
-        p[0] = (/* @__PURE__ */ new Date()).toUTCString() + " " + u + " " + p[0];
+    exports.formatters.O = function(v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts);
+    };
+    function formatArgs(args) {
+      var name = this.namespace;
+      var useColors2 = this.useColors;
+      if (useColors2) {
+        var c = this.color;
+        var prefix = "  \x1B[3" + c + ";1m" + name + " \x1B[0m";
+        args[0] = prefix + args[0].split("\n").join("\n" + prefix);
+        args.push("\x1B[3" + c + "m+" + exports.humanize(this.diff) + "\x1B[0m");
+      } else {
+        args[0] = (/* @__PURE__ */ new Date()).toUTCString() + " " + name + " " + args[0];
+      }
     }
-    function r() {
-      return c.write(t.format.apply(t, arguments) + `
-`);
+    function log() {
+      return stream.write(util.format.apply(util, arguments) + "\n");
     }
-    function s(p) {
-      p == null ? delete process.env.DEBUG : process.env.DEBUG = p;
+    function save(namespaces) {
+      if (null == namespaces) {
+        delete process.env.DEBUG;
+      } else {
+        process.env.DEBUG = namespaces;
+      }
     }
-    function l() {
+    function load() {
       return process.env.DEBUG;
     }
-    function d(p) {
-      var u, h = process.binding("tty_wrap");
-      switch (h.guessHandleType(p)) {
+    function createWritableStdioStream(fd2) {
+      var stream2;
+      var tty_wrap = process.binding("tty_wrap");
+      switch (tty_wrap.guessHandleType(fd2)) {
         case "TTY":
-          u = new n.WriteStream(p), u._type = "tty", u._handle && u._handle.unref && u._handle.unref();
+          stream2 = new tty.WriteStream(fd2);
+          stream2._type = "tty";
+          if (stream2._handle && stream2._handle.unref) {
+            stream2._handle.unref();
+          }
           break;
         case "FILE":
-          var v = fe;
-          u = new v.SyncWriteStream(p, { autoClose: !1 }), u._type = "fs";
+          var fs = require$$3;
+          stream2 = new fs.SyncWriteStream(fd2, { autoClose: false });
+          stream2._type = "fs";
           break;
         case "PIPE":
         case "TCP":
-          var b = we;
-          u = new b.Socket({
-            fd: p,
-            readable: !1,
-            writable: !0
-          }), u.readable = !1, u.read = null, u._type = "pipe", u._handle && u._handle.unref && u._handle.unref();
+          var net = require$$4;
+          stream2 = new net.Socket({
+            fd: fd2,
+            readable: false,
+            writable: true
+          });
+          stream2.readable = false;
+          stream2.read = null;
+          stream2._type = "pipe";
+          if (stream2._handle && stream2._handle.unref) {
+            stream2._handle.unref();
+          }
           break;
         default:
           throw new Error("Implement me. Unknown stream file type!");
       }
-      return u.fd = p, u._isStdio = !0, u;
+      stream2.fd = fd2;
+      stream2._isStdio = true;
+      return stream2;
     }
-    function g(p) {
-      p.inspectOpts = {};
-      for (var u = Object.keys(e.inspectOpts), h = 0; h < u.length; h++)
-        p.inspectOpts[u[h]] = e.inspectOpts[u[h]];
+    function init(debug2) {
+      debug2.inspectOpts = {};
+      var keys = Object.keys(exports.inspectOpts);
+      for (var i = 0; i < keys.length; i++) {
+        debug2.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+      }
     }
-    e.enable(l());
-  }(L, L.exports)), L.exports;
+    exports.enable(load());
+  })(node, node.exports);
+  return node.exports;
 }
-var z;
-function Ce() {
-  return z || (z = 1, typeof process < "u" && process.type === "renderer" ? T.exports = Pe() : T.exports = _e()), T.exports;
+var hasRequiredSrc;
+function requireSrc() {
+  if (hasRequiredSrc) return src.exports;
+  hasRequiredSrc = 1;
+  if (typeof process !== "undefined" && process.type === "renderer") {
+    src.exports = requireBrowser();
+  } else {
+    src.exports = requireNode();
+  }
+  return src.exports;
 }
-var G, K;
-function Se() {
-  if (K) return G;
-  K = 1;
-  var o = pe, e = de.spawn, n = Ce()("electron-squirrel-startup"), t = ce.app, a = function(f, i) {
-    var r = o.resolve(o.dirname(process.execPath), "..", "Update.exe");
-    n("Spawning `%s` with args `%s`", r, f), e(r, f, {
-      detached: !0
-    }).on("close", i);
-  }, c = function() {
-    if (process.platform === "win32") {
-      var f = process.argv[1];
-      n("processing squirrel command `%s`", f);
-      var i = o.basename(process.execPath);
-      if (f === "--squirrel-install" || f === "--squirrel-updated")
-        return a(["--createShortcut=" + i], t.quit), !0;
-      if (f === "--squirrel-uninstall")
-        return a(["--removeShortcut=" + i], t.quit), !0;
-      if (f === "--squirrel-obsolete")
-        return t.quit(), !0;
-    }
-    return !1;
+var electronSquirrelStartup$1;
+var hasRequiredElectronSquirrelStartup;
+function requireElectronSquirrelStartup() {
+  if (hasRequiredElectronSquirrelStartup) return electronSquirrelStartup$1;
+  hasRequiredElectronSquirrelStartup = 1;
+  var path2 = require$$0$1;
+  var spawn2 = require$$1$1.spawn;
+  var debug2 = requireSrc()("electron-squirrel-startup");
+  var app2 = require$$3$1.app;
+  var run = function(args, done) {
+    var updateExe = path2.resolve(path2.dirname(process.execPath), "..", "Update.exe");
+    debug2("Spawning `%s` with args `%s`", updateExe, args);
+    spawn2(updateExe, args, {
+      detached: true
+    }).on("close", done);
   };
-  return G = c(), G;
+  var check = function() {
+    if (process.platform === "win32") {
+      var cmd = process.argv[1];
+      debug2("processing squirrel command `%s`", cmd);
+      var target = path2.basename(process.execPath);
+      if (cmd === "--squirrel-install" || cmd === "--squirrel-updated") {
+        run(["--createShortcut=" + target], app2.quit);
+        return true;
+      }
+      if (cmd === "--squirrel-uninstall") {
+        run(["--removeShortcut=" + target], app2.quit);
+        return true;
+      }
+      if (cmd === "--squirrel-obsolete") {
+        app2.quit();
+        return true;
+      }
+    }
+    return false;
+  };
+  electronSquirrelStartup$1 = check();
+  return electronSquirrelStartup$1;
 }
-var be = Se();
-const Ne = /* @__PURE__ */ Ee(be);
-Ne && y.quit();
-const Ae = async () => {
+var electronSquirrelStartupExports = requireElectronSquirrelStartup();
+const electronSquirrelStartup = /* @__PURE__ */ getDefaultExportFromCjs(electronSquirrelStartupExports);
+if (electronSquirrelStartup) {
+  app.quit();
+}
+const loadEnvironmentVariables = async () => {
   try {
-    const o = w.resolve(".env"), n = (await A.readFile(o, "utf-8")).split(`
-`);
-    console.log("🔍 Loading .env file from:", o);
-    for (const t of n) {
-      const a = t.trim();
-      if (a && !a.startsWith("#")) {
-        const [c, ...f] = a.split("=");
-        if (c && f.length > 0) {
-          const i = f.join("=").trim();
-          process.env[c.trim()] = i, !c.includes("SECRET") && !c.includes("PASSWORD") && !c.includes("KEY") && !c.includes("ID") ? console.log(`📝 Loaded: ${c.trim()}=${i}`) : console.log(`📝 Loaded: ${c.trim()}=***`);
+    const envPath = path.resolve(".env");
+    const envContent = await promises.readFile(envPath, "utf-8");
+    const envLines = envContent.split("\n");
+    console.log("🔍 Loading .env file from:", envPath);
+    for (const line of envLines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#")) {
+        const [key, ...valueParts] = trimmed.split("=");
+        if (key && valueParts.length > 0) {
+          const value = valueParts.join("=").trim();
+          process.env[key.trim()] = value;
+          if (!key.includes("SECRET") && !key.includes("PASSWORD") && !key.includes("KEY") && !key.includes("ID")) {
+            console.log(`📝 Loaded: ${key.trim()}=${value}`);
+          } else {
+            console.log(`📝 Loaded: ${key.trim()}=***`);
+          }
         }
       }
     }
     console.log("✅ Environment variables loaded successfully");
-  } catch (o) {
-    console.error("❌ Failed to load .env file:", o), console.log("📝 This may cause VPN detection to fail");
+  } catch (error) {
+    console.error("❌ Failed to load .env file:", error);
+    console.log("📝 This may cause VPN detection to fail");
   }
-}, V = w.dirname(ue(import.meta.url));
-process.env.APP_ROOT = w.join(V, "..");
-const I = process.env.VITE_DEV_SERVER_URL, Qe = w.join(process.env.APP_ROOT, "dist-electron"), oe = w.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = I ? w.join(process.env.APP_ROOT, "public") : oe;
-let P = [], E = null, O = !1, ne = null;
-const C = (o) => {
-  const e = O;
-  O = o, e !== o && console.log(`🔄 VPN status changed: ${e ? "Connected" : "Disconnected"} → ${o ? "Connected" : "Disconnected"}`), console.log(`📡 VPN Status Updated: ${o ? "✅ Connected - Allowing all HTTPS requests" : "❌ Disconnected - Blocking external requests"}`), P.forEach((n) => {
-    n && !n.isDestroyed() && n.webContents.send("vpn-status-changed", o);
+};
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+process.env.APP_ROOT = path.join(__dirname, "..");
+const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
+const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
+let windows = [];
+let mainWindow = null;
+let vpnConnected = false;
+let wireguardProcess = null;
+const updateVPNStatus = (connected) => {
+  const wasConnected = vpnConnected;
+  vpnConnected = connected;
+  if (wasConnected !== connected) {
+    console.log(`🔄 VPN status changed: ${wasConnected ? "Connected" : "Disconnected"} → ${connected ? "Connected" : "Disconnected"}`);
+  }
+  console.log(`📡 VPN Status Updated: ${connected ? "✅ Connected - Allowing all HTTPS requests" : "❌ Disconnected - Blocking external requests"}`);
+  windows.forEach((window2) => {
+    if (window2 && !window2.isDestroyed()) {
+      window2.webContents.send("vpn-status-changed", connected);
+    }
   });
-}, q = async () => {
+};
+const connectVPN = async () => {
   try {
-    const o = process.env.VPN_PROVIDER || "wireguard";
-    if (o === "wireguard")
-      return await Ie();
-    throw new Error(`VPN provider ${o} not implemented`);
-  } catch (o) {
-    return console.error("❌ VPN connection failed:", o), !1;
+    const provider = process.env.VPN_PROVIDER || "wireguard";
+    if (provider === "wireguard") {
+      return await connectWireGuard();
+    } else {
+      throw new Error(`VPN provider ${provider} not implemented`);
+    }
+  } catch (error) {
+    console.error("❌ VPN connection failed:", error);
+    return false;
   }
-}, te = async () => {
+};
+const disconnectVPN = async () => {
   try {
-    return ne ? await Ue() : !0;
-  } catch (o) {
-    return console.error("❌ VPN disconnection failed:", o), !1;
+    if (wireguardProcess) {
+      return await disconnectWireGuard();
+    }
+    return true;
+  } catch (error) {
+    console.error("❌ VPN disconnection failed:", error);
+    return false;
   }
-}, Ie = async () => {
+};
+const connectWireGuard = async () => {
   try {
-    console.log("🔍 Debug: Environment variables at startup:"), console.log(`  NODE_ENV: ${process.env.NODE_ENV}`), console.log(`  VPN_PROVIDER: ${process.env.VPN_PROVIDER}`), console.log(`  WIREGUARD_CONFIG_PATH: ${process.env.WIREGUARD_CONFIG_PATH}`), console.log(`  WIREGUARD_ENDPOINT: ${process.env.WIREGUARD_ENDPOINT}`);
-    const o = process.env.WIREGUARD_CONFIG_PATH || "./config/wireguard-australia.conf", e = w.resolve(o);
-    console.log(`🔍 Resolved config path: ${e}`);
+    console.log("🔍 Debug: Environment variables at startup:");
+    console.log(`  NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`  VPN_PROVIDER: ${process.env.VPN_PROVIDER}`);
+    console.log(`  WIREGUARD_CONFIG_PATH: ${process.env.WIREGUARD_CONFIG_PATH}`);
+    console.log(`  WIREGUARD_ENDPOINT: ${process.env.WIREGUARD_ENDPOINT}`);
+    const configPath = process.env.WIREGUARD_CONFIG_PATH || "./config/wireguard-australia.conf";
+    const resolvedPath = path.resolve(configPath);
+    console.log(`🔍 Resolved config path: ${resolvedPath}`);
     try {
-      await A.access(e), console.log("✅ Config file found");
-    } catch (c) {
-      console.log("❌ Config file not found:", c), console.log("📝 This is OK - config file not required for detection");
+      await promises.access(resolvedPath);
+      console.log("✅ Config file found");
+    } catch (error) {
+      console.log("❌ Config file not found:", error);
+      console.log("📝 This is OK - config file not required for detection");
     }
-    const n = Q();
-    return console.log(`🔌 Checking WireGuard connection on ${n.displayName}...`), await U() ? (console.log("✅ WireGuard is connected and active"), console.log("✅ VPN connected successfully - unrestricted access enabled"), !0) : (console.log("🔄 Attempting to establish WireGuard connection..."), await Oe(e) ? (console.log("✅ WireGuard connection established successfully"), await U() ? (console.log("✅ VPN auto-connected successfully"), !0) : (console.log("⚠️ Connection established but IP location verification failed"), !1)) : (console.log("❌ WireGuard connection failed."), ve(e), !1));
-  } catch (o) {
-    return console.error("❌ WireGuard setup error:", o), !1;
+    const platformInfo = getPlatformInfo();
+    console.log(`🔌 Checking WireGuard connection on ${platformInfo.displayName}...`);
+    const isConnected = await checkWireGuardConnection();
+    if (isConnected) {
+      console.log("✅ WireGuard is connected and active");
+      console.log("✅ VPN connected successfully - unrestricted access enabled");
+      return true;
+    }
+    console.log("🔄 Attempting to establish WireGuard connection...");
+    const connectionResult = await establishWireGuardConnection(resolvedPath);
+    if (connectionResult) {
+      console.log("✅ WireGuard connection established successfully");
+      const verifyConnection = await checkWireGuardConnection();
+      if (verifyConnection) {
+        console.log("✅ VPN auto-connected successfully");
+        return true;
+      } else {
+        console.log("⚠️ Connection established but IP location verification failed");
+        return false;
+      }
+    } else {
+      console.log("❌ WireGuard connection failed.");
+      printPlatformInstructions(resolvedPath);
+      return false;
+    }
+  } catch (error) {
+    console.error("❌ WireGuard setup error:", error);
+    return false;
   }
-}, Oe = async (o) => {
-  const e = process.platform;
+};
+const establishWireGuardConnection = async (configPath) => {
+  const platform = process.platform;
   try {
-    switch (e) {
+    switch (platform) {
       case "linux":
-        return await Re(o);
+        return await connectWireGuardLinux(configPath);
       case "darwin":
-        return await Te(o);
+        return await connectWireGuardMacOS(configPath);
       case "win32":
-        return await De(o);
+        return await connectWireGuardWindows(configPath);
       default:
-        return console.error(`❌ Unsupported platform: ${e}`), !1;
+        console.error(`❌ Unsupported platform: ${platform}`);
+        return false;
     }
-  } catch (n) {
-    return console.error(`❌ Failed to connect on ${e}:`, n), !1;
+  } catch (error) {
+    console.error(`❌ Failed to connect on ${platform}:`, error);
+    return false;
   }
-}, Re = async (o) => new Promise((e) => {
-  console.log("🐧 Using Linux wg-quick...");
-  const n = _("wg-quick", ["up", o], {
-    stdio: ["pipe", "pipe", "pipe"]
+};
+const connectWireGuardLinux = async (configPath) => {
+  return new Promise((resolve) => {
+    console.log("🐧 Using Linux wg-quick...");
+    const process2 = spawn("wg-quick", ["up", configPath], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    process2.on("exit", (code) => {
+      resolve(code === 0);
+    });
+    process2.on("error", (error) => {
+      console.error("❌ wg-quick error:", error);
+      resolve(false);
+    });
+    setTimeout(() => resolve(false), 3e4);
   });
-  n.on("exit", (t) => {
-    e(t === 0);
-  }), n.on("error", (t) => {
-    console.error("❌ wg-quick error:", t), e(!1);
-  }), setTimeout(() => e(!1), 3e4);
-}), Te = async (o) => new Promise((e) => {
-  console.log("🍎 Using macOS wg-quick...");
-  const n = _("wg-quick", ["up", o], {
-    stdio: ["pipe", "pipe", "pipe"]
+};
+const connectWireGuardMacOS = async (configPath) => {
+  return new Promise((resolve) => {
+    console.log("🍎 Using macOS wg-quick...");
+    const process2 = spawn("wg-quick", ["up", configPath], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    process2.on("exit", (code) => {
+      resolve(code === 0);
+    });
+    process2.on("error", () => {
+      console.log("🍎 Trying WireGuard macOS app...");
+      resolve(false);
+    });
+    setTimeout(() => resolve(false), 3e4);
   });
-  n.on("exit", (t) => {
-    e(t === 0);
-  }), n.on("error", () => {
-    console.log("🍎 Trying WireGuard macOS app..."), e(!1);
-  }), setTimeout(() => e(!1), 3e4);
-}), De = async (o) => (console.log("🪟 Windows detected - checking existing connection..."), console.log(`   Config available at: ${o}`), !1), U = async () => {
-  const o = process.platform;
+};
+const connectWireGuardWindows = async (configPath) => {
+  console.log("🪟 Windows detected - checking existing connection...");
+  console.log(`   Config available at: ${configPath}`);
+  return false;
+};
+const checkWireGuardConnection = async () => {
+  const platform = process.platform;
   try {
-    switch (o) {
+    switch (platform) {
       case "linux":
-        return await ke();
+        return await checkWireGuardLinux();
       case "darwin":
-        return await Le();
+        return await checkWireGuardMacOS();
       case "win32":
-        return await We();
+        return await checkWireGuardWindows();
       default:
-        return console.warn(`⚠️ Unsupported platform: ${o}`), !1;
+        console.warn(`⚠️ Unsupported platform: ${platform}`);
+        return false;
     }
-  } catch (e) {
-    return console.error("❌ Error checking WireGuard status:", e), !1;
+  } catch (error) {
+    console.error("❌ Error checking WireGuard status:", error);
+    return false;
   }
-}, ke = async () => new Promise((o) => {
-  const e = _("wg", ["show"], {
-    stdio: ["pipe", "pipe", "pipe"]
+};
+const checkWireGuardLinux = async () => {
+  return new Promise((resolve) => {
+    const process2 = spawn("wg", ["show"], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    let output = "";
+    process2.stdout.on("data", (data) => {
+      output += data.toString();
+    });
+    process2.on("exit", (code) => {
+      if (code === 0 && output.trim()) {
+        console.log("🐧 WireGuard active on Linux");
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+    process2.on("error", () => resolve(false));
+    setTimeout(() => resolve(false), 5e3);
   });
-  let n = "";
-  e.stdout.on("data", (t) => {
-    n += t.toString();
-  }), e.on("exit", (t) => {
-    t === 0 && n.trim() ? (console.log("🐧 WireGuard active on Linux"), o(!0)) : o(!1);
-  }), e.on("error", () => o(!1)), setTimeout(() => o(!1), 5e3);
-}), Le = async () => new Promise((o) => {
-  const e = _("wg", ["show"], {
-    stdio: ["pipe", "pipe", "pipe"]
+};
+const checkWireGuardMacOS = async () => {
+  return new Promise((resolve) => {
+    const process2 = spawn("wg", ["show"], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    let output = "";
+    process2.stdout.on("data", (data) => {
+      output += data.toString();
+    });
+    process2.on("exit", (code) => {
+      if (code === 0 && output.trim()) {
+        console.log("🍎 WireGuard active on macOS");
+        resolve(true);
+      } else {
+        checkMacOSNetworkInterfaces().then(resolve);
+      }
+    });
+    process2.on("error", () => {
+      checkMacOSNetworkInterfaces().then(resolve);
+    });
+    setTimeout(() => resolve(false), 5e3);
   });
-  let n = "";
-  e.stdout.on("data", (t) => {
-    n += t.toString();
-  }), e.on("exit", (t) => {
-    t === 0 && n.trim() ? (console.log("🍎 WireGuard active on macOS"), o(!0)) : Y().then(o);
-  }), e.on("error", () => {
-    Y().then(o);
-  }), setTimeout(() => o(!1), 5e3);
-}), Y = async () => new Promise((o) => {
-  const e = _("ifconfig", [], {
-    stdio: ["pipe", "pipe", "pipe"]
+};
+const checkMacOSNetworkInterfaces = async () => {
+  return new Promise((resolve) => {
+    const process2 = spawn("ifconfig", [], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    let output = "";
+    process2.stdout.on("data", (data) => {
+      output += data.toString();
+    });
+    process2.on("exit", () => {
+      const hasWG = output.includes("utun") || output.includes("tun") || output.includes("wg");
+      resolve(hasWG);
+    });
+    process2.on("error", () => resolve(false));
+    setTimeout(() => resolve(false), 5e3);
   });
-  let n = "";
-  e.stdout.on("data", (t) => {
-    n += t.toString();
-  }), e.on("exit", () => {
-    const t = n.includes("utun") || n.includes("tun") || n.includes("wg");
-    o(t);
-  }), e.on("error", () => o(!1)), setTimeout(() => o(!1), 5e3);
-}), We = async () => {
-  if (console.log("🪟 Starting comprehensive Windows VPN detection..."), console.log("🔍 PRIMARY CHECK: IP geolocation (mandatory)..."), !await Ve())
-    return console.log("❌ IP geolocation check FAILED - not connected to Australian VPN"), console.log("🚨 CRITICAL: User appears to be browsing from non-Australian IP"), console.log("🔍 Running diagnostic checks for troubleshooting..."), await Z(), await J(), await X(), console.log("⚠️  Note: Ping connectivity to VPN server does not indicate active VPN connection"), !1;
-  console.log("✅ IP geolocation check PASSED - Australian VPN confirmed"), console.log("🔍 Running secondary verification checks...");
-  const e = await Z(), n = await J(), t = await X();
-  return console.log(e || n || t ? "✅ Secondary checks confirm WireGuard is properly configured" : "⚠️  Secondary checks inconclusive, but IP location confirms VPN is working"), !0;
-}, Z = async () => new Promise((o) => {
-  console.log("🔍 Checking WireGuard CLI...");
-  const e = _("wg", ["show"], {
-    stdio: ["pipe", "pipe", "pipe"]
+};
+const checkWireGuardWindows = async () => {
+  console.log("🪟 Starting comprehensive Windows VPN detection...");
+  console.log("🔍 PRIMARY CHECK: IP geolocation (mandatory)...");
+  const ipResult = await checkCurrentIP();
+  if (!ipResult) {
+    console.log("❌ IP geolocation check FAILED - not connected to Australian VPN");
+    console.log("🚨 CRITICAL: User appears to be browsing from non-Australian IP");
+    console.log("🔍 Running diagnostic checks for troubleshooting...");
+    await checkWireGuardCLI();
+    await checkWindowsNetworkInterfaces();
+    await checkRoutingTable();
+    console.log("⚠️  Note: Ping connectivity to VPN server does not indicate active VPN connection");
+    return false;
+  }
+  console.log("✅ IP geolocation check PASSED - Australian VPN confirmed");
+  console.log("🔍 Running secondary verification checks...");
+  const cliResult = await checkWireGuardCLI();
+  const interfaceResult = await checkWindowsNetworkInterfaces();
+  const routingResult = await checkRoutingTable();
+  if (cliResult || interfaceResult || routingResult) {
+    console.log("✅ Secondary checks confirm WireGuard is properly configured");
+  } else {
+    console.log("⚠️  Secondary checks inconclusive, but IP location confirms VPN is working");
+  }
+  return true;
+};
+const checkWireGuardCLI = async () => {
+  return new Promise((resolve) => {
+    console.log("🔍 Checking WireGuard CLI...");
+    const wgProcess = spawn("wg", ["show"], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    let wgOutput = "";
+    wgProcess.stdout.on("data", (data) => {
+      wgOutput += data.toString();
+    });
+    wgProcess.on("exit", (code) => {
+      console.log(`🔍 WireGuard CLI exit code: ${code}`);
+      console.log(`🔍 WireGuard CLI output: "${wgOutput.trim()}"`);
+      if (code === 0 && wgOutput.trim()) {
+        console.log("🪟 WireGuard active on Windows (CLI)");
+        resolve(true);
+        return;
+      }
+      resolve(false);
+    });
+    wgProcess.on("error", (error) => {
+      console.log("🔍 WireGuard CLI error:", error.message);
+      resolve(false);
+    });
+    setTimeout(() => {
+      console.log("🔍 WireGuard CLI check timed out");
+      resolve(false);
+    }, 3e3);
   });
-  let n = "";
-  e.stdout.on("data", (t) => {
-    n += t.toString();
-  }), e.on("exit", (t) => {
-    if (console.log(`🔍 WireGuard CLI exit code: ${t}`), console.log(`🔍 WireGuard CLI output: "${n.trim()}"`), t === 0 && n.trim()) {
-      console.log("🪟 WireGuard active on Windows (CLI)"), o(!0);
-      return;
-    }
-    o(!1);
-  }), e.on("error", (t) => {
-    console.log("🔍 WireGuard CLI error:", t.message), o(!1);
-  }), setTimeout(() => {
-    console.log("🔍 WireGuard CLI check timed out"), o(!1);
-  }, 3e3);
-}), J = async () => new Promise((o) => {
-  console.log("🔍 Checking network interfaces via netsh...");
-  const e = _("netsh", ["interface", "show", "interface"], {
-    stdio: ["pipe", "pipe", "pipe"]
+};
+const checkWindowsNetworkInterfaces = async () => {
+  return new Promise((resolve) => {
+    console.log("🔍 Checking network interfaces via netsh...");
+    const netshProcess = spawn("netsh", ["interface", "show", "interface"], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    let output = "";
+    netshProcess.stdout.on("data", (data) => {
+      output += data.toString();
+    });
+    netshProcess.on("exit", () => {
+      console.log("🔍 Network interfaces output:");
+      console.log(output);
+      const hasWireGuard = output.toLowerCase().includes("wireguard") || output.toLowerCase().includes("wg") || output.toLowerCase().includes("tun");
+      console.log(`🔍 WireGuard interface found: ${hasWireGuard}`);
+      if (hasWireGuard) {
+        console.log("🪟 WireGuard interface detected on Windows");
+      }
+      resolve(hasWireGuard);
+    });
+    netshProcess.on("error", (error) => {
+      console.log("🔍 Network interface check error:", error.message);
+      resolve(false);
+    });
+    setTimeout(() => {
+      console.log("🔍 Network interface check timed out");
+      resolve(false);
+    }, 3e3);
   });
-  let n = "";
-  e.stdout.on("data", (t) => {
-    n += t.toString();
-  }), e.on("exit", () => {
-    console.log("🔍 Network interfaces output:"), console.log(n);
-    const t = n.toLowerCase().includes("wireguard") || n.toLowerCase().includes("wg") || n.toLowerCase().includes("tun");
-    console.log(`🔍 WireGuard interface found: ${t}`), t && console.log("🪟 WireGuard interface detected on Windows"), o(t);
-  }), e.on("error", (t) => {
-    console.log("🔍 Network interface check error:", t.message), o(!1);
-  }), setTimeout(() => {
-    console.log("🔍 Network interface check timed out"), o(!1);
-  }, 3e3);
-}), X = async () => new Promise((o) => {
-  console.log("🔍 Checking routing table...");
-  const n = (process.env.WIREGUARD_ENDPOINT || "134.199.169.102:59926").split(":")[0];
-  console.log(`🔍 Looking for routes to server: ${n}`);
-  const t = _("route", ["print"], {
-    stdio: ["pipe", "pipe", "pipe"]
+};
+const checkRoutingTable = async () => {
+  return new Promise((resolve) => {
+    console.log("🔍 Checking routing table...");
+    const endpoint = process.env.WIREGUARD_ENDPOINT || "134.199.169.102:59926";
+    const serverIP = endpoint.split(":")[0];
+    console.log(`🔍 Looking for routes to server: ${serverIP}`);
+    const routeProcess = spawn("route", ["print"], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    let output = "";
+    routeProcess.stdout.on("data", (data) => {
+      output += data.toString();
+    });
+    routeProcess.on("exit", () => {
+      const hasServerRoute = output.includes(serverIP);
+      console.log(`🔍 Route to VPN server found: ${hasServerRoute}`);
+      if (hasServerRoute) {
+        console.log(`🪟 Found route to VPN server ${serverIP}`);
+      }
+      resolve(hasServerRoute);
+    });
+    routeProcess.on("error", (error) => {
+      console.log("🔍 Route check error:", error.message);
+      resolve(false);
+    });
+    setTimeout(() => {
+      console.log("🔍 Route check timed out");
+      resolve(false);
+    }, 3e3);
   });
-  let a = "";
-  t.stdout.on("data", (c) => {
-    a += c.toString();
-  }), t.on("exit", () => {
-    const c = a.includes(n);
-    console.log(`🔍 Route to VPN server found: ${c}`), c && console.log(`🪟 Found route to VPN server ${n}`), o(c);
-  }), t.on("error", (c) => {
-    console.log("🔍 Route check error:", c.message), o(!1);
-  }), setTimeout(() => {
-    console.log("🔍 Route check timed out"), o(!1);
-  }, 3e3);
-}), Ve = async () => new Promise((o) => {
-  console.log("🔍 Checking current public IP and location...");
-  const n = _("powershell", ["-Command", '(Invoke-WebRequest -Uri "https://ipinfo.io/json" -UseBasicParsing).Content | ConvertFrom-Json | ConvertTo-Json -Compress'], {
-    stdio: ["pipe", "pipe", "pipe"]
+};
+const checkCurrentIP = async () => {
+  return new Promise((resolve) => {
+    console.log("🔍 Checking current public IP and location...");
+    const psCommand = `(Invoke-WebRequest -Uri "https://ipinfo.io/json" -UseBasicParsing).Content | ConvertFrom-Json | ConvertTo-Json -Compress`;
+    const psProcess = spawn("powershell", ["-Command", psCommand], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    let output = "";
+    psProcess.stdout.on("data", (data) => {
+      output += data.toString();
+    });
+    psProcess.on("exit", () => {
+      try {
+        const ipInfo = JSON.parse(output.trim());
+        const currentIP = ipInfo.ip;
+        const country = ipInfo.country;
+        const region = ipInfo.region;
+        const city = ipInfo.city;
+        console.log(`🔍 Current public IP: ${currentIP}`);
+        console.log(`🔍 Location: ${city}, ${region}, ${country}`);
+        const isAustralianIP = country === "AU" || country === "Australia";
+        if (isAustralianIP) {
+          console.log("🇦🇺 ✅ Connected via Australian VPN!");
+          console.log(`📍 Australian location detected: ${city}, ${region}`);
+        } else {
+          console.log(`❌ Not connected to Australian VPN. Current location: ${country}`);
+        }
+        resolve(isAustralianIP);
+      } catch (error) {
+        console.log("🔍 Failed to parse IP info:", error);
+        console.log("🔍 Raw output:", output);
+        const ipOnlyCommand = `(Invoke-WebRequest -Uri "https://ipinfo.io/ip" -UseBasicParsing).Content.Trim()`;
+        const fallbackProcess = spawn("powershell", ["-Command", ipOnlyCommand], {
+          stdio: ["pipe", "pipe", "pipe"]
+        });
+        let fallbackOutput = "";
+        fallbackProcess.stdout.on("data", (data) => {
+          fallbackOutput += data.toString();
+        });
+        fallbackProcess.on("exit", () => {
+          const ip = fallbackOutput.trim();
+          console.log(`🔍 Fallback IP check: ${ip}`);
+          const isNotLocalIP = !ip.startsWith("192.168.") && !ip.startsWith("10.") && !ip.startsWith("172.") && ip !== "127.0.0.1";
+          console.log(`🔍 Assuming VPN status based on non-local IP: ${isNotLocalIP}`);
+          resolve(isNotLocalIP);
+        });
+        fallbackProcess.on("error", () => {
+          resolve(false);
+        });
+      }
+    });
+    psProcess.on("error", (error) => {
+      console.log("🔍 IP check error:", error.message);
+      resolve(false);
+    });
+    setTimeout(() => {
+      console.log("🔍 IP check timed out");
+      resolve(false);
+    }, 1e4);
   });
-  let t = "";
-  n.stdout.on("data", (a) => {
-    t += a.toString();
-  }), n.on("exit", () => {
-    try {
-      const a = JSON.parse(t.trim()), c = a.ip, f = a.country, i = a.region, r = a.city;
-      console.log(`🔍 Current public IP: ${c}`), console.log(`🔍 Location: ${r}, ${i}, ${f}`);
-      const s = f === "AU" || f === "Australia";
-      s ? (console.log("🇦🇺 ✅ Connected via Australian VPN!"), console.log(`📍 Australian location detected: ${r}, ${i}`)) : console.log(`❌ Not connected to Australian VPN. Current location: ${f}`), o(s);
-    } catch (a) {
-      console.log("🔍 Failed to parse IP info:", a), console.log("🔍 Raw output:", t);
-      const f = _("powershell", ["-Command", '(Invoke-WebRequest -Uri "https://ipinfo.io/ip" -UseBasicParsing).Content.Trim()'], {
-        stdio: ["pipe", "pipe", "pipe"]
-      });
-      let i = "";
-      f.stdout.on("data", (r) => {
-        i += r.toString();
-      }), f.on("exit", () => {
-        const r = i.trim();
-        console.log(`🔍 Fallback IP check: ${r}`);
-        const s = !r.startsWith("192.168.") && !r.startsWith("10.") && !r.startsWith("172.") && r !== "127.0.0.1";
-        console.log(`🔍 Assuming VPN status based on non-local IP: ${s}`), o(s);
-      }), f.on("error", () => {
-        o(!1);
-      });
-    }
-  }), n.on("error", (a) => {
-    console.log("🔍 IP check error:", a.message), o(!1);
-  }), setTimeout(() => {
-    console.log("🔍 IP check timed out"), o(!1);
-  }, 1e4);
-}), Ue = async () => {
+};
+const disconnectWireGuard = async () => {
   try {
-    const o = process.env.WIREGUARD_CONFIG_PATH || "./config/wireguard-australia.conf", e = w.resolve(o), n = process.platform;
-    switch (console.log(`🔌 Disconnecting WireGuard on ${n}...`), n) {
+    const configPath = process.env.WIREGUARD_CONFIG_PATH || "./config/wireguard-australia.conf";
+    const resolvedPath = path.resolve(configPath);
+    const platform = process.platform;
+    console.log(`🔌 Disconnecting WireGuard on ${platform}...`);
+    switch (platform) {
       case "linux":
       case "darwin":
-        return await xe(e);
+        return await disconnectWireGuardUnix(resolvedPath);
       case "win32":
-        return await Ge();
+        return await disconnectWireGuardWindows();
       default:
-        return console.error(`❌ Unsupported platform: ${n}`), !1;
+        console.error(`❌ Unsupported platform: ${platform}`);
+        return false;
     }
-  } catch (o) {
-    return console.error("❌ WireGuard disconnect setup error:", o), !1;
+  } catch (error) {
+    console.error("❌ WireGuard disconnect setup error:", error);
+    return false;
   }
-}, xe = async (o) => new Promise((e) => {
-  const n = _("wg-quick", ["down", o], {
-    stdio: ["pipe", "pipe", "pipe"]
+};
+const disconnectWireGuardUnix = async (configPath) => {
+  return new Promise((resolve) => {
+    const downProcess = spawn("wg-quick", ["down", configPath], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    downProcess.on("exit", (code) => {
+      wireguardProcess = null;
+      if (code === 0) {
+        console.log("✅ WireGuard disconnected successfully");
+        resolve(true);
+      } else {
+        console.error(`❌ WireGuard disconnection failed with code: ${code}`);
+        resolve(false);
+      }
+    });
+    downProcess.on("error", (error) => {
+      console.error("❌ WireGuard disconnect error:", error);
+      resolve(false);
+    });
+    setTimeout(() => resolve(false), 15e3);
   });
-  n.on("exit", (t) => {
-    ne = null, t === 0 ? (console.log("✅ WireGuard disconnected successfully"), e(!0)) : (console.error(`❌ WireGuard disconnection failed with code: ${t}`), e(!1));
-  }), n.on("error", (t) => {
-    console.error("❌ WireGuard disconnect error:", t), e(!1);
-  }), setTimeout(() => e(!1), 15e3);
-}), Ge = async () => (console.log("🪟 On Windows, please disconnect manually via WireGuard GUI"), console.log("   1. Open WireGuard application"), console.log('   2. Click "Deactivate" on your tunnel'), !0), $e = () => {
-  const o = W.defaultSession, e = W.fromPartition("persist:shared-auth");
-  e.webRequest.onBeforeRequest((i, r) => {
-    const s = i.url.toLowerCase();
-    if (s.startsWith("chrome-extension://") || s.startsWith("moz-extension://") || s.startsWith("extension://")) {
-      r({ cancel: !1 });
+};
+const disconnectWireGuardWindows = async () => {
+  console.log("🪟 On Windows, please disconnect manually via WireGuard GUI");
+  console.log("   1. Open WireGuard application");
+  console.log('   2. Click "Deactivate" on your tunnel');
+  return true;
+};
+const configureSecureSession = () => {
+  const defaultSession = session.defaultSession;
+  const sharedAuthSession = session.fromPartition("persist:shared-auth");
+  sharedAuthSession.webRequest.onBeforeRequest((details, callback) => {
+    const url = details.url.toLowerCase();
+    if (url.startsWith("chrome-extension://") || url.startsWith("moz-extension://") || url.startsWith("extension://")) {
+      callback({ cancel: false });
       return;
     }
-    if (s.includes("localhost") || s.includes("127.0.0.1") || s.startsWith("file://") || s.startsWith("data:")) {
-      r({ cancel: !1 });
+    if (url.includes("localhost") || url.includes("127.0.0.1") || url.startsWith("file://") || url.startsWith("data:")) {
+      callback({ cancel: false });
       return;
     }
-    if (s.includes("clerk.dev") || s.includes("clerk.com") || s.includes("clerk.accounts.dev")) {
-      console.log("✅ Allowing Clerk auth request:", i.url), r({ cancel: !1 });
+    if (url.includes("clerk.dev") || url.includes("clerk.com") || url.includes("clerk.accounts.dev")) {
+      console.log("✅ Allowing Clerk auth request:", details.url);
+      callback({ cancel: false });
       return;
     }
-    if (s.startsWith("http://")) {
-      console.log("🚫 Blocking insecure HTTP request:", i.url), r({ cancel: !0 });
+    if (url.startsWith("http://")) {
+      console.log("🚫 Blocking insecure HTTP request:", details.url);
+      callback({ cancel: true });
       return;
     }
-    if (s.startsWith("https://")) {
-      console.log("✅ Allowing HTTPS auth request:", i.url), r({ cancel: !1 });
+    if (url.startsWith("https://")) {
+      console.log("✅ Allowing HTTPS auth request:", details.url);
+      callback({ cancel: false });
       return;
     }
-    r({ cancel: !1 });
-  }), e.webRequest.onBeforeSendHeaders((i, r) => {
-    let s = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-    (i.url.includes("accounts.google.com") || i.url.includes("googleapis.com")) && (s = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"), r({
+    callback({ cancel: false });
+  });
+  sharedAuthSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    let userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    if (details.url.includes("accounts.google.com") || details.url.includes("googleapis.com")) {
+      userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
+    }
+    callback({
       requestHeaders: {
-        ...i.requestHeaders,
-        "User-Agent": s,
+        ...details.requestHeaders,
+        "User-Agent": userAgent,
         // Add additional headers for OAuth compatibility
         "Sec-Fetch-Site": "cross-site",
         "Sec-Fetch-Mode": "navigate",
@@ -703,142 +1113,184 @@ const C = (o) => {
       }
     });
   });
-  const n = (i, r, s) => {
-    if (console.log("🎯 Download detected from", s, ":", {
-      filename: r.getFilename(),
-      url: r.getURL(),
-      size: r.getTotalBytes(),
+  const handleDownload = (event, item, sessionName) => {
+    console.log("🎯 Download detected from", sessionName, ":", {
+      filename: item.getFilename(),
+      url: item.getURL(),
+      size: item.getTotalBytes(),
       blocked: process.env.SECURITY_BLOCK_DOWNLOADS === "true"
-    }), process.env.SECURITY_BLOCK_DOWNLOADS === "true") {
-      console.log("🚫 Blocking download (SECURITY_BLOCK_DOWNLOADS=true):", r.getFilename()), i.preventDefault(), P.forEach((g) => {
-        g && !g.isDestroyed() && g.webContents.send("download-blocked", {
-          filename: r.getFilename(),
-          url: r.getURL(),
-          size: r.getTotalBytes()
-        });
+    });
+    if (process.env.SECURITY_BLOCK_DOWNLOADS === "true") {
+      console.log("🚫 Blocking download (SECURITY_BLOCK_DOWNLOADS=true):", item.getFilename());
+      event.preventDefault();
+      windows.forEach((window2) => {
+        if (window2 && !window2.isDestroyed()) {
+          window2.webContents.send("download-blocked", {
+            filename: item.getFilename(),
+            url: item.getURL(),
+            size: item.getTotalBytes()
+          });
+        }
       });
       return;
     }
-    console.log("✅ Download allowed from", s, ":", r.getFilename());
-    const l = `download_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, d = {
-      id: l,
-      filename: r.getFilename(),
-      url: r.getURL(),
-      totalBytes: r.getTotalBytes()
+    console.log("✅ Download allowed from", sessionName, ":", item.getFilename());
+    const downloadId = `download_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const downloadStartedData = {
+      id: downloadId,
+      filename: item.getFilename(),
+      url: item.getURL(),
+      totalBytes: item.getTotalBytes()
     };
-    console.log("📤 Sending download-started event from", s, ":", d), P.forEach((g) => {
-      g && !g.isDestroyed() && g.webContents.send("download-started", d);
-    }), r.on("updated", (g, p) => {
-      const u = {
-        id: l,
-        filename: r.getFilename(),
-        state: p,
-        receivedBytes: r.getReceivedBytes(),
-        totalBytes: r.getTotalBytes(),
-        speed: r.getCurrentBytesPerSecond ? r.getCurrentBytesPerSecond() : 0
+    console.log("📤 Sending download-started event from", sessionName, ":", downloadStartedData);
+    windows.forEach((window2) => {
+      if (window2 && !window2.isDestroyed()) {
+        window2.webContents.send("download-started", downloadStartedData);
+      }
+    });
+    item.on("updated", (_event, state) => {
+      const progressData = {
+        id: downloadId,
+        filename: item.getFilename(),
+        state,
+        receivedBytes: item.getReceivedBytes(),
+        totalBytes: item.getTotalBytes(),
+        speed: item.getCurrentBytesPerSecond ? item.getCurrentBytesPerSecond() : 0
       };
       console.log("📤 Sending download-progress event:", {
-        id: l,
-        progress: `${u.receivedBytes}/${u.totalBytes}`,
-        percent: Math.round(u.receivedBytes / u.totalBytes * 100)
-      }), P.forEach((h) => {
-        h && !h.isDestroyed() && h.webContents.send("download-progress", u);
+        id: downloadId,
+        progress: `${progressData.receivedBytes}/${progressData.totalBytes}`,
+        percent: Math.round(progressData.receivedBytes / progressData.totalBytes * 100)
       });
-    }), r.once("done", (g, p) => {
-      const u = {
-        id: l,
-        filename: r.getFilename(),
-        state: p,
-        filePath: p === "completed" ? r.getSavePath() : null
+      windows.forEach((window2) => {
+        if (window2 && !window2.isDestroyed()) {
+          window2.webContents.send("download-progress", progressData);
+        }
+      });
+    });
+    item.once("done", (_event, state) => {
+      const completedData = {
+        id: downloadId,
+        filename: item.getFilename(),
+        state,
+        filePath: state === "completed" ? item.getSavePath() : null
       };
-      console.log("📤 Sending download-completed event:", u), P.forEach((h) => {
-        h && !h.isDestroyed() && h.webContents.send("download-completed", u);
+      console.log("📤 Sending download-completed event:", completedData);
+      windows.forEach((window2) => {
+        if (window2 && !window2.isDestroyed()) {
+          window2.webContents.send("download-completed", completedData);
+        }
       });
     });
   };
-  o.on("will-download", (i, r) => {
-    n(i, r, "default-session");
-  }), e.on("will-download", (i, r) => {
-    n(i, r, "shared-auth-session");
-  }), W.fromPartition("persist:main").on("will-download", (i, r) => {
-    n(i, r, "webview-session");
+  defaultSession.on("will-download", (event, item) => {
+    handleDownload(event, item, "default-session");
   });
-  const a = async () => {
+  sharedAuthSession.on("will-download", (event, item) => {
+    handleDownload(event, item, "shared-auth-session");
+  });
+  const webviewSession = session.fromPartition("persist:main");
+  webviewSession.on("will-download", (event, item) => {
+    handleDownload(event, item, "webview-session");
+  });
+  const enable1PasswordExtension = async () => {
     try {
-      const i = await f();
-      i ? (await o.loadExtension(i), console.log("✅ 1Password extension loaded successfully on default session")) : console.log("📝 1Password extension not found - users can install it manually");
-    } catch (i) {
-      console.warn("⚠️ Could not load 1Password extension on default session:", i), console.log("📝 Users can install 1Password extension manually from their browser");
+      const extensionPath = await find1PasswordExtension();
+      if (extensionPath) {
+        await defaultSession.loadExtension(extensionPath);
+        console.log("✅ 1Password extension loaded successfully on default session");
+      } else {
+        console.log("📝 1Password extension not found - users can install it manually");
+      }
+    } catch (error) {
+      console.warn("⚠️ Could not load 1Password extension on default session:", error);
+      console.log("📝 Users can install 1Password extension manually from their browser");
     }
-  }, c = async (i) => {
+  };
+  const enable1PasswordExtensionForSession = async (targetSession) => {
     try {
-      const r = await f();
-      r ? (await i.loadExtension(r), console.log("✅ 1Password extension loaded successfully on shared auth session")) : console.log("📝 1Password extension not found for shared session - users can install it manually");
-    } catch (r) {
-      console.warn("⚠️ Could not load 1Password extension on shared session:", r), console.log("📝 Users can install 1Password extension manually from their browser");
+      const extensionPath = await find1PasswordExtension();
+      if (extensionPath) {
+        await targetSession.loadExtension(extensionPath);
+        console.log("✅ 1Password extension loaded successfully on shared auth session");
+      } else {
+        console.log("📝 1Password extension not found for shared session - users can install it manually");
+      }
+    } catch (error) {
+      console.warn("⚠️ Could not load 1Password extension on shared session:", error);
+      console.log("📝 Users can install 1Password extension manually from their browser");
     }
-  }, f = async () => {
-    const i = [
+  };
+  const find1PasswordExtension = async () => {
+    const possiblePaths = [
       // Chrome/Chromium paths
-      w.join(S(), "AppData", "Local", "Google", "Chrome", "User Data", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
-      w.join(S(), "Library", "Application Support", "Google", "Chrome", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
-      w.join(S(), ".config", "google-chrome", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
+      path.join(homedir(), "AppData", "Local", "Google", "Chrome", "User Data", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
+      path.join(homedir(), "Library", "Application Support", "Google", "Chrome", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
+      path.join(homedir(), ".config", "google-chrome", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
       // Edge paths
-      w.join(S(), "AppData", "Local", "Microsoft", "Edge", "User Data", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
-      w.join(S(), "Library", "Application Support", "Microsoft Edge", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
+      path.join(homedir(), "AppData", "Local", "Microsoft", "Edge", "User Data", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
+      path.join(homedir(), "Library", "Application Support", "Microsoft Edge", "Default", "Extensions", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"),
       // Firefox paths (1Password uses different ID)
-      w.join(S(), "AppData", "Roaming", "Mozilla", "Firefox", "Profiles"),
-      w.join(S(), "Library", "Application Support", "Firefox", "Profiles"),
-      w.join(S(), ".mozilla", "firefox")
+      path.join(homedir(), "AppData", "Roaming", "Mozilla", "Firefox", "Profiles"),
+      path.join(homedir(), "Library", "Application Support", "Firefox", "Profiles"),
+      path.join(homedir(), ".mozilla", "firefox")
     ];
-    for (const r of i)
+    for (const basePath of possiblePaths) {
       try {
-        if (await A.access(r).then(() => !0).catch(() => !1)) {
-          const l = (await A.readdir(r)).filter((d) => /^\d+\.\d+\.\d+/.test(d));
-          if (l.length > 0) {
-            const d = l.sort((u, h) => h.localeCompare(u))[0], g = w.join(r, d), p = w.join(g, "manifest.json");
-            if (await A.access(p).then(() => !0).catch(() => !1))
-              return g;
+        if (await promises.access(basePath).then(() => true).catch(() => false)) {
+          const entries = await promises.readdir(basePath);
+          const versionFolders = entries.filter((entry) => /^\d+\.\d+\.\d+/.test(entry));
+          if (versionFolders.length > 0) {
+            const latestVersion = versionFolders.sort((a, b) => b.localeCompare(a))[0];
+            const extensionPath = path.join(basePath, latestVersion);
+            const manifestPath = path.join(extensionPath, "manifest.json");
+            if (await promises.access(manifestPath).then(() => true).catch(() => false)) {
+              return extensionPath;
+            }
           }
         }
-      } catch {
+      } catch (error) {
       }
+    }
     return null;
   };
-  o.webRequest.onBeforeRequest((i, r) => {
-    const s = i.url.toLowerCase();
-    if (s.startsWith("chrome-extension://") || s.startsWith("moz-extension://") || s.startsWith("extension://")) {
-      r({ cancel: !1 });
+  defaultSession.webRequest.onBeforeRequest((details, callback) => {
+    const url = details.url.toLowerCase();
+    if (url.startsWith("chrome-extension://") || url.startsWith("moz-extension://") || url.startsWith("extension://")) {
+      callback({ cancel: false });
       return;
     }
-    if (s.includes("localhost") || s.includes("127.0.0.1") || s.startsWith("file://") || s.startsWith("data:")) {
-      r({ cancel: !1 });
+    if (url.includes("localhost") || url.includes("127.0.0.1") || url.startsWith("file://") || url.startsWith("data:")) {
+      callback({ cancel: false });
       return;
     }
-    if (s.startsWith("http://")) {
-      console.log("🚫 Blocking insecure HTTP request:", i.url), r({ cancel: !0 });
+    if (url.startsWith("http://")) {
+      console.log("🚫 Blocking insecure HTTP request:", details.url);
+      callback({ cancel: true });
       return;
     }
-    if (s.startsWith("https://")) {
-      console.log("✅ Allowing HTTPS request:", i.url), r({ cancel: !1 });
+    if (url.startsWith("https://")) {
+      console.log("✅ Allowing HTTPS request:", details.url);
+      callback({ cancel: false });
       return;
     }
-    r({ cancel: !1 });
-  }), o.webRequest.onHeadersReceived((i, r) => {
-    const s = i.url.toLowerCase();
-    if (s.includes("office.com") || s.includes("microsoft.com") || s.includes("google.com") || s.includes("sharepoint.com")) {
-      r({
+    callback({ cancel: false });
+  });
+  defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const url = details.url.toLowerCase();
+    if (url.includes("office.com") || url.includes("microsoft.com") || url.includes("google.com") || url.includes("sharepoint.com")) {
+      callback({
         responseHeaders: {
-          ...i.responseHeaders,
+          ...details.responseHeaders,
           "X-Content-Type-Options": ["nosniff"],
           "Referrer-Policy": ["strict-origin-when-cross-origin"]
         }
       });
       return;
     }
-    r({
+    callback({
       responseHeaders: {
-        ...i.responseHeaders,
+        ...details.responseHeaders,
         "X-Frame-Options": ["SAMEORIGIN"],
         "X-Content-Type-Options": ["nosniff"],
         "Referrer-Policy": ["strict-origin-when-cross-origin"],
@@ -848,126 +1300,71 @@ const C = (o) => {
         ]
       }
     });
-  }), o.webRequest.onBeforeSendHeaders((i, r) => {
-    const s = i.url.toLowerCase();
-    let l = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-    (s.includes("accounts.google.com") || s.includes("googleapis.com")) && (l = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"), r({
+  });
+  defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const url = details.url.toLowerCase();
+    let userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    if (url.includes("accounts.google.com") || url.includes("googleapis.com")) {
+      userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
+    }
+    callback({
       requestHeaders: {
-        ...i.requestHeaders,
-        "User-Agent": l,
+        ...details.requestHeaders,
+        "User-Agent": userAgent,
         // Add additional headers for OAuth compatibility
         "Sec-Fetch-Site": "cross-site",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Dest": "document"
       }
     });
-  }), setTimeout(async () => {
-    await a(), await c(e);
+  });
+  setTimeout(async () => {
+    await enable1PasswordExtension();
+    await enable1PasswordExtensionForSession(sharedAuthSession);
   }, 1e3);
 };
-function se(o = !1) {
-  const e = new R({
+function createBrowserWindow(isMain = false) {
+  const newWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1200,
     minHeight: 700,
-    icon: w.join(V, "../build/icon.png"),
+    icon: path.join(__dirname, "../build/icon.png"),
     titleBarStyle: "default",
-    show: !1,
+    show: false,
     // Don't show until ready
     webPreferences: {
-      preload: w.join(V, "preload.cjs"),
+      preload: path.join(__dirname, "preload.cjs"),
       // Security: Enable webview for controlled browsing
-      webviewTag: !0,
+      webviewTag: true,
       // Security: Disable node integration
-      nodeIntegration: !1,
+      nodeIntegration: false,
       // Security: Enable context isolation
-      contextIsolation: !0,
+      contextIsolation: true,
       // Security: Enable web security
-      webSecurity: !0,
+      webSecurity: true,
       // Security: Disable node integration in workers
-      nodeIntegrationInWorker: !1,
+      nodeIntegrationInWorker: false,
       // Security: Disable node integration in subframes  
-      nodeIntegrationInSubFrames: !1,
+      nodeIntegrationInSubFrames: false,
       // 🔐 SHARED SESSION: All windows use the same session partition
       // This ensures authentication state (Clerk tokens, localStorage) is shared
       partition: "persist:shared-auth",
       // Security: Enable sandbox mode
-      sandbox: !1,
+      sandbox: false,
       // Keep false to allow webview
       // Security: Disable experimental features
-      experimentalFeatures: !1,
+      experimentalFeatures: false,
       // Security: Disable web workers
-      enableWebSQL: !1,
+      enableWebSQL: false,
       // Additional security settings
-      allowRunningInsecureContent: !1,
-      plugins: !1
+      allowRunningInsecureContent: false,
+      plugins: false
     }
   });
-  return e.webContents.setWindowOpenHandler((n) => {
-    const t = n.url;
-    return [
-      "https://accounts.google.com",
-      "https://login.microsoftonline.com",
-      "https://github.com/login",
-      "https://clerk.shared.lcl.dev",
-      "https://api.clerk.dev",
-      "https://clerk.dev",
-      "https://major-snipe-9.clerk.accounts.dev"
-    ].some((c) => t.startsWith(c)) ? (console.log("🔐 Opening OAuth in system browser:", t), $.openExternal(t), { action: "deny" }) : { action: "deny" };
-  }), e.webContents.on("before-input-event", (n, t) => {
-    if (t.type === "keyDown" && (t.modifiers.includes("control") || t.modifiers.includes("meta"))) {
-      const a = t.key.toLowerCase();
-      console.log("⌨️ [MAIN] Intercepting keyboard shortcut:", a, t.modifiers);
-      const c = ["t", "n", "w", "r", "h", "j", "=", "+", "-", "_", "0"], f = t.modifiers.includes("shift") && ["o", "i", "t"].includes(a);
-      if (c.includes(a) || f) {
-        console.log("⌨️ [MAIN] Preventing webview from handling critical shortcut:", a), n.preventDefault();
-        let i = "";
-        switch (a) {
-          case "t":
-            t.modifiers.includes("shift") ? i = "task-manager" : i = "new-tab";
-            break;
-          case "n":
-            i = "new-window";
-            break;
-          case "w":
-            i = "close-tab";
-            break;
-          case "r":
-            i = "reload";
-            break;
-          case "h":
-            i = "history";
-            break;
-          case "j":
-            i = "downloads";
-            break;
-          case "=":
-          case "+":
-            i = "zoom-in";
-            break;
-          case "-":
-          case "_":
-            i = "zoom-out";
-            break;
-          case "0":
-            i = "zoom-reset";
-            break;
-          case "o":
-            t.modifiers.includes("shift") && (i = "bookmarks");
-            break;
-        }
-        i && (console.log("⌨️ [MAIN] Sending shortcut action to renderer:", i), setTimeout(() => {
-          e.webContents.send("keyboard-shortcut", i);
-        }, 10));
-      }
-    }
-  }), e.webContents.on("will-navigate", (n, t) => {
-    const a = [
-      I,
-      "file://",
-      "about:blank"
-    ].filter(Boolean), c = [
+  newWindow.webContents.setWindowOpenHandler((details) => {
+    const url = details.url;
+    const oauthProviders = [
       "https://accounts.google.com",
       "https://login.microsoftonline.com",
       "https://github.com/login",
@@ -976,39 +1373,268 @@ function se(o = !1) {
       "https://clerk.dev",
       "https://major-snipe-9.clerk.accounts.dev"
     ];
-    a.some(
-      (i) => t.startsWith(i || "")
-    ) || c.some(
-      (i) => t.startsWith(i)
-    ) ? c.some((i) => t.startsWith(i)) && console.log("🔐 Allowing OAuth navigation to:", t) : (console.log("🚫 Blocking window navigation to:", t), n.preventDefault());
-  }), I ? (e.loadURL(I), process.env.NODE_ENV === "development" && e.webContents.openDevTools()) : e.loadFile(w.join(oe, "index.html")), e.once("ready-to-show", () => {
-    e.show(), e.focus();
-  }), P.push(e), (o || !E) && (E = e, setTimeout(async () => {
-    try {
-      if (await U())
-        console.log("✅ VPN is already connected during app initialization"), C(!0);
-      else if (process.env.VPN_AUTO_CONNECT === "true") {
-        console.log("🔄 VPN not connected, attempting auto-connect...");
-        const t = await q();
-        C(t), t ? console.log("✅ VPN auto-connected successfully") : console.warn("⚠️ VPN auto-connect failed");
-      } else
-        console.log("⚠️ VPN not connected and auto-connect disabled"), C(!1);
-    } catch (n) {
-      console.error("❌ VPN initialization error:", n), C(!1);
+    if (oauthProviders.some((provider) => url.startsWith(provider))) {
+      console.log("🔐 Opening OAuth in system browser:", url);
+      shell.openExternal(url);
+      return { action: "deny" };
     }
-  }, 500)), e.on("closed", () => {
-    const n = P.indexOf(e);
-    n > -1 && P.splice(n, 1), e === E && (P.length > 0 ? E = P[0] : (te().catch((t) => {
-      console.error("❌ Error disconnecting VPN on app close:", t);
-    }), E = null));
-  }), process.env.NODE_ENV === "production" && e.setMenuBarVisibility(!1), e;
+    return { action: "deny" };
+  });
+  newWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.type === "keyDown" && (input.modifiers.includes("control") || input.modifiers.includes("meta"))) {
+      const key = input.key.toLowerCase();
+      console.log("⌨️ [MAIN] Intercepting keyboard shortcut:", key, input.modifiers);
+      const criticalShortcuts = ["t", "n", "w", "r", "h", "j", "=", "+", "-", "_", "0"];
+      const isShiftShortcut = input.modifiers.includes("shift") && ["o", "i", "t"].includes(key);
+      if (criticalShortcuts.includes(key) || isShiftShortcut) {
+        console.log("⌨️ [MAIN] Preventing webview from handling critical shortcut:", key);
+        event.preventDefault();
+        let shortcutAction = "";
+        switch (key) {
+          case "t":
+            if (input.modifiers.includes("shift")) {
+              shortcutAction = "task-manager";
+            } else {
+              shortcutAction = "new-tab";
+            }
+            break;
+          case "n":
+            shortcutAction = "new-window";
+            break;
+          case "w":
+            shortcutAction = "close-tab";
+            break;
+          case "r":
+            shortcutAction = "reload";
+            break;
+          case "h":
+            shortcutAction = "history";
+            break;
+          case "j":
+            shortcutAction = "downloads";
+            break;
+          case "=":
+          case "+":
+            shortcutAction = "zoom-in";
+            break;
+          case "-":
+          case "_":
+            shortcutAction = "zoom-out";
+            break;
+          case "0":
+            shortcutAction = "zoom-reset";
+            break;
+          case "o":
+            if (input.modifiers.includes("shift")) {
+              shortcutAction = "bookmarks";
+            }
+            break;
+        }
+        if (shortcutAction) {
+          console.log("⌨️ [MAIN] Sending shortcut action to renderer:", shortcutAction);
+          setTimeout(() => {
+            newWindow.webContents.send("keyboard-shortcut", shortcutAction);
+          }, 10);
+        }
+      }
+    }
+  });
+  newWindow.webContents.on("will-navigate", (event, navigationUrl) => {
+    const allowedOrigins = [
+      VITE_DEV_SERVER_URL,
+      "file://",
+      "about:blank"
+    ].filter(Boolean);
+    const oauthProviders = [
+      "https://accounts.google.com",
+      "https://login.microsoftonline.com",
+      "https://github.com/login",
+      "https://clerk.shared.lcl.dev",
+      "https://api.clerk.dev",
+      "https://clerk.dev",
+      "https://major-snipe-9.clerk.accounts.dev"
+    ];
+    const isAllowed = allowedOrigins.some(
+      (origin) => navigationUrl.startsWith(origin || "")
+    ) || oauthProviders.some(
+      (provider) => navigationUrl.startsWith(provider)
+    );
+    if (!isAllowed) {
+      console.log("🚫 Blocking window navigation to:", navigationUrl);
+      event.preventDefault();
+    } else if (oauthProviders.some((provider) => navigationUrl.startsWith(provider))) {
+      console.log("🔐 Allowing OAuth navigation to:", navigationUrl);
+    }
+  });
+  if (VITE_DEV_SERVER_URL) {
+    newWindow.loadURL(VITE_DEV_SERVER_URL);
+    if (process.env.NODE_ENV === "development") {
+      newWindow.webContents.openDevTools();
+    }
+  } else {
+    newWindow.loadFile(path.join(RENDERER_DIST, "index.html"));
+  }
+  newWindow.once("ready-to-show", () => {
+    newWindow.show();
+    newWindow.focus();
+  });
+  windows.push(newWindow);
+  if (isMain || !mainWindow) {
+    mainWindow = newWindow;
+    setTimeout(async () => {
+      try {
+        const alreadyConnected = await checkWireGuardConnection();
+        if (alreadyConnected) {
+          console.log("✅ VPN is already connected during app initialization");
+          updateVPNStatus(true);
+        } else if (process.env.VPN_AUTO_CONNECT === "true") {
+          console.log("🔄 VPN not connected, attempting auto-connect...");
+          const connected = await connectVPN();
+          updateVPNStatus(connected);
+          if (connected) {
+            console.log("✅ VPN auto-connected successfully");
+          } else {
+            console.warn("⚠️ VPN auto-connect failed");
+          }
+        } else {
+          console.log("⚠️ VPN not connected and auto-connect disabled");
+          updateVPNStatus(false);
+        }
+      } catch (error) {
+        console.error("❌ VPN initialization error:", error);
+        updateVPNStatus(false);
+      }
+    }, 500);
+  }
+  newWindow.on("closed", () => {
+    const index = windows.indexOf(newWindow);
+    if (index > -1) {
+      windows.splice(index, 1);
+    }
+    if (newWindow === mainWindow) {
+      if (windows.length > 0) {
+        mainWindow = windows[0];
+      } else {
+        disconnectVPN().catch((error) => {
+          console.error("❌ Error disconnecting VPN on app close:", error);
+        });
+        mainWindow = null;
+      }
+    }
+  });
+  if (process.env.NODE_ENV === "production") {
+    newWindow.setMenuBarVisibility(false);
+  }
+  return newWindow;
 }
-function re() {
-  se(!0);
+function createWindow() {
+  createBrowserWindow(true);
 }
-m.handle("system-get-version", () => y.getVersion());
-m.handle("system-get-environment", () => {
-  const o = {
+ipcMain.handle("sharepoint-get-oauth-token", async () => {
+  try {
+    console.log("🔄 Acquiring SharePoint OAuth token in main process...");
+    const clientId = process.env.MSAL_CLIENT_ID;
+    const tenantId = process.env.MSAL_TENANT_ID;
+    const clientSecret = process.env.MSAL_CLIENT_SECRET;
+    if (!clientId || !tenantId || !clientSecret) {
+      throw new Error("MSAL configuration missing in environment variables");
+    }
+    const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+    const params = new URLSearchParams();
+    params.append("client_id", clientId);
+    params.append("client_secret", clientSecret);
+    params.append("scope", "https://graph.microsoft.com/.default");
+    params.append("grant_type", "client_credentials");
+    console.log("📡 Making OAuth request to:", tokenUrl);
+    console.log("🔑 Client ID:", clientId.substring(0, 8) + "...");
+    const response = await fetch(tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: params.toString()
+    });
+    const responseText = await response.text();
+    console.log("📊 OAuth Response Status:", response.status);
+    if (response.ok) {
+      const tokenData = JSON.parse(responseText);
+      if (tokenData.access_token) {
+        console.log("✅ OAuth token acquired successfully in main process");
+        console.log("⏱ Token expires in:", tokenData.expires_in, "seconds");
+        return {
+          success: true,
+          accessToken: tokenData.access_token,
+          expiresIn: tokenData.expires_in,
+          tokenType: tokenData.token_type
+        };
+      } else {
+        throw new Error("No access token in response");
+      }
+    } else {
+      let errorDetails = responseText;
+      try {
+        const errorData = JSON.parse(responseText);
+        errorDetails = `${errorData.error}: ${errorData.error_description}`;
+      } catch {
+      }
+      console.error("❌ OAuth failed:", response.status, response.statusText);
+      console.error("📄 Error details:", errorDetails);
+      throw new Error(`OAuth failed: ${response.status} ${response.statusText} - ${errorDetails}`);
+    }
+  } catch (error) {
+    console.error("❌ Error in sharepoint-get-oauth-token:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error"
+    };
+  }
+});
+ipcMain.handle("sharepoint-graph-request", async (_, { endpoint, accessToken }) => {
+  var _a, _b;
+  try {
+    console.log("📡 Making Graph API request to:", endpoint);
+    const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Accept": "application/json"
+      }
+    });
+    const responseText = await response.text();
+    console.log("📊 Graph API Response Status:", response.status);
+    if (response.ok) {
+      const data = JSON.parse(responseText);
+      console.log("✅ Graph API request successful");
+      return {
+        success: true,
+        data
+      };
+    } else {
+      let errorDetails = responseText;
+      try {
+        const errorData = JSON.parse(responseText);
+        errorDetails = `${(_a = errorData.error) == null ? void 0 : _a.code}: ${(_b = errorData.error) == null ? void 0 : _b.message}`;
+      } catch {
+      }
+      console.error("❌ Graph API failed:", response.status, response.statusText);
+      console.error("📄 Error details:", errorDetails);
+      return {
+        success: false,
+        error: `Graph API failed: ${response.status} ${response.statusText} - ${errorDetails}`
+      };
+    }
+  } catch (error) {
+    console.error("❌ Error in sharepoint-graph-request:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error"
+    };
+  }
+});
+ipcMain.handle("system-get-version", () => {
+  return app.getVersion();
+});
+ipcMain.handle("system-get-environment", () => {
+  const envVars = {
     NODE_ENV: process.env.NODE_ENV,
     APP_NAME: process.env.APP_NAME,
     APP_VERSION: process.env.APP_VERSION,
@@ -1033,9 +1659,13 @@ m.handle("system-get-environment", () => {
     OP_CONNECT_HOST: process.env.OP_CONNECT_HOST,
     OP_CONNECT_TOKEN: process.env.OP_CONNECT_TOKEN,
     SHAREPOINT_TENANT_URL: process.env.SHAREPOINT_TENANT_URL,
+    SHAREPOINT_BASE_URL: process.env.SHAREPOINT_BASE_URL,
     SHAREPOINT_AUTO_LOGIN: process.env.SHAREPOINT_AUTO_LOGIN,
     SHAREPOINT_DEFAULT_ACCESS_LEVEL: process.env.SHAREPOINT_DEFAULT_ACCESS_LEVEL,
     SHAREPOINT_DOCUMENT_LIBRARIES: process.env.SHAREPOINT_DOCUMENT_LIBRARIES,
+    MSAL_CLIENT_ID: process.env.MSAL_CLIENT_ID,
+    MSAL_TENANT_ID: process.env.MSAL_TENANT_ID,
+    MSAL_CLIENT_SECRET: process.env.MSAL_CLIENT_SECRET,
     SECURITY_BLOCK_DOWNLOADS: process.env.SECURITY_BLOCK_DOWNLOADS,
     SECURITY_HTTPS_ONLY: process.env.SECURITY_HTTPS_ONLY,
     SECURITY_FAIL_CLOSED_VPN: process.env.SECURITY_FAIL_CLOSED_VPN,
@@ -1046,276 +1676,355 @@ m.handle("system-get-environment", () => {
     LOG_LEVEL: process.env.LOG_LEVEL,
     LOG_FILE_PATH: process.env.LOG_FILE_PATH
   };
-  return console.log("🔄 Environment variables requested from renderer:", {
-    NODE_ENV: o.NODE_ENV,
-    VPN_PROVIDER: o.VPN_PROVIDER,
-    WIREGUARD_ENDPOINT: o.WIREGUARD_ENDPOINT
-  }), JSON.stringify(o);
+  console.log("🔄 Environment variables requested from renderer:", {
+    NODE_ENV: envVars.NODE_ENV,
+    VPN_PROVIDER: envVars.VPN_PROVIDER,
+    WIREGUARD_ENDPOINT: envVars.WIREGUARD_ENDPOINT
+  });
+  return JSON.stringify(envVars);
 });
-m.handle("vpn-get-status", async () => {
+ipcMain.handle("vpn-get-status", async () => {
   console.log("🔍 VPN status requested - running comprehensive check...");
   try {
-    const o = await U(), e = o ? "connected" : "disconnected";
-    return console.log(`📊 VPN status check result: ${e}`), C(o), e;
-  } catch (o) {
-    return console.error("❌ VPN status check error:", o), "disconnected";
+    const isConnected = await checkWireGuardConnection();
+    const status = isConnected ? "connected" : "disconnected";
+    console.log(`📊 VPN status check result: ${status}`);
+    updateVPNStatus(isConnected);
+    return status;
+  } catch (error) {
+    console.error("❌ VPN status check error:", error);
+    return "disconnected";
   }
 });
-m.handle("vpn-connect", async (o, e) => {
-  console.log(`🌐 VPN connect requested: ${e}`);
+ipcMain.handle("vpn-connect", async (_event, provider) => {
+  console.log(`🌐 VPN connect requested: ${provider}`);
   try {
-    const n = await q();
-    return C(n), n;
-  } catch (n) {
-    return console.error("❌ VPN connection error:", n), C(!1), !1;
+    const success = await connectVPN();
+    updateVPNStatus(success);
+    return success;
+  } catch (error) {
+    console.error("❌ VPN connection error:", error);
+    updateVPNStatus(false);
+    return false;
   }
 });
-m.handle("vpn-disconnect", async () => {
+ipcMain.handle("vpn-disconnect", async () => {
   console.log("🌐 VPN disconnect requested");
   try {
-    const o = await te();
-    return C(!1), o;
-  } catch (o) {
-    return console.error("❌ VPN disconnection error:", o), !1;
+    const success = await disconnectVPN();
+    updateVPNStatus(false);
+    return success;
+  } catch (error) {
+    console.error("❌ VPN disconnection error:", error);
+    return false;
   }
 });
-const qe = async (o) => {
-  const e = process.env.OP_SERVICE_ACCOUNT_TOKEN;
-  if (!e)
+const get1PasswordSecret = async (itemId) => {
+  const serviceAccountToken = process.env.OP_SERVICE_ACCOUNT_TOKEN;
+  if (!serviceAccountToken) {
     throw new Error("1Password Service Account not configured. Set OP_SERVICE_ACCOUNT_TOKEN environment variable.");
+  }
   try {
-    const n = await fetch(`https://my.1password.com/api/v1/items/${o}`, {
+    const response = await fetch(`https://my.1password.com/api/v1/items/${itemId}`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${e}`,
+        "Authorization": `Bearer ${serviceAccountToken}`,
         "Content-Type": "application/json"
       }
     });
-    if (!n.ok)
-      throw new Error(`1Password Service Account API error: ${n.status} ${n.statusText}`);
-    const t = await n.json(), a = {};
-    if (t.fields) {
-      for (const c of t.fields)
-        if (c.label && c.value)
-          switch (c.label.toLowerCase()) {
+    if (!response.ok) {
+      throw new Error(`1Password Service Account API error: ${response.status} ${response.statusText}`);
+    }
+    const item = await response.json();
+    const secrets = {};
+    if (item.fields) {
+      for (const field of item.fields) {
+        if (field.label && field.value) {
+          switch (field.label.toLowerCase()) {
             case "username":
             case "email":
-              a.username = c.value;
+              secrets.username = field.value;
               break;
             case "password":
-              a.password = c.value;
+              secrets.password = field.value;
               break;
             case "tenant_url":
             case "url":
             case "website":
-              a.tenant_url = c.value;
+              secrets.tenant_url = field.value;
               break;
             case "level1_domains":
-              a.level1_domains = c.value;
+              secrets.level1_domains = field.value;
               break;
             case "level2_domains":
-              a.level2_domains = c.value;
+              secrets.level2_domains = field.value;
               break;
             case "level3_enabled":
-              a.level3_enabled = c.value === "true";
+              secrets.level3_enabled = field.value === "true";
               break;
             default:
-              a[c.label.toLowerCase().replace(/\s+/g, "_")] = c.value;
+              secrets[field.label.toLowerCase().replace(/\s+/g, "_")] = field.value;
           }
+        }
+      }
     }
-    return a;
-  } catch (n) {
-    throw new Error(`Failed to retrieve 1Password secret: ${n instanceof Error ? n.message : String(n)}`);
+    return secrets;
+  } catch (error) {
+    throw new Error(`Failed to retrieve 1Password secret: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
-m.handle("vault-get-sharepoint-credentials", async () => {
+ipcMain.handle("vault-get-sharepoint-credentials", async () => {
   console.log("🔑 SharePoint credentials requested from main process");
   try {
-    const o = process.env.VAULT_PROVIDER || "hashicorp";
-    if (process.env.NODE_ENV === "development")
-      return console.log("🔧 Development mode: returning mock vault credentials"), {
+    const vaultProvider = process.env.VAULT_PROVIDER || "hashicorp";
+    if (process.env.NODE_ENV === "development") {
+      console.log("🔧 Development mode: returning mock vault credentials");
+      return {
         username: "dev-user@yourcompany.sharepoint.com",
         password: "dev-password-from-vault",
         lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
       };
-    if (o === "1password" || o === "1password-cli") {
+    }
+    if (vaultProvider === "1password" || vaultProvider === "1password-cli") {
       console.log("🔐 Using 1Password Service Account for credentials");
-      const e = process.env.OP_SHAREPOINT_ITEM_ID || "SharePoint Service Account", n = await qe(e);
+      const itemId = process.env.OP_SHAREPOINT_ITEM_ID || "SharePoint Service Account";
+      const secrets = await get1PasswordSecret(itemId);
       return {
-        username: n.username,
-        password: n.password,
-        tenant_url: n.tenant_url,
+        username: secrets.username,
+        password: secrets.password,
+        tenant_url: secrets.tenant_url,
         lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
       };
-    } else
-      return console.log(`⚠️ Vault provider ${o} not fully implemented`), {
+    } else {
+      console.log(`⚠️ Vault provider ${vaultProvider} not fully implemented`);
+      return {
         username: "vault-user@yourcompany.sharepoint.com",
         password: "vault-retrieved-password",
         lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
       };
-  } catch (o) {
-    throw console.error("❌ Vault credentials retrieval failed:", o), new Error(`Vault credentials unavailable: ${o instanceof Error ? o.message : "Unknown error"}`);
+    }
+  } catch (error) {
+    console.error("❌ Vault credentials retrieval failed:", error);
+    throw new Error(`Vault credentials unavailable: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 });
-m.handle("vault-rotate-credentials", async () => {
+ipcMain.handle("vault-rotate-credentials", async () => {
   console.log("🔄 Vault credential rotation requested from main process");
   try {
-    return process.env.NODE_ENV === "development" && console.log("🔧 Development mode: simulating credential rotation"), !0;
-  } catch (o) {
-    return console.error("❌ Vault credential rotation failed:", o), !1;
+    if (process.env.NODE_ENV === "development") {
+      console.log("🔧 Development mode: simulating credential rotation");
+      return true;
+    }
+    return true;
+  } catch (error) {
+    console.error("❌ Vault credential rotation failed:", error);
+    return false;
   }
 });
-m.handle("vault-get-status", async () => {
-  if (process.env.NODE_ENV === "development")
+ipcMain.handle("vault-get-status", async () => {
+  if (process.env.NODE_ENV === "development") {
     return "connected-dev";
-  const o = process.env.VAULT_PROVIDER || "hashicorp";
+  }
+  const vaultProvider = process.env.VAULT_PROVIDER || "hashicorp";
   try {
-    if (o === "1password" || o === "1password-cli") {
-      const e = process.env.OP_SERVICE_ACCOUNT_TOKEN, n = process.env.OP_SHAREPOINT_ITEM_ID;
-      if (!e)
+    if (vaultProvider === "1password" || vaultProvider === "1password-cli") {
+      const serviceAccountToken = process.env.OP_SERVICE_ACCOUNT_TOKEN;
+      const itemId = process.env.OP_SHAREPOINT_ITEM_ID;
+      if (!serviceAccountToken) {
         return "error: 1Password Service Account not configured";
-      if (!n)
+      }
+      if (!itemId) {
         return "error: SharePoint Item ID not configured";
-      const t = await fetch(`https://my.1password.com/api/v1/items/${n}`, {
+      }
+      const response = await fetch(`https://my.1password.com/api/v1/items/${itemId}`, {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${e}`,
+          "Authorization": `Bearer ${serviceAccountToken}`,
           "Content-Type": "application/json"
         }
       });
-      return t.ok ? (console.log("✅ 1Password Service Account access verified"), "connected") : (console.error("❌ 1Password Service Account access failed:", t.status), "error: Cannot access SharePoint credentials in 1Password");
-    } else
+      if (response.ok) {
+        console.log("✅ 1Password Service Account access verified");
+        return "connected";
+      } else {
+        console.error("❌ 1Password Service Account access failed:", response.status);
+        return "error: Cannot access SharePoint credentials in 1Password";
+      }
+    } else {
       return "connected";
-  } catch (e) {
-    return console.error("❌ Vault status check failed:", e), `error: ${e instanceof Error ? e.message : "Unknown error"}`;
+    }
+  } catch (error) {
+    console.error("❌ Vault status check failed:", error);
+    return `error: ${error instanceof Error ? error.message : "Unknown error"}`;
   }
 });
-m.handle("security-check-url", async (o, e, n) => (console.log(`🔒 URL check: ${e} (Level ${n})`), !0));
-m.handle("security-log-navigation", async (o, e, n, t) => {
-  console.log(`📝 Navigation log: ${e} - ${n ? "ALLOWED" : "BLOCKED"} (Level ${t})`);
+ipcMain.handle("security-check-url", async (_event, url, accessLevel) => {
+  console.log(`🔒 URL check: ${url} (Level ${accessLevel})`);
+  return true;
 });
-m.handle("security-prevent-download", async (o, e) => {
-  console.log(`🚫 Download blocked: ${e}`);
+ipcMain.handle("security-log-navigation", async (_event, url, allowed, accessLevel) => {
+  console.log(`📝 Navigation log: ${url} - ${allowed ? "ALLOWED" : "BLOCKED"} (Level ${accessLevel})`);
 });
-m.handle("shell-open-path", async (o, e) => {
+ipcMain.handle("security-prevent-download", async (_event, filename) => {
+  console.log(`🚫 Download blocked: ${filename}`);
+});
+ipcMain.handle("shell-open-path", async (_event, filePath) => {
   try {
-    console.log("📁 Opening file with system default application:", e);
-    const n = await $.openPath(e);
-    return n ? (console.error("❌ Failed to open file:", n), n) : (console.log("✅ File opened successfully"), null);
-  } catch (n) {
-    return console.error("❌ Error opening file:", n), n instanceof Error ? n.message : "Unknown error";
+    console.log("📁 Opening file with system default application:", filePath);
+    const result = await shell.openPath(filePath);
+    if (result) {
+      console.error("❌ Failed to open file:", result);
+      return result;
+    } else {
+      console.log("✅ File opened successfully");
+      return null;
+    }
+  } catch (error) {
+    console.error("❌ Error opening file:", error);
+    return error instanceof Error ? error.message : "Unknown error";
   }
 });
-m.handle("shell-show-item-in-folder", async (o, e) => {
+ipcMain.handle("shell-show-item-in-folder", async (_event, filePath) => {
   try {
-    return console.log("📂 Revealing file in system file manager:", e), $.showItemInFolder(e), console.log("✅ File revealed in explorer successfully"), null;
-  } catch (n) {
-    return console.error("❌ Error revealing file:", n), n instanceof Error ? n.message : "Unknown error";
+    console.log("📂 Revealing file in system file manager:", filePath);
+    shell.showItemInFolder(filePath);
+    console.log("✅ File revealed in explorer successfully");
+    return null;
+  } catch (error) {
+    console.error("❌ Error revealing file:", error);
+    return error instanceof Error ? error.message : "Unknown error";
   }
 });
-m.handle("save-page-as-pdf", async (o) => {
+ipcMain.handle("save-page-as-pdf", async (_event) => {
   try {
-    const { dialog: e } = require("electron"), n = require("fs"), t = R.getFocusedWindow();
-    if (!t)
-      return { success: !1, error: "No focused window found" };
-    const a = await e.showSaveDialog(t, {
+    const { dialog } = require("electron");
+    const fs2 = require("fs");
+    const focusedWindow = BrowserWindow.getFocusedWindow();
+    if (!focusedWindow) {
+      return { success: false, error: "No focused window found" };
+    }
+    const result = await dialog.showSaveDialog(focusedWindow, {
       title: "Save page as PDF",
       defaultPath: "page.pdf",
       filters: [
         { name: "PDF Files", extensions: ["pdf"] }
       ]
     });
-    if (a.canceled)
-      return { success: !1, error: "User canceled" };
-    const c = {
+    if (result.canceled) {
+      return { success: false, error: "User canceled" };
+    }
+    const options = {
       marginsType: 0,
       // Default margins
       pageSize: "A4",
-      printBackground: !0,
-      printSelectionOnly: !1,
-      landscape: !1
-    }, f = await t.webContents.printToPDF(c);
-    return n.writeFileSync(a.filePath, f), console.log(`✅ PDF saved to: ${a.filePath}`), {
-      success: !0,
-      filePath: a.filePath
+      printBackground: true,
+      printSelectionOnly: false,
+      landscape: false
     };
-  } catch (e) {
-    return console.error("❌ Error saving PDF:", e), {
-      success: !1,
-      error: e instanceof Error ? e.message : "Unknown error"
+    const data = await focusedWindow.webContents.printToPDF(options);
+    fs2.writeFileSync(result.filePath, data);
+    console.log(`✅ PDF saved to: ${result.filePath}`);
+    return {
+      success: true,
+      filePath: result.filePath
+    };
+  } catch (error) {
+    console.error("❌ Error saving PDF:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error"
     };
   }
 });
-m.handle("extension-get-1password-status", async () => {
+ipcMain.handle("extension-get-1password-status", async () => {
   try {
-    const e = W.defaultSession.getAllExtensions().find(
-      (n) => n.name.toLowerCase().includes("1password") || n.id === "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
+    const extensions = session.defaultSession.getAllExtensions();
+    const onePasswordExtension = extensions.find(
+      (ext) => ext.name.toLowerCase().includes("1password") || ext.id === "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
     );
-    return e ? {
-      installed: !0,
-      version: e.version,
-      name: e.name,
-      id: e.id
-    } : {
-      installed: !1,
-      downloadUrl: "https://chromewebstore.google.com/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa",
-      instructions: "Please install the 1Password extension for the best experience"
-    };
-  } catch (o) {
-    return console.error("❌ Error checking 1Password extension status:", o), {
-      installed: !1,
+    if (onePasswordExtension) {
+      return {
+        installed: true,
+        version: onePasswordExtension.version,
+        name: onePasswordExtension.name,
+        id: onePasswordExtension.id
+      };
+    } else {
+      return {
+        installed: false,
+        downloadUrl: "https://chromewebstore.google.com/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa",
+        instructions: "Please install the 1Password extension for the best experience"
+      };
+    }
+  } catch (error) {
+    console.error("❌ Error checking 1Password extension status:", error);
+    return {
+      installed: false,
       error: "Could not check extension status"
     };
   }
 });
-m.handle("extension-install-1password", async () => (console.log("🔧 1Password extension installation requested"), {
-  success: !1,
-  message: "Please install 1Password extension manually",
-  steps: [
-    "1. Open Chrome or Edge browser",
-    "2. Go to chrome://extensions/ or edge://extensions/",
-    "3. Enable Developer mode",
-    "4. Install 1Password extension from the web store",
-    "5. Restart the Aussie Vault Browser"
-  ],
-  webStoreUrl: "https://chromewebstore.google.com/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa"
-}));
-m.handle("sharepoint-inject-credentials", async (o, e) => (console.log(`🔐 SharePoint credentials injection requested for: ${e}`), !0));
-m.handle("sharepoint-get-config", async () => ({
-  tenantUrl: process.env.SHAREPOINT_TENANT_URL || "https://your-tenant.sharepoint.com",
-  libraryPath: "/sites/documents/Shared Documents"
-}));
-m.handle("sharepoint-validate-access", async (o, e) => (console.log(`🔍 SharePoint access validation: ${e}`), !0));
-m.handle("window-create-new", async () => {
+ipcMain.handle("extension-install-1password", async () => {
+  console.log("🔧 1Password extension installation requested");
+  return {
+    success: false,
+    message: "Please install 1Password extension manually",
+    steps: [
+      "1. Open Chrome or Edge browser",
+      "2. Go to chrome://extensions/ or edge://extensions/",
+      "3. Enable Developer mode",
+      "4. Install 1Password extension from the web store",
+      "5. Restart the Aussie Vault Browser"
+    ],
+    webStoreUrl: "https://chromewebstore.google.com/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa"
+  };
+});
+ipcMain.handle("sharepoint-inject-credentials", async (_event, webviewId) => {
+  console.log(`🔐 SharePoint credentials injection requested for: ${webviewId}`);
+  return true;
+});
+ipcMain.handle("sharepoint-get-config", async () => {
+  return {
+    tenantUrl: process.env.SHAREPOINT_TENANT_URL || "https://your-tenant.sharepoint.com",
+    libraryPath: "/sites/documents/Shared Documents"
+  };
+});
+ipcMain.handle("sharepoint-validate-access", async (_event, url) => {
+  console.log(`🔍 SharePoint access validation: ${url}`);
+  return true;
+});
+ipcMain.handle("window-create-new", async () => {
   console.log("🪟 Creating new browser window...");
   try {
-    const o = se(!1);
-    return console.log("✅ New window shares authentication state - no need to sign in again!"), {
-      success: !0,
-      windowId: o.id,
+    const newWindow = createBrowserWindow(false);
+    console.log("✅ New window shares authentication state - no need to sign in again!");
+    return {
+      success: true,
+      windowId: newWindow.id,
       message: "New browser window created successfully with shared authentication"
     };
-  } catch (o) {
-    return console.error("❌ Error creating new window:", o), {
-      success: !1,
+  } catch (error) {
+    console.error("❌ Error creating new window:", error);
+    return {
+      success: false,
       error: "Failed to create new window"
     };
   }
 });
-m.handle("context-menu-show", async (o, e) => {
-  const n = R.fromWebContents(o.sender);
-  if (!n) return;
-  const t = [
+ipcMain.handle("context-menu-show", async (event, params) => {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  if (!senderWindow) return;
+  const baseMenu = [
     {
       label: "New Tab",
       click: () => {
-        n.webContents.send("context-menu-action", "new-tab");
+        senderWindow.webContents.send("context-menu-action", "new-tab");
       }
     },
     {
       label: "New Window",
       click: () => {
-        n.webContents.send("context-menu-action", "new-window");
+        senderWindow.webContents.send("context-menu-action", "new-window");
       }
     },
     { type: "separator" },
@@ -1323,98 +2032,141 @@ m.handle("context-menu-show", async (o, e) => {
       label: "Reload",
       accelerator: "CmdOrCtrl+R",
       click: () => {
-        n.webContents.send("context-menu-action", "reload");
+        senderWindow.webContents.send("context-menu-action", "reload");
       }
     }
-  ], a = O ? [
+  ];
+  const vpnMenu = vpnConnected ? [
     {
       label: "Go Back",
       accelerator: "Alt+Left",
       click: () => {
-        n.webContents.send("context-menu-action", "go-back");
+        senderWindow.webContents.send("context-menu-action", "go-back");
       }
     },
     {
       label: "Go Forward",
       accelerator: "Alt+Right",
       click: () => {
-        n.webContents.send("context-menu-action", "go-forward");
+        senderWindow.webContents.send("context-menu-action", "go-forward");
       }
     },
     { type: "separator" },
     {
       label: "Go Home",
       click: () => {
-        n.webContents.send("context-menu-action", "go-home");
+        senderWindow.webContents.send("context-menu-action", "go-home");
       }
     }
-  ] : [], c = [
+  ] : [];
+  const statusMenu = [
     { type: "separator" },
     {
       label: "VPN Status",
       submenu: [
         {
-          label: O ? "✅ VPN Connected" : "❌ VPN Disconnected",
-          enabled: !1
+          label: vpnConnected ? "✅ VPN Connected" : "❌ VPN Disconnected",
+          enabled: false
         },
         {
-          label: O ? "Reconnect VPN" : "Connect VPN",
+          label: vpnConnected ? "Reconnect VPN" : "Connect VPN",
           click: () => {
-            n.webContents.send("context-menu-action", "reconnect-vpn");
+            senderWindow.webContents.send("context-menu-action", "reconnect-vpn");
           }
         }
       ]
     }
   ];
-  le.buildFromTemplate([...t, ...a, ...c]).popup({
-    window: n,
-    x: e.x,
-    y: e.y
+  const contextMenu = Menu.buildFromTemplate([...baseMenu, ...vpnMenu, ...statusMenu]);
+  contextMenu.popup({
+    window: senderWindow,
+    x: params.x,
+    y: params.y
   });
 });
-m.handle("window-get-count", async () => ({
-  total: P.length,
-  mainWindowId: (E == null ? void 0 : E.id) || null
-}));
-m.handle("window-close", async (o, e) => {
+ipcMain.handle("window-get-count", async () => {
+  return {
+    total: windows.length,
+    mainWindowId: (mainWindow == null ? void 0 : mainWindow.id) || null
+  };
+});
+ipcMain.handle("window-close", async (_event, windowId) => {
   try {
-    if (e) {
-      const n = P.find((t) => t.id === e);
-      return n && !n.isDestroyed() ? (n.close(), { success: !0, message: "Window closed successfully" }) : { success: !1, error: "Window not found" };
+    if (windowId) {
+      const windowToClose = windows.find((win) => win.id === windowId);
+      if (windowToClose && !windowToClose.isDestroyed()) {
+        windowToClose.close();
+        return { success: true, message: "Window closed successfully" };
+      }
+      return { success: false, error: "Window not found" };
     } else {
-      const n = R.fromWebContents(o.sender);
-      return n && !n.isDestroyed() ? (n.close(), { success: !0, message: "Current window closed successfully" }) : { success: !1, error: "Could not identify current window" };
+      const senderWindow = BrowserWindow.fromWebContents(_event.sender);
+      if (senderWindow && !senderWindow.isDestroyed()) {
+        senderWindow.close();
+        return { success: true, message: "Current window closed successfully" };
+      }
+      return { success: false, error: "Could not identify current window" };
     }
-  } catch (n) {
-    return console.error("❌ Error closing window:", n), { success: !1, error: "Failed to close window" };
+  } catch (error) {
+    console.error("❌ Error closing window:", error);
+    return { success: false, error: "Failed to close window" };
   }
 });
-y.whenReady().then(async () => {
-  console.log("🚀 Initializing Aussie Vault Browser..."), process.platform === "darwin" && y.dock && y.dock.setIcon(w.join(V, "../build/icon.png")), await Ae(), $e(), console.log("🔌 Starting VPN connection...");
-  const o = await q();
-  C(o), o ? console.log("✅ VPN connected successfully - unrestricted access enabled") : console.error("❌ VPN connection failed - starting with restricted access"), re();
-}).catch((o) => {
-  console.error("❌ Failed to initialize app:", o), y.quit();
+app.whenReady().then(async () => {
+  console.log("🚀 Initializing Aussie Vault Browser...");
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(path.join(__dirname, "../build/icon.png"));
+  }
+  await loadEnvironmentVariables();
+  configureSecureSession();
+  console.log("🔌 Starting VPN connection...");
+  const vpnConnected2 = await connectVPN();
+  updateVPNStatus(vpnConnected2);
+  if (!vpnConnected2) {
+    console.error("❌ VPN connection failed - starting with restricted access");
+  } else {
+    console.log("✅ VPN connected successfully - unrestricted access enabled");
+  }
+  createWindow();
+}).catch((error) => {
+  console.error("❌ Failed to initialize app:", error);
+  app.quit();
 });
-const Fe = y.requestSingleInstanceLock();
-Fe ? y.on("second-instance", () => {
-  E && !E.isDestroyed() && (E.isMinimized() && E.restore(), E.focus());
-}) : (console.log("🚫 Another instance is already running"), y.quit());
-y.on("window-all-closed", () => {
-  process.platform !== "darwin" && (console.log("🔐 Closing Aussie Vault Browser"), y.quit());
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  console.log("🚫 Another instance is already running");
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    console.log("🔐 Closing Aussie Vault Browser");
+    app.quit();
+  }
 });
-y.on("activate", () => {
-  R.getAllWindows().length === 0 && re();
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
 });
-y.on("web-contents-created", (o, e) => {
-  e.on("will-navigate", (n, t) => {
+app.on("web-contents-created", (_event, contents) => {
+  contents.on("will-navigate", (event, navigationUrl) => {
     try {
-      if (E && !E.isDestroyed() && e === E.webContents) {
-        const c = new URL(t), f = [
-          I,
+      const isMainWindowContents = mainWindow && !mainWindow.isDestroyed() && contents === mainWindow.webContents;
+      if (isMainWindowContents) {
+        const parsedUrl = new URL(navigationUrl);
+        const allowedOrigins = [
+          VITE_DEV_SERVER_URL,
           "file:",
           "about:"
-        ].filter(Boolean), i = [
+        ].filter(Boolean);
+        const oauthProviders = [
           "https://accounts.google.com",
           "https://login.microsoftonline.com",
           "https://github.com/login",
@@ -1423,27 +2175,46 @@ y.on("web-contents-created", (o, e) => {
           "https://clerk.dev",
           "https://major-snipe-9.clerk.accounts.dev"
         ];
-        f.some(
-          (s) => c.protocol.startsWith(s || "") || t.startsWith(s || "")
-        ) || i.some(
-          (s) => t.startsWith(s)
-        ) ? i.some((s) => t.startsWith(s)) && console.log("🔐 Allowing OAuth navigation to:", t) : (console.log("🚫 Blocking main window navigation to:", t), n.preventDefault());
-      } else
-        console.log("🌐 Webview navigation allowed:", t);
-    } catch (a) {
-      console.warn("⚠️ Failed to parse navigation URL:", t, a), E && !E.isDestroyed() && e === E.webContents && n.preventDefault();
+        const isAllowed = allowedOrigins.some(
+          (origin) => parsedUrl.protocol.startsWith(origin || "") || navigationUrl.startsWith(origin || "")
+        ) || oauthProviders.some(
+          (provider) => navigationUrl.startsWith(provider)
+        );
+        if (!isAllowed) {
+          console.log("🚫 Blocking main window navigation to:", navigationUrl);
+          event.preventDefault();
+        } else if (oauthProviders.some((provider) => navigationUrl.startsWith(provider))) {
+          console.log("🔐 Allowing OAuth navigation to:", navigationUrl);
+        }
+      } else {
+        console.log("🌐 Webview navigation allowed:", navigationUrl);
+      }
+    } catch (error) {
+      console.warn("⚠️ Failed to parse navigation URL:", navigationUrl, error);
+      const isMainWindowContentsError = mainWindow && !mainWindow.isDestroyed() && contents === mainWindow.webContents;
+      if (isMainWindowContentsError) {
+        event.preventDefault();
+      }
     }
   });
 });
-process.defaultApp ? process.argv.length >= 2 && y.setAsDefaultProtocolClient("secure-browser", process.execPath, [w.resolve(process.argv[1])]) : y.setAsDefaultProtocolClient("secure-browser");
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient("secure-browser", process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient("secure-browser");
+}
 process.on("SIGINT", () => {
-  console.log("🔐 Received SIGINT, gracefully shutting down"), y.quit();
+  console.log("🔐 Received SIGINT, gracefully shutting down");
+  app.quit();
 });
 process.on("SIGTERM", () => {
-  console.log("🔐 Received SIGTERM, gracefully shutting down"), y.quit();
+  console.log("🔐 Received SIGTERM, gracefully shutting down");
+  app.quit();
 });
 export {
-  Qe as MAIN_DIST,
-  oe as RENDERER_DIST,
-  I as VITE_DEV_SERVER_URL
+  MAIN_DIST,
+  RENDERER_DIST,
+  VITE_DEV_SERVER_URL
 };
