@@ -59,11 +59,11 @@ const checkIPGeolocation = async (): Promise<{ country: string; ip: string; isAu
                        country.toLowerCase() === 'au' ||
                        country.toLowerCase() === 'aus';
     
-    console.log(`🌍 Fast IP Check: IP=${ip}, Country=${country}, IsAustralia=${isAustralia}`);
+    // console.log(`🌍 Fast IP Check: IP=${ip}, Country=${country}, IsAustralia=${isAustralia}`);
     
     return { country, ip, isAustralia };
   } catch (error) {
-    console.warn('⚠️ IP check failed, allowing WireGuard status to determine connection:', error);
+    // console.warn('⚠️ IP check failed, allowing WireGuard status to determine connection:', error);
     // If IP check fails, rely on WireGuard status
     return { country: 'Checking...', ip: 'Checking...', isAustralia: true };
   }
@@ -90,15 +90,15 @@ export const useVPN = () => {
     setIsAutoReconnecting(false);
     
     try {
-      console.log("🔌 Fast VPN connection attempt...");
+      // console.log("🔌 Fast VPN connection attempt...");
       const success = await window.electronAPI?.vpn?.connect('wireguard');
       
       if (success) {
         setVpnStatus("connected");
         setRetryCount(0);
         setAutoReconnectAttempts(0);
-        console.log("✅ VPN Connected successfully - browsing enabled");
-        
+        // console.log("✅ VPN Connected successfully - browsing enabled");
+
         // Do IP check in background for display info
         checkIPGeolocation().then(ipInfo => {
           setActualIP(ipInfo.ip);
@@ -115,14 +115,14 @@ export const useVPN = () => {
         throw new Error("VPN connection failed");
       }
     } catch (error) {
-      console.error("❌ VPN connection failed:", error);
+      // console.error("❌ VPN connection failed:", error);
       setLastError("Failed to connect to Australian VPN via WireGuard");
       setVpnStatus("failed");
     }
   };
 
   const disconnectVPN = async (): Promise<void> => {
-    console.log("Disconnecting VPN...");
+    // console.log("Disconnecting VPN...");
     setVpnStatus("disconnected");
     setAutoReconnectAttempts(0);
     setIsAutoReconnecting(false);
@@ -141,7 +141,7 @@ export const useVPN = () => {
 
     setIsAutoReconnecting(true);
     setAutoReconnectAttempts(prev => prev + 1);
-    console.log(`🔄 Auto-reconnect attempt ${autoReconnectAttempts + 1}...`);
+    // console.log(`🔄 Auto-reconnect attempt ${autoReconnectAttempts + 1}...`);
 
     try {
       // Use IPC to connect VPN via main process
@@ -152,8 +152,8 @@ export const useVPN = () => {
         setRetryCount(0);
         setAutoReconnectAttempts(0);
         setIsAutoReconnecting(false);
-        console.log("✅ VPN Auto-reconnected successfully");
-        
+        // console.log("✅ VPN Auto-reconnected successfully");
+
         // Update connection info
         setConnection(prev => ({
           ...prev,
@@ -164,12 +164,12 @@ export const useVPN = () => {
         throw new Error("Auto-reconnection failed");
       }
     } catch (error) {
-      console.error("❌ VPN auto-reconnection failed:", error);
+      // console.error("❌ VPN auto-reconnection failed:", error);
       setIsAutoReconnecting(false);
       
       // If we've tried too many times, give up auto-reconnect
       if (autoReconnectAttempts >= 5) {
-        console.log("❌ Auto-reconnect failed after 5 attempts, stopping");
+        // console.log("❌ Auto-reconnect failed after 5 attempts, stopping");
         setVpnStatus("failed");
         setLastError("Auto-reconnection failed after multiple attempts");
       }
@@ -180,11 +180,11 @@ export const useVPN = () => {
   const checkVPNStatus = useCallback(async (): Promise<void> => {
     setIsCheckingStatus(true);
     try {
-      console.log("🔍 Fast VPN status check...");
+      // console.log("🔍 Fast VPN status check...");
       
       // Check WireGuard status first (faster and more reliable)
       const status = await window.electronAPI?.vpn?.getStatus();
-      console.log(`📊 WireGuard status: ${status}`);
+      // console.log(`📊 WireGuard status: ${status}`);
       
       if (status === 'connected') {
         // If WireGuard says connected, trust it immediately for speed
@@ -206,10 +206,10 @@ export const useVPN = () => {
             latency: Math.floor(Math.random() * 30) + 15
           }));
           
-          console.log(`✅ VPN Connected: ${ipInfo.country} (${ipInfo.ip})`);
+          // console.log(`✅ VPN Connected: ${ipInfo.country} (${ipInfo.ip})`);
         });
         
-        console.log("✅ WireGuard VPN Connected - allowing browsing immediately");
+        // console.log("✅ WireGuard VPN Connected - allowing browsing immediately");
         return;
       }
       
@@ -238,17 +238,17 @@ export const useVPN = () => {
           }, 2000); // Faster reconnect - 2 seconds
         }
         
-        console.log(`❌ VPN disconnected: ${ipInfo.country} (${ipInfo.ip})`);
+        // console.log(`❌ VPN disconnected: ${ipInfo.country} (${ipInfo.ip})`);
       } else if (status === 'connecting') {
         setVpnStatus("connecting");
-        console.log("🔄 VPN connecting...");
+        // console.log("🔄 VPN connecting...");
       } else {
         setVpnStatus("failed");
         setLastError(`VPN status error: ${status}`);
-        console.log(`❌ VPN failed: ${status}`);
+        // console.log(`❌ VPN failed: ${status}`);
       }
     } catch (error) {
-      console.error("❌ VPN status check failed:", error);
+      // console.error("❌ VPN status check failed:", error);
       setVpnStatus("failed");
       setLastError("Failed to check VPN status");
     } finally {
@@ -264,18 +264,18 @@ export const useVPN = () => {
       if (!mounted) return;
       
       try {
-        console.log("🔍 Fast initial VPN check...");
+        // console.log("🔍 Fast initial VPN check...");
         
         // Quick check if electronAPI is ready
         if (!window.electronAPI?.vpn?.getStatus) {
-          console.log("⏳ Waiting for electronAPI...");
+          // console.log("⏳ Waiting for electronAPI...");
           setTimeout(checkInitialStatus, 500); // Quick retry
           return;
         }
 
         // Prioritize WireGuard status for speed
         const status = await window.electronAPI?.vpn?.getStatus();
-        console.log(`🔍 Initial WireGuard status: ${status}`);
+        // console.log(`🔍 Initial WireGuard status: ${status}`);
         
         if (status === 'connected') {
           // Allow browsing immediately if WireGuard is connected
@@ -294,13 +294,13 @@ export const useVPN = () => {
               latency: Math.floor(Math.random() * 30) + 15
             }));
             
-            console.log(`✅ Initial check complete: ${ipInfo.country} (${ipInfo.ip})`);
+            // console.log(`✅ Initial check complete: ${ipInfo.country} (${ipInfo.ip})`);
           });
           
-          console.log("✅ Initial check: WireGuard connected - browsing allowed");
+          // console.log("✅ Initial check: WireGuard connected - browsing allowed");
         } else if (status === 'connecting') {
           setVpnStatus("connecting");
-          console.log("🔄 Initial check: WireGuard connecting...");
+          // console.log("🔄 Initial check: WireGuard connecting...");
           
           // Check again soon
           setTimeout(() => {
@@ -323,11 +323,11 @@ export const useVPN = () => {
               latency: undefined
             }));
             
-            console.log(`❌ Initial check: Disconnected from ${ipInfo.country} (${ipInfo.ip})`);
+            // console.log(`❌ Initial check: Disconnected from ${ipInfo.country} (${ipInfo.ip})`);
           });
         }
       } catch (error) {
-        console.error("❌ Initial VPN check failed:", error);
+        // console.error("❌ Initial VPN check failed:", error);
         setVpnStatus("failed");
         setLastError("Failed to check initial VPN status");
       } finally {
@@ -360,7 +360,7 @@ export const useVPN = () => {
     let autoReconnectTimeout: NodeJS.Timeout;
 
     if (vpnStatus === "disconnected" && autoReconnectAttempts < 3 && !isAutoReconnecting) {
-      console.log(`⏰ Fast auto-reconnect attempt ${autoReconnectAttempts + 1} in 5 seconds...`);
+      // console.log(`⏰ Fast auto-reconnect attempt ${autoReconnectAttempts + 1} in 5 seconds...`);
       autoReconnectTimeout = setTimeout(() => {
         autoReconnectVPN();
       }, 5000); // Much faster reconnect - 5 seconds instead of 30

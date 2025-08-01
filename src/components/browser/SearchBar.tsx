@@ -23,9 +23,9 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   // Test focus on mount
   useEffect(() => {
-    console.log('SearchBar mounted, input ref:', inputRef.current);
+    // console.log('SearchBar mounted, input ref:', inputRef.current);
     if (inputRef.current) {
-      console.log('Input element found');
+      // console.log('Input element found');
     }
   }, []);
 
@@ -111,26 +111,26 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const handleContainerClick = (e: React.MouseEvent) => {
     // Ensure clicking anywhere in the search container focuses the input
     if (inputRef.current && e.target !== inputRef.current) {
-      console.log('Container clicked, focusing input');
+      // console.log('Container clicked, focusing input');
       inputRef.current.focus();
     }
   };
 
   const handleInputFocus = () => {
-    console.log('✅ Input focused');
+    // console.log('✅ Input focused');
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('✅ Input changed:', e.target.value);
+    // console.log('✅ Input changed:', e.target.value);
     onChange(e.target.value);
   };
 
   const handleInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    console.log('✅ Key pressed:', e.key);
+    // console.log('✅ Key pressed:', e.key);
   };
 
   const handleInputClick = (e: React.MouseEvent<HTMLInputElement>) => {
-    console.log('✅ Input clicked');
+    // console.log('✅ Input clicked');
     e.stopPropagation();
   };
 

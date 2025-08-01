@@ -120,7 +120,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({
     setFilteredHistory(prev => prev.filter(h => h.url !== entry.url));
     
     // TODO: Implement actual deletion from database/localStorage
-    console.log('Delete entry:', entry.url);
+    // console.log('Delete entry:', entry.url);
   };
 
   const handleClearHistory = async (timeRange: 'hour' | 'day' | 'week' | 'month' | 'all') => {

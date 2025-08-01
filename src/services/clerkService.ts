@@ -27,12 +27,12 @@ class ClerkAuthService {
       if (persistedState) {
         const parsed = JSON.parse(persistedState);
         if (parsed && parsed.isSignedIn && parsed.user) {
-          console.log('✅ Loaded persisted authentication state from localStorage');
+          // console.log('✅ Loaded persisted authentication state from localStorage');
           ClerkAuthService.globalAuthState = parsed;
         }
       }
     } catch (error) {
-      console.warn('⚠️ Failed to load persisted auth state:', error);
+      // console.warn('⚠️ Failed to load persisted auth state:', error);
     }
   }
   
@@ -41,13 +41,13 @@ class ClerkAuthService {
     try {
       if (state.isSignedIn && state.user) {
         localStorage.setItem(ClerkAuthService.AUTH_STATE_KEY, JSON.stringify(state));
-        console.log('💾 Authentication state persisted to localStorage');
+        // console.log('💾 Authentication state persisted to localStorage');
       } else {
         localStorage.removeItem(ClerkAuthService.AUTH_STATE_KEY);
-        console.log('🗑️ Authentication state cleared from localStorage');
+        // console.log('🗑️ Authentication state cleared from localStorage');
       }
     } catch (error) {
-      console.warn('⚠️ Failed to persist auth state:', error);
+      // console.warn('⚠️ Failed to persist auth state:', error);
     }
   }
   
@@ -57,7 +57,7 @@ class ClerkAuthService {
     
     // 🔐 CHECK GLOBAL INITIALIZATION: If already initialized globally, just set up local listeners
          if (ClerkAuthService.isGloballyInitialized && this.clerk) {
-       console.log('✅ Clerk already initialized globally - setting up window listeners');
+       // console.log('✅ Clerk already initialized globally - setting up window listeners');
        
        // Immediately notify with current state
        this.notifyAuthStateChange(ClerkAuthService.globalAuthState);
@@ -66,7 +66,7 @@ class ClerkAuthService {
     
     // 🔐 SINGLETON PATTERN: Only allow one initialization across all windows
          if (ClerkAuthService.globalInitPromise) {
-       console.log('🔄 Waiting for global Clerk initialization to complete...');
+       // console.log('🔄 Waiting for global Clerk initialization to complete...');
        await ClerkAuthService.globalInitPromise;
        this.notifyAuthStateChange(ClerkAuthService.globalAuthState);
        return;
@@ -78,7 +78,7 @@ class ClerkAuthService {
     }
 
     // 🔐 START GLOBAL INITIALIZATION: This window will handle the initialization
-    console.log('🔄 Starting global Clerk initialization...');
+    // console.log('🔄 Starting global Clerk initialization...');
     ClerkAuthService.globalInitPromise = this.performInitialization();
     this.initializationPromise = ClerkAuthService.globalInitPromise;
     
@@ -98,15 +98,15 @@ class ClerkAuthService {
       const existingSession = localStorage.getItem('__clerk_db_jwt') || 
                             localStorage.getItem('__clerk_client_jwt') ||
                             sessionStorage.getItem('__clerk_db_jwt');
-      
-      console.log('🔍 Checking for existing authentication state...');
-      console.log('🔍 Local storage keys:', Object.keys(localStorage));
-      console.log('🔍 Found existing session token:', !!existingSession);
-      
+
+      // console.log('🔍 Checking for existing authentication state...');
+      // console.log('🔍 Local storage keys:', Object.keys(localStorage));
+      // console.log('🔍 Found existing session token:', !!existingSession);
+
       if (existingSession) {
-        console.log('🔍 Found existing Clerk session, initializing with existing state...');
+        // console.log('🔍 Found existing Clerk session, initializing with existing state...');
       } else {
-        console.log('🔍 No existing session found, user will need to authenticate');
+        // console.log('🔍 No existing session found, user will need to authenticate');
       }
 
       // Initialize Clerk using the constructor with OAuth popup configuration
@@ -138,7 +138,7 @@ class ClerkAuthService {
 
       // 🔐 FORCE SESSION SYNC: Immediately check if user is already signed in
       if (this.clerk.user && this.clerk.session) {
-        console.log('✅ Found existing authentication session for:', this.clerk.user.primaryEmailAddress?.emailAddress);
+        // console.log('✅ Found existing authentication session for:', this.clerk.user.primaryEmailAddress?.emailAddress);
         const initialState = {
           user: this.clerk.user as unknown as ClerkUser | null,
           isLoaded: true,
@@ -152,9 +152,9 @@ class ClerkAuthService {
 
              // 🔐 MARK AS GLOBALLY INITIALIZED
        ClerkAuthService.isGloballyInitialized = true;
-       console.log('✅ Clerk authentication initialized globally');
+       // console.log('✅ Clerk authentication initialized globally');
     } catch (error) {
-      console.error('❌ Failed to initialize Clerk:', error);
+      // console.error('❌ Failed to initialize Clerk:', error);
       ClerkAuthService.globalInitPromise = null; // Reset on failure
       throw error;
     }
@@ -180,7 +180,7 @@ class ClerkAuthService {
         routing: 'hash'
       });
     } catch (error) {
-      console.error('❌ Sign in failed:', error);
+      // console.error('❌ Sign in failed:', error);
       throw error;
     }
   }
@@ -216,10 +216,10 @@ class ClerkAuthService {
              // 🔐 RESET GLOBAL INITIALIZATION: Allow re-initialization after sign out
        ClerkAuthService.isGloballyInitialized = false;
        ClerkAuthService.globalInitPromise = null;
-      
-      console.log('✅ User signed out successfully');
+
+      // console.log('✅ User signed out successfully');
     } catch (error) {
-      console.error('❌ Sign out failed:', error);
+      // console.error('❌ Sign out failed:', error);
       throw error;
     }
   }
@@ -231,7 +231,7 @@ class ClerkAuthService {
     try {
       // 🔐 RETURN GLOBAL STATE: If we have global auth state, return it immediately
       if (ClerkAuthService.globalAuthState.isSignedIn) {
-        console.log('🔄 Returning cached global authentication state');
+        // console.log('🔄 Returning cached global authentication state');
         this.notifyAuthStateChange(ClerkAuthService.globalAuthState);
         return ClerkAuthService.globalAuthState;
       }
@@ -251,15 +251,15 @@ class ClerkAuthService {
       
       // Notify listeners of current state
       this.notifyAuthStateChange(currentState);
-      
-      console.log('🔄 Authentication state refreshed:', {
-        isSignedIn: currentState.isSignedIn,
-        userEmail: currentState.user?.emailAddresses?.[0]?.emailAddress
-      });
+
+      // console.log('🔄 Authentication state refreshed:', {
+      //   isSignedIn: currentState.isSignedIn,
+      //   userEmail: currentState.user?.emailAddresses?.[0]?.emailAddress
+      // });
 
       return currentState;
     } catch (error) {
-      console.error('❌ Failed to refresh authentication state:', error);
+      // console.error('❌ Failed to refresh authentication state:', error);
       throw error;
     }
   }

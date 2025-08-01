@@ -110,23 +110,23 @@ export class VaultService {
 
     try {
       // Use IPC to get vault status from main process (secure)
-      console.log('🔄 Initializing vault via main process...');
+      // console.log('🔄 Initializing vault via main process...');
       
       if (typeof window !== 'undefined' && window.secureBrowser?.vault?.getVaultStatus) {
         const status = await window.secureBrowser.vault.getVaultStatus();
-        console.log('🔍 Vault status from main process:', status);
+        // console.log('🔍 Vault status from main process:', status);
         
         if (status && (status.includes('connected') || status === 'connected-dev')) {
           this.initialized = true;
           this.vaultProvider = 'hashicorp'; // Default for now
-          console.log(`✅ Vault initialized via main process: ${status}`);
+          // console.log(`✅ Vault initialized via main process: ${status}`);
           return;
         }
       }
       
       // Fallback for development
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔧 Development mode: vault initialization bypassed');
+        // console.log('🔧 Development mode: vault initialization bypassed');
         this.initialized = true;
         this.vaultProvider = 'hashicorp';
         return;
@@ -134,11 +134,11 @@ export class VaultService {
       
       throw new Error('Unable to initialize vault via main process');
     } catch (error) {
-      console.error('❌ Failed to initialize vault:', error);
+      // console.error('❌ Failed to initialize vault:', error);
       
       // In development, allow graceful degradation
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔧 Development mode: continuing without vault');
+        // console.log('🔧 Development mode: continuing without vault');
         this.initialized = true;
         this.vaultProvider = 'hashicorp';
         return;
@@ -156,12 +156,12 @@ export class VaultService {
 
     try {
       // Use IPC to get credentials from main process (secure)
-      console.log('🔑 Requesting SharePoint credentials via main process...');
+      // console.log('🔑 Requesting SharePoint credentials via main process...');
       
       if (typeof window !== 'undefined' && window.secureBrowser?.vault?.getSharePointCredentials) {
         const credentials = await window.secureBrowser.vault.getSharePointCredentials();
-        console.log('✅ SharePoint credentials retrieved from main process');
-        
+        // console.log('✅ SharePoint credentials retrieved from main process');
+
         return {
           sharepointUsername: credentials.username,
           sharepointPassword: credentials.password,
@@ -172,7 +172,7 @@ export class VaultService {
       
       throw new Error('IPC vault service not available');
     } catch (error) {
-      console.error('❌ Failed to retrieve SharePoint credentials:', error);
+      // console.error('❌ Failed to retrieve SharePoint credentials:', error);
       throw new Error(`Unable to access SharePoint credentials from vault: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -196,7 +196,7 @@ export class VaultService {
         credentials
       };
     } catch (error) {
-      console.error('❌ Failed to retrieve SharePoint configuration:', error);
+      // console.error('❌ Failed to retrieve SharePoint configuration:', error);
       throw new Error(`Unable to access SharePoint configuration: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -250,7 +250,7 @@ export class VaultService {
       }
 
       this.accessToken = auth.client_token;
-      console.log('✅ HashiCorp Vault authentication successful');
+      // console.log('✅ HashiCorp Vault authentication successful');
     } catch (error) {
       throw new Error(`HashiCorp Vault authentication failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -270,8 +270,8 @@ export class VaultService {
     }
 
     this.vaultEndpoint = region;
-    console.log(`✅ AWS Secrets Manager initialized for region: ${region}`);
-    
+    // console.log(`✅ AWS Secrets Manager initialized for region: ${region}`);
+
     // Note: Full AWS SDK integration would be implemented here
     // For now, we'll throw an error to indicate it needs implementation
     throw new Error('AWS Secrets Manager integration not fully implemented. Please implement AWS SDK integration.');
@@ -303,8 +303,8 @@ export class VaultService {
         }
       });
 
-      console.log('✅ 1Password Connect initialized successfully');
-      console.log('🔍 1Password Connect health check:', response);
+      // console.log('✅ 1Password Connect initialized successfully');
+      // console.log('🔍 1Password Connect health check:', response);
     } catch (error) {
       throw new Error(`1Password Connect initialization failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -327,7 +327,7 @@ export class VaultService {
       throw new Error('Azure Key Vault URL not configured. Set AZURE_VAULT_URL environment variable.');
     }
 
-    console.log('✅ Azure Key Vault initialized');
+    // console.log('✅ Azure Key Vault initialized');
     
     // Note: Full Azure Key Vault SDK integration would be implemented here
     throw new Error('Azure Key Vault integration not fully implemented. Please implement Azure SDK integration.');
@@ -379,7 +379,7 @@ export class VaultService {
 
   private async getAWSSecret(secretName: string): Promise<Record<string, unknown>> {
     // AWS Secrets Manager implementation would go here
-    console.log(`AWS secret requested: ${secretName}`);
+    // console.log(`AWS secret requested: ${secretName}`);
     throw new Error('AWS Secrets Manager integration not implemented');
   }
 
@@ -462,7 +462,7 @@ export class VaultService {
 
   private async getAzureSecret(secretName: string): Promise<Record<string, unknown>> {
     // Azure Key Vault implementation would go here
-    console.log(`Azure secret requested: ${secretName}`);
+    // console.log(`Azure secret requested: ${secretName}`);
     throw new Error('Azure Key Vault integration not implemented');
   }
 
@@ -505,12 +505,12 @@ export class VaultService {
 
     try {
       // Use IPC to rotate credentials via main process (secure)
-      console.log('🔄 Rotating vault credentials via main process...');
+      // console.log('🔄 Rotating vault credentials via main process...');
       
       if (typeof window !== 'undefined' && window.secureBrowser?.vault?.rotateCredentials) {
         const success = await window.secureBrowser.vault.rotateCredentials();
         if (success) {
-          console.log('✅ Credentials rotated successfully via main process');
+          // console.log('✅ Credentials rotated successfully via main process');
           return;
         } else {
           throw new Error('Credential rotation failed in main process');
@@ -518,7 +518,7 @@ export class VaultService {
       }
       
       // Fallback for development
-      console.log('⚠️ Development mode: credential rotation simulated');
+      // console.log('⚠️ Development mode: credential rotation simulated');
     } catch (error) {
       console.error('❌ Failed to rotate credentials:', error);
       throw new Error(`Credential rotation failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -540,7 +540,7 @@ export const injectSharePointCredentials = async (webview: HTMLElement): Promise
     if (typeof window !== 'undefined' && window.secureBrowser) {
       const webviewId = webview.getAttribute('id') || 'default';
       await window.secureBrowser.sharepoint.injectCredentials(webviewId);
-      console.log('✅ SharePoint credentials injected successfully');
+      // console.log('✅ SharePoint credentials injected successfully');
     } else {
       throw new Error('Secure browser API not available');
     }

@@ -101,20 +101,20 @@ export const SharePointDiagnostics: React.FC = () => {
 
   const testOAuthFlow = async (envVars: any) => {
     try {
-      console.log('🔄 Testing OAuth token request via main process...');
-      console.log('Client ID:', envVars.MSAL_CLIENT_ID?.substring(0, 8) + '...');
+      // console.log('🔄 Testing OAuth token request via main process...');
+      // console.log('Client ID:', envVars.MSAL_CLIENT_ID?.substring(0, 8) + '...');
       
       // Use main process OAuth handler
       if (typeof window !== 'undefined' && window.secureBrowser?.sharepoint?.getOAuthToken) {
         const result = await window.secureBrowser.sharepoint.getOAuthToken();
-        
-        console.log('OAuth Response:', result);
+
+        // console.log('OAuth Response:', result);
 
         if (result.success && result.accessToken) {
           updateTest(2, { 
             status: 'success', 
             message: 'OAuth token acquired successfully via main process',
-            details: `Token type: ${result.tokenType || 'Bearer'}, Token length: ${result.accessToken.length}`
+            details: `Token length: ${result.accessToken.length}`
           });
           
           // Test 4: SharePoint API Access
@@ -145,13 +145,13 @@ export const SharePointDiagnostics: React.FC = () => {
 
   const testSharePointAPI = async (accessToken: string) => {
     try {
-      console.log('🔄 Testing SharePoint API access via main process...');
+      // console.log('🔄 Testing SharePoint API access via main process...');
       
       // Use main process Graph API handler
       if (typeof window !== 'undefined' && window.secureBrowser?.sharepoint?.graphRequest) {
         const response = await window.secureBrowser.sharepoint.graphRequest('/sites/root', accessToken);
-        
-        console.log('SharePoint API Response:', response);
+
+        // console.log('SharePoint API Response:', response);
 
         if (response.success && response.data) {
           const siteData = response.data;

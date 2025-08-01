@@ -37,7 +37,7 @@ function AppContent() {
     (window as any).debugVPN = SecureBrowserDatabaseService.debugVPNConnectionLogging;
     (window as any).testVPNStatus = async () => {
       const status = await vpnService.isConnected();
-      console.log('🔧 DEBUG: VPN Status check result:', status);
+      // console.log('🔧 DEBUG: VPN Status check result:', status);
       return status;
     };
   }, []);
@@ -63,11 +63,11 @@ function AppContent() {
           const envConfigStr = await window.secureBrowser?.system.getEnvironment();
           if (envConfigStr) {
             envConfig = JSON.parse(envConfigStr);
-            console.log('🔍 Environment config loaded:', {
-              NODE_ENV: envConfig.NODE_ENV,
-              VPN_PROVIDER: envConfig.VPN_PROVIDER,
-              WIREGUARD_ENDPOINT: envConfig.WIREGUARD_ENDPOINT ? 'Set ✅' : 'Missing ❌'
-            });
+            // console.log('🔍 Environment config loaded:', {
+            //   NODE_ENV: envConfig.NODE_ENV,
+            //   VPN_PROVIDER: envConfig.VPN_PROVIDER,
+            //   WIREGUARD_ENDPOINT: envConfig.WIREGUARD_ENDPOINT ? 'Set ✅' : 'Missing ❌'
+            // });
             
             const validation = EnvironmentValidator.validateEnvironment(envConfig);
             
@@ -104,7 +104,7 @@ function AppContent() {
             }
             
             if (validation.warnings.length > 0) {
-              console.warn('⚠️ Environment warnings:', validation.warnings);
+              // console.warn('⚠️ Environment warnings:', validation.warnings);
               // Log warnings as low-severity security events
               await SecureBrowserDatabaseService.logSecurityEvent(
                 'unauthorized_access',
@@ -157,11 +157,11 @@ function AppContent() {
         
         try {
           await vaultService.initialize();
-          console.log('✅ Vault service initialized successfully');
+          // console.log('✅ Vault service initialized successfully');
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Vault initialization failed';
           setVaultError(errorMessage);
-          console.error('❌ Vault initialization failed:', error);
+          // console.error('❌ Vault initialization failed:', error);
           
           // Log vault initialization failure
           await SecureBrowserDatabaseService.logSecurityEvent(
@@ -181,13 +181,13 @@ function AppContent() {
         // Real VPN connection with retry logic and proper error handling
         try {
           // First check if VPN is already connected (to avoid unnecessary reconnection attempts)
-          console.log('🔍 Checking existing VPN connection status...');
+          // console.log('🔍 Checking existing VPN connection status...');
           let vpnConnected = await vpnService.isConnected();
           
           const maxRetries = 3;
           
           if (vpnConnected) {
-            console.log('✅ VPN is already connected, skipping connection attempt');
+            // console.log('✅ VPN is already connected, skipping connection attempt');
             
             // Update database with existing connection status
             await SecureBrowserDatabaseService.updateVPNStatus(
@@ -200,13 +200,13 @@ function AppContent() {
             
             // Try connecting with retries - don't show error immediately
             while (!vpnConnected && retryCount < maxRetries) {
-              console.log(`🔄 VPN connection attempt ${retryCount + 1}/${maxRetries}...`);
+              // console.log(`🔄 VPN connection attempt ${retryCount + 1}/${maxRetries}...`);
               
               // Use the enhanced VPN service that integrates with database
               vpnConnected = await vpnService.connect();
               
               if (!vpnConnected && retryCount < maxRetries - 1) {
-                console.log(`⏳ VPN connection attempt ${retryCount + 1} failed, retrying in 2 seconds...`);
+                // console.log(`⏳ VPN connection attempt ${retryCount + 1} failed, retrying in 2 seconds...`);
                 
                 // Log retry attempt
                 await SecureBrowserDatabaseService.logSecurityEvent(
@@ -238,7 +238,8 @@ function AppContent() {
             );
             
             // Only show error after all retries failed
-            console.log(`❌ VPN connection failed after ${maxRetries} attempts`);
+            // console.log(`❌ VPN connection failed after ${maxRetries} attempts`);
+
             setErrors([{
               type: 'vpn',
               title: 'VPN Connection Failed',
@@ -254,8 +255,9 @@ function AppContent() {
             }]);
             return;
           }
-          console.log('✅ VPN connected successfully');
-          
+
+          // console.log('✅ VPN connected successfully');
+
           // Log successful VPN initialization
           await SecureBrowserDatabaseService.logSecurityEvent(
             'vpn_disconnected', // Note: We use vpn_disconnected type but with positive message
@@ -310,7 +312,7 @@ function AppContent() {
         );
         
       } catch (error) {
-        console.error('❌ Service initialization failed:', error);
+        // console.error('❌ Service initialization failed:', error);
         
         // Log general initialization failure
         await SecureBrowserDatabaseService.logSecurityEvent(
@@ -343,14 +345,14 @@ function AppContent() {
         // Only log if status actually changed
         if (isCurrentlyConnected !== wasConnected) {
           if (isCurrentlyConnected) {
-            console.log('✅ VPN reconnected detected');
+            // console.log('✅ VPN reconnected detected');
             await SecureBrowserDatabaseService.logSecurityEvent(
               'vpn_disconnected', // Using this type but with positive message
               'VPN connection restored',
               'low'
             );
           } else {
-            console.warn('⚠️ VPN disconnection detected');
+            // console.warn('⚠️ VPN disconnection detected');
             await SecureBrowserDatabaseService.logSecurityEvent(
               'vpn_disconnected',
               'VPN connection lost during session',
@@ -372,7 +374,7 @@ function AppContent() {
       try {
         // Check if user has permission to edit access level
         if (user.canEditAccessLevel === false) {
-          console.error('❌ User does not have permission to edit access level');
+          // console.error('❌ User does not have permission to edit access level');
           alert('You do not have permission to change your access level. Please contact your administrator.');
           return;
         }
@@ -381,7 +383,7 @@ function AppContent() {
         setInitStage('vpn');
         setInitProgress(50);
         
-        console.log(`🔄 Changing access level from ${user.accessLevel} to ${newLevel}...`);
+        // console.log(`🔄 Changing access level from ${user.accessLevel} to ${newLevel}...`);
         
         // Update access level in database
         const updateSuccess = await SecureBrowserDatabaseService.updateUserAccessLevel(user.email, newLevel);
@@ -413,12 +415,12 @@ function AppContent() {
         
         // Clear any existing errors
         setErrors([]);
-        
-        console.log(`✅ Access level changed to ${newLevel} successfully`);
-        
+
+        // console.log(`✅ Access level changed to ${newLevel} successfully`);
+
       } catch (error) {
-        console.error('❌ Failed to change access level:', error);
-        
+        // console.error('❌ Failed to change access level:', error);
+
         // Log access level change failure
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
@@ -446,15 +448,15 @@ function AppContent() {
         vpnStatus={vpnStatusInfo || undefined}
         environmentStatus={envStatusInfo || undefined}
         onRetry={() => {
-          console.log('🔄 Retry clicked - clearing errors without reload for non-critical issues');
+          // console.log('🔄 Retry clicked - clearing errors without reload for non-critical issues');
           setErrors([]);
           
           // Only reload for critical errors, otherwise just retry initialization
           if (hasCriticalErrors) {
-            console.log('⚠️ Critical error detected - performing full reload');
+            // console.log('⚠️ Critical error detected - performing full reload');
             window.location.reload();
           } else {
-            console.log('✅ Non-critical error - retrying without reload');
+            // console.log('✅ Non-critical error - retrying without reload');
             setInitStage('auth');
             setInitProgress(0);
             // Re-run initialization without reload
@@ -462,7 +464,7 @@ function AppContent() {
           }
         }}
         onOpenSettings={() => {
-          console.log('Opening settings...');
+          // console.log('Opening settings...');
           // TODO: Implement settings modal
         }}
       />
@@ -499,24 +501,24 @@ function AppContent() {
     return (
       <ClerkLoginForm 
         onAuthSuccess={async (userData) => {
-          console.log('✅ User authenticated via Clerk:', userData);
-          
+          // console.log('✅ User authenticated via Clerk:', userData);
+
           // Initialize database session for the authenticated user
           try {
-            console.log('🔑 Initializing database session for Clerk user...');
+            // console.log('🔑 Initializing database session for Clerk user...');
             const sessionSuccess = await SecureBrowserDatabaseService.initializeUserSession(
               userData.email, 
               userData.name
             );
             
             if (sessionSuccess) {
-              console.log('✅ Database session initialized successfully');
+              // console.log('✅ Database session initialized successfully');
               
               // Now that we have a session, update VPN status if connected
               try {
                 const vpnConnected = await vpnService.isConnected();
-                console.log('🔍 Checking VPN status after session creation:', vpnConnected);
-                
+                // console.log('🔍 Checking VPN status after session creation:', vpnConnected);
+
                 if (vpnConnected) {
                   // Get current environment config
                   const envConfigStr = await window.secureBrowser?.system.getEnvironment();
@@ -538,18 +540,18 @@ function AppContent() {
                     '134.199.169.102' // VPN IP
                   );
                   
-                  console.log('✅ VPN status synchronized to database');
+                  // console.log('✅ VPN status synchronized to database');
                 } else {
-                  console.log('⚠️ VPN not connected during session initialization');
+                  // console.log('⚠️ VPN not connected during session initialization');
                 }
               } catch (error) {
-                console.error('❌ Failed to sync VPN status after session creation:', error);
+                // console.error('❌ Failed to sync VPN status after session creation:', error);
               }
               
               // Start session monitoring
               SecureBrowserDatabaseService.startSessionMonitoring();
             } else {
-              console.warn('⚠️ Database session initialization failed, but continuing with authentication');
+              // console.warn('⚠️ Database session initialization failed, but continuing with authentication');
               // Log the failure but don't block authentication
               await SecureBrowserDatabaseService.logSecurityEvent(
                 'unauthorized_access',
@@ -558,7 +560,7 @@ function AppContent() {
               );
             }
           } catch (error) {
-            console.error('❌ Failed to initialize database session:', error);
+            // console.error('❌ Failed to initialize database session:', error);
             // Log the error but don't block authentication
             await SecureBrowserDatabaseService.logSecurityEvent(
               'unauthorized_access',
@@ -572,7 +574,7 @@ function AppContent() {
           setIsAuthenticated(true);
         }}
         onAuthError={(error) => {
-          console.error('❌ Clerk authentication failed:', error);
+          // console.error('❌ Clerk authentication failed:', error);
           setErrors([{
             type: 'config',
             title: 'Authentication Failed',
@@ -604,10 +606,10 @@ function AppContent() {
       // Clear local state
       setUser(null);
       setIsAuthenticated(false);
-      
-      console.log('✅ User logged out successfully');
+
+      // console.log('✅ User logged out successfully');
     } catch (error) {
-      console.error('❌ Failed to clean up session during logout:', error);
+      // console.error('❌ Failed to clean up session during logout:', error);
       // Still proceed with logout even if database cleanup fails
       setUser(null);
       setIsAuthenticated(false);

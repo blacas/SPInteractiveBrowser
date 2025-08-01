@@ -94,7 +94,7 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
                              target.closest('[id*="webview"]');
       
       if ((isWebview || isInWebviewContainer || isInTabsContent || isInBrowserContent || isInContentArea) && isOpen) {
-        console.log('🖱️ Browser content area clicked, closing menu');
+        // console.log('🖱️ Browser content area clicked, closing menu');
         setIsOpen(false);
       }
     };
@@ -136,9 +136,9 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
   const handleZoomClick = (action: () => void, event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    console.log('🔍 [MENU] Zoom control clicked, calling action function');
+    // console.log('🔍 [MENU] Zoom control clicked, calling action function');
     action();
-    console.log('🔍 [MENU] Zoom action function completed');
+    // console.log('🔍 [MENU] Zoom action function completed');
     // Keep the menu open by preventing the dropdown from closing
   };
 
@@ -323,7 +323,9 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
 
         <DropdownMenuItem 
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => console.log('Developer tools'))}
+          onClick={() => handleMenuClick(() => {
+            // console.log('Developer tools')
+          })}
         >
           <Settings className="w-4 h-4" />
           <span>Developer tools</span>
@@ -342,9 +344,11 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
         </DropdownMenuItem>
 
         {/* Help */}
-        <DropdownMenuItem 
+        <DropdownMenuItem
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => console.log('Help'))}
+          onClick={() => handleMenuClick(() => {
+            // console.log('Help')             
+          })}
         >
           <HelpCircle className="w-4 h-4" />
           <span>Help</span>
@@ -355,7 +359,9 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
         {/* Security & Account */}
         <DropdownMenuItem 
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => console.log('Security'))}
+          onClick={() => handleMenuClick(() => {
+            // console.log('Security')
+          })}
         >
           <Shield className="w-4 h-4" />
           <span>Security & Privacy</span>
@@ -374,7 +380,9 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
         {/* About */}
         <DropdownMenuItem 
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => console.log('About'))}
+          onClick={() => handleMenuClick(() => {
+            // console.log('About')
+          })}
         >
           <Info className="w-4 h-4" />
           <span>About Secure Browser</span>

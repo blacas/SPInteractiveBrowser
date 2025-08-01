@@ -152,9 +152,9 @@ try {
 }
 
 // Log security initialization
-console.log('🔒 Secure Browser Preload: Context isolation enabled')
-console.log('🌐 VPN-routed traffic: Ready for Australian endpoint')
-console.log('🔑 Vault integration: SharePoint credentials secure')
+// console.log('🔒 Secure Browser Preload: Context isolation enabled')
+// console.log('🌐 VPN-routed traffic: Ready for Australian endpoint')
+// console.log('🔑 Vault integration: SharePoint credentials secure')
 
 // Type definitions for renderer process
 // Type definitions for renderer process

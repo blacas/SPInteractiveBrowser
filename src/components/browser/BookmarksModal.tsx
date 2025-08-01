@@ -100,12 +100,12 @@ const BookmarksModal: React.FC<BookmarksModalProps> = ({
       const success = await bookmarksService.removeBookmark(bookmark.url, userId);
       if (success) {
         await loadBookmarks();
-        console.log('✅ Bookmark deleted successfully');
+        // console.log('✅ Bookmark deleted successfully');
       } else {
-        console.error('❌ Failed to delete bookmark');
+        // console.error('❌ Failed to delete bookmark');
       }
     } catch (error) {
-      console.error('Error deleting bookmark:', error);
+      // console.error('Error deleting bookmark:', error);
     }
   };
 

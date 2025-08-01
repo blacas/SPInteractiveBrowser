@@ -74,11 +74,11 @@ export class SharePointService {
 
       this.initialized = true;
       
-      console.log('✅ SharePoint service initialized successfully');
-      console.log('📧 Client ID:', clientId.substring(0, 8) + '...');
-      console.log('🏢 Tenant ID:', tenantId.substring(0, 8) + '...');
+      // console.log('✅ SharePoint service initialized successfully');
+      // console.log('📧 Client ID:', clientId.substring(0, 8) + '...');
+      // console.log('🏢 Tenant ID:', tenantId.substring(0, 8) + '...');
     } catch (error) {
-      console.error('❌ Failed to initialize SharePoint service:', error);
+      // console.error('❌ Failed to initialize SharePoint service:', error);
       throw new Error(`SharePoint initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -94,7 +94,7 @@ export class SharePointService {
     }
 
     try {
-      console.log('🔄 Acquiring new access token via main process...');
+      // console.log('🔄 Acquiring new access token via main process...');
       
       // Use main process to handle OAuth (bypasses CORS)
       if (typeof window !== 'undefined' && window.secureBrowser?.sharepoint?.getOAuthToken) {
@@ -105,8 +105,8 @@ export class SharePointService {
           // Set expiry to 55 minutes from now (tokens usually last 1 hour)
           this.tokenExpiry = new Date(Date.now() + (55 * 60 * 1000));
           
-          console.log('✅ Access token acquired successfully via main process');
-          console.log(`📅 Token expires at: ${this.tokenExpiry.toISOString()}`);
+          // console.log('✅ Access token acquired successfully via main process');
+          // console.log(`📅 Token expires at: ${this.tokenExpiry.toISOString()}`);
           
           return this.currentToken;
         } else {
@@ -116,7 +116,7 @@ export class SharePointService {
         throw new Error('Main process OAuth handler not available');
       }
     } catch (error) {
-      console.error('❌ Error acquiring access token:', error);
+      // console.error('❌ Error acquiring access token:', error);
       throw new Error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -126,7 +126,7 @@ export class SharePointService {
       const token = await this.getAccessToken();
       let discoveredSite: SharePointSite | null = null;
 
-      console.log('🔍 Starting SharePoint site discovery...');
+      // console.log('🔍 Starting SharePoint site discovery...');
 
       // Try SharePoint root site first
       try {
@@ -134,7 +134,7 @@ export class SharePointService {
 
         if (rootResponse.success && rootResponse.data) {
           const rootData = rootResponse.data;
-          console.log('✅ SharePoint root site accessible!');
+          // console.log('✅ SharePoint root site accessible!');
           
           discoveredSite = {
             id: rootData.id,
@@ -144,7 +144,7 @@ export class SharePointService {
           };
         }
       } catch (error) {
-        console.log('Root site discovery failed, trying hostname approach...');
+        // console.log('Root site discovery failed, trying hostname approach...');
       }
 
       // Try hostname-based approach if root failed
@@ -171,7 +171,7 @@ export class SharePointService {
 
             if (hostnameResponse.success && hostnameResponse.data) {
               const hostnameData = hostnameResponse.data;
-              console.log('✅ SharePoint site accessible via hostname!');
+              // console.log('✅ SharePoint site accessible via hostname!');
               
               discoveredSite = {
                 id: hostnameData.id,
@@ -181,7 +181,7 @@ export class SharePointService {
               };
             }
           } catch (error) {
-            console.log('Hostname method failed:', error);
+            // console.log('Hostname method failed:', error);
           }
         }
       }
@@ -195,7 +195,7 @@ export class SharePointService {
 
       return [discoveredSite];
     } catch (error) {
-      console.error('❌ Error getting SharePoint sites:', error);
+      // console.error('❌ Error getting SharePoint sites:', error);
       throw new Error(`Failed to get SharePoint sites: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -215,7 +215,7 @@ export class SharePointService {
         throw new Error(response.error || 'Failed to get site drives');
       }
     } catch (error) {
-      console.error('❌ Error getting site drives:', error);
+      // console.error('❌ Error getting site drives:', error);
       throw new Error(`Failed to get site drives: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -250,7 +250,7 @@ export class SharePointService {
         throw new Error(response.error || 'Failed to get files');
       }
     } catch (error) {
-      console.error('❌ Error getting files:', error);
+      // console.error('❌ Error getting files:', error);
       throw new Error(`Failed to get files: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -267,7 +267,7 @@ export class SharePointService {
 
       return await response.blob();
     } catch (error) {
-      console.error('❌ Error downloading file:', error);
+      // console.error('❌ Error downloading file:', error);
       throw new Error(`Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

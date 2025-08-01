@@ -51,9 +51,9 @@ export class HistoryService {
         await this.updateDatabaseHistory(url, domain, pageTitle, faviconUrl);
       }
       
-      console.log('✅ History entry added:', { url, pageTitle, domain });
+      // console.log('✅ History entry added:', { url, pageTitle, domain });
     } catch (error) {
-      console.error('❌ Failed to add history entry:', error);
+      // console.error('❌ Failed to add history entry:', error);
     }
   }
 
@@ -103,7 +103,7 @@ export class HistoryService {
       
       localStorage.setItem(this.HISTORY_KEY, JSON.stringify(localHistory));
     } catch (error) {
-      console.error('❌ Failed to update local history:', error);
+      // console.error('❌ Failed to update local history:', error);
     }
   }
 
@@ -143,7 +143,7 @@ export class HistoryService {
         await this.handleDatabaseConflict(url, domain, pageTitle, faviconUrl);
       }
     } catch (error) {
-      console.error('❌ Failed to update database history:', error);
+      // console.error('❌ Failed to update database history:', error);
     }
   }
 
@@ -196,7 +196,7 @@ export class HistoryService {
           });
       }
     } catch (error) {
-      console.error('❌ Failed to handle database conflict:', error);
+      // console.error('❌ Failed to handle database conflict:', error);
     }
   }
 
@@ -206,7 +206,7 @@ export class HistoryService {
       const stored = localStorage.getItem(this.HISTORY_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
-      console.error('❌ Failed to get local history:', error);
+      // console.error('❌ Failed to get local history:', error);
       return [];
     }
   }
@@ -238,7 +238,7 @@ export class HistoryService {
         accessLevel: row.access_level
       })) || [];
     } catch (error) {
-      console.error('❌ Failed to get database history:', error);
+      // console.error('❌ Failed to get database history:', error);
       return [];
     }
   }
@@ -313,7 +313,7 @@ export class HistoryService {
         )
         .slice(0, limit);
     } catch (error) {
-      console.error('❌ Failed to search history:', error);
+      // console.error('❌ Failed to search history:', error);
       return [];
     }
   }
@@ -348,9 +348,9 @@ export class HistoryService {
         await query;
       }
       
-      console.log('✅ History cleared for timeRange:', timeRange);
+      // console.log('✅ History cleared for timeRange:', timeRange);
     } catch (error) {
-      console.error('❌ Failed to clear history:', error);
+      // console.error('❌ Failed to clear history:', error);
     }
   }
 
@@ -394,7 +394,7 @@ export class HistoryService {
       if (!this.currentUser?.id) return;
       
       const localHistory = this.getLocalHistory();
-      console.log(`🔄 Syncing ${localHistory.length} local history entries to database...`);
+      // console.log(`🔄 Syncing ${localHistory.length} local history entries to database...`);
       
       for (const entry of localHistory) {
         await this.updateDatabaseHistory(
@@ -405,9 +405,9 @@ export class HistoryService {
         );
       }
       
-      console.log('✅ Local history synced to database');
+      // console.log('✅ Local history synced to database');
     } catch (error) {
-      console.error('❌ Failed to sync local history to database:', error);
+      // console.error('❌ Failed to sync local history to database:', error);
     }
   }
 } 

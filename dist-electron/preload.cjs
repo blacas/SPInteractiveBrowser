@@ -124,6 +124,3 @@ try {
   Object.freeze(console);
 } catch (error) {
 }
-console.log("🔒 Secure Browser Preload: Context isolation enabled");
-console.log("🌐 VPN-routed traffic: Ready for Australian endpoint");
-console.log("🔑 Vault integration: SharePoint credentials secure");

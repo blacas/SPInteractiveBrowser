@@ -5,11 +5,11 @@ const supabaseUrl = import.meta.env?.NEXT_PUBLIC_SUPABASE_URL as string
 const supabaseKey = import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
 
 // Debug: Check if environment variables are loaded
-console.log('🔍 Secure Browser Supabase Config:')
-console.log('Supabase URL:', supabaseUrl)
-console.log('Anon Key (first 20 chars):', supabaseKey?.substring(0, 20) + '...')
-console.log('URL is valid:', supabaseUrl?.startsWith('https://'))
-console.log('Key is valid:', supabaseKey?.startsWith('eyJ'))
+// console.log('🔍 Secure Browser Supabase Config:')
+// console.log('Supabase URL:', supabaseUrl)
+// console.log('Anon Key (first 20 chars):', supabaseKey?.substring(0, 20) + '...')
+// console.log('URL is valid:', supabaseUrl?.startsWith('https://'))
+// console.log('Key is valid:', supabaseKey?.startsWith('eyJ'))
 
 // Validate environment variables
 if (!supabaseUrl || !supabaseKey) {
@@ -238,9 +238,9 @@ export class DatabaseService {
         ...connectionData,
         connection_start: new Date().toISOString()
       }
-      
-      console.log('🔧 DatabaseService.logVPNConnection - Inserting data:', insertData)
-      
+
+      // console.log('🔧 DatabaseService.logVPNConnection - Inserting data:', insertData)
+
       const { data, error } = await supabase
         .from('vpn_connections')
         .insert(insertData)
@@ -248,20 +248,20 @@ export class DatabaseService {
         .single()
       
       if (error) {
-        console.error('❌ Error logging VPN connection to database:', error)
-        console.error('❌ Error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        })
+        // console.error('❌ Error logging VPN connection to database:', error)
+        // console.error('❌ Error details:', {
+        //   message: error.message,
+        //   details: error.details,
+        //   hint: error.hint,
+        //   code: error.code
+        // })
         return null
       }
       
-      console.log('✅ VPN connection successfully inserted into database:', data)
+      // console.log('✅ VPN connection successfully inserted into database:', data)
       return data
     } catch (error) {
-      console.error('❌ Exception in logVPNConnection:', error)
+      // console.error('❌ Exception in logVPNConnection:', error)
       return null
     }
   }
@@ -277,13 +277,13 @@ export class DatabaseService {
         })
       
       if (error) {
-        console.error('Error logging navigation:', error)
+        // console.error('Error logging navigation:', error)
         return false
       }
       
       return true
     } catch (error) {
-      console.error('Exception in logNavigation:', error)
+      // console.error('Exception in logNavigation:', error)
       return false
     }
   }
@@ -298,13 +298,13 @@ export class DatabaseService {
         .single()
       
       if (error) {
-        console.error('Error fetching access level:', error)
+        // console.error('Error fetching access level:', error)
         return null
       }
       
       return data
     } catch (error) {
-      console.error('Exception in getAccessLevel:', error)
+      // console.error('Exception in getAccessLevel:', error)
       return null
     }
   }
@@ -321,13 +321,13 @@ export class DatabaseService {
       const { data, error } = await query
       
       if (error) {
-        console.error('Error fetching system settings:', error)
+        // console.error('Error fetching system settings:', error)
         return []
       }
       
       return data || []
     } catch (error) {
-      console.error('Exception in getSystemSettings:', error)
+      // console.error('Exception in getSystemSettings:', error)
       return []
     }
   }
@@ -344,13 +344,13 @@ export class DatabaseService {
         .eq('key', key)
       
       if (error) {
-        console.error('Error updating system setting:', error)
+        // console.error('Error updating system setting:', error)
         return false
       }
       
       return true
     } catch (error) {
-      console.error('Exception in updateSystemSetting:', error)
+      // console.error('Exception in updateSystemSetting:', error)
       return false
     }
   }

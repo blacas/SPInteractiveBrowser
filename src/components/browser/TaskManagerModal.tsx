@@ -151,10 +151,10 @@ const TaskManagerModal: React.FC<TaskManagerModalProps> = ({ isOpen, onClose }) 
   const endTask = (taskId: string) => {
     if (taskId.includes('tab')) {
       // In a real implementation, this would close the tab
-      console.log('🔄 Closing tab:', taskId);
+      // console.log('🔄 Closing tab:', taskId);
       setTasks(prev => prev.filter(task => task.id !== taskId));
     } else {
-      console.log('⚠️ Cannot end system process:', taskId);
+      // console.log('⚠️ Cannot end system process:', taskId);
     }
   };
 

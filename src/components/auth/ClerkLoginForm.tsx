@@ -36,11 +36,11 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
         setInitError(null);
 
         // 🔐 CHECK GLOBAL AUTH STATE FIRST: If user is already authenticated globally, use that
-        console.log('🔍 Checking for existing global authentication state...');
+        // console.log('🔍 Checking for existing global authentication state...');
         const globalAuthState = clerkAuth.getCurrentAuthState();
         
         if (globalAuthState.isSignedIn && globalAuthState.user) {
-          console.log('✅ Found existing global authentication - user already signed in!');
+          // console.log('✅ Found existing global authentication - user already signed in!');
           setAuthState(globalAuthState);
           
           // Notify parent immediately with existing auth
@@ -51,13 +51,13 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
               onAuthError('No email address found for this user');
               return;
             }
-            console.log('🔍 Using cached user data for:', userEmail);
+            // console.log('🔍 Using cached user data for:', userEmail);
             
             // Fetch user data from database with permissions
             const dbUserData = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail);
             
             if (dbUserData) {
-              console.log('✅ Database user data loaded from cache:', dbUserData);
+              // console.log('✅ Database user data loaded from cache:', dbUserData);
               onAuthSuccess({
                 id: globalAuthState.user.id,
                 dbId: dbUserData.id,
@@ -67,7 +67,7 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
                 canEditAccessLevel: dbUserData.canEditAccessLevel,
               });
             } else {
-              console.warn('⚠️ User not found in database, using Clerk defaults from cache');
+              // console.warn('⚠️ User not found in database, using Clerk defaults from cache');
               // 🔐 USE CACHED DATA: Get user info from cached state directly
               const firstName = globalAuthState.user.firstName || '';
               const lastName = globalAuthState.user.lastName || '';
@@ -84,7 +84,7 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
               });
             }
           } catch (error) {
-            console.error('❌ Error processing cached user data:', error);
+            // console.error('❌ Error processing cached user data:', error);
             // 🔐 FALLBACK WITH CACHED DATA: Use cached user data directly as fallback
             const userEmail = globalAuthState.user.emailAddresses?.[0]?.emailAddress || 'unknown@example.com';
             const firstName = globalAuthState.user.firstName || '';
@@ -107,11 +107,11 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
         }
 
         // 🔐 NO EXISTING AUTH: Initialize Clerk for first time
-        console.log('🔄 No existing authentication found - initializing Clerk...');
+        // console.log('🔄 No existing authentication found - initializing Clerk...');
         await clerkAuth.initialize();
 
         // 🔐 REFRESH AUTH STATE: Check for session after initialization
-        console.log('🔄 Refreshing authentication state after initialization...');
+        // console.log('🔄 Refreshing authentication state after initialization...');
         await clerkAuth.refreshAuthenticationState();
 
         // Set up auth state listener for future changes
@@ -126,13 +126,13 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
                 onAuthError('No email address found for this user');
                 return;
               }
-              console.log('🔍 Fetching user data from database for:', userEmail);
+              // console.log('🔍 Fetching user data from database for:', userEmail);
               
               // Fetch user data from database with permissions
               const dbUserData = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail);
               
               if (dbUserData) {
-                console.log('✅ Database user data loaded:', dbUserData);
+                // console.log('✅ Database user data loaded:', dbUserData);
                 onAuthSuccess({
                   id: state.user.id,
                   dbId: dbUserData.id,
@@ -187,11 +187,11 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
   const handleSignIn = async () => {
     try {
       setIsSigningIn(true);
-      console.log('🔐 Opening Clerk sign-in modal...');
+      // console.log('🔐 Opening Clerk sign-in modal...');
       await clerkAuth.signIn();
-      console.log('✅ Clerk sign-in modal opened successfully');
+      // console.log('✅ Clerk sign-in modal opened successfully');
     } catch (error) {
-      console.error('❌ Sign in failed:', error);
+      // console.error('❌ Sign in failed:', error);
       onAuthError(error instanceof Error ? error.message : 'Unable to open sign-in. Please refresh and try again.');
     } finally {
       setIsSigningIn(false);
@@ -201,11 +201,11 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
   const handleSignUp = async () => {
     try {
       setIsSigningUp(true);
-      console.log('🔐 Opening Clerk sign-up modal...');
+      // console.log('🔐 Opening Clerk sign-up modal...');
       await clerkAuth.signUp();
-      console.log('✅ Clerk sign-up modal opened successfully');
+      // console.log('✅ Clerk sign-up modal opened successfully');
     } catch (error) {
-      console.error('❌ Sign up failed:', error);
+      // console.error('❌ Sign up failed:', error);
       onAuthError(error instanceof Error ? error.message : 'Unable to open sign-up. Please refresh and try again.');
     } finally {
       setIsSigningUp(false);

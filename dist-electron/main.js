@@ -90,16 +90,9 @@ const getPlatformInfo = (platform) => {
 };
 const printPlatformInstructions = (configPath) => {
   const info = getPlatformInfo();
-  console.log(`${info.emoji} ${info.displayName} Instructions:`);
-  console.log(`   Config file: ${configPath}`);
-  console.log("");
   info.installInstructions.forEach((instruction, index) => {
-    console.log(`   ${index + 1}. ${instruction}`);
   });
-  if (info.requiresManualSetup) {
-    console.log("");
-    console.log("🔄 After connecting, restart this application to verify the connection.");
-  }
+  if (info.requiresManualSetup) ;
 };
 function getDefaultExportFromCjs(x) {
   return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
@@ -588,7 +581,6 @@ const loadEnvironmentVariables = async () => {
     const envPath = path.resolve(".env");
     const envContent = await promises.readFile(envPath, "utf-8");
     const envLines = envContent.split("\n");
-    console.log("🔍 Loading .env file from:", envPath);
     for (const line of envLines) {
       const trimmed = line.trim();
       if (trimmed && !trimmed.startsWith("#")) {
@@ -597,17 +589,12 @@ const loadEnvironmentVariables = async () => {
           const value = valueParts.join("=").trim();
           process.env[key.trim()] = value;
           if (!key.includes("SECRET") && !key.includes("PASSWORD") && !key.includes("KEY") && !key.includes("ID")) {
-            console.log(`📝 Loaded: ${key.trim()}=${value}`);
           } else {
-            console.log(`📝 Loaded: ${key.trim()}=***`);
           }
         }
       }
     }
-    console.log("✅ Environment variables loaded successfully");
   } catch (error) {
-    console.error("❌ Failed to load .env file:", error);
-    console.log("📝 This may cause VPN detection to fail");
   }
 };
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -621,12 +608,7 @@ let mainWindow = null;
 let vpnConnected = false;
 let wireguardProcess = null;
 const updateVPNStatus = (connected) => {
-  const wasConnected = vpnConnected;
   vpnConnected = connected;
-  if (wasConnected !== connected) {
-    console.log(`🔄 VPN status changed: ${wasConnected ? "Connected" : "Disconnected"} → ${connected ? "Connected" : "Disconnected"}`);
-  }
-  console.log(`📡 VPN Status Updated: ${connected ? "✅ Connected - Allowing all HTTPS requests" : "❌ Disconnected - Blocking external requests"}`);
   windows.forEach((window2) => {
     if (window2 && !window2.isDestroyed()) {
       window2.webContents.send("vpn-status-changed", connected);
@@ -642,7 +624,6 @@ const connectVPN = async () => {
       throw new Error(`VPN provider ${provider} not implemented`);
     }
   } catch (error) {
-    console.error("❌ VPN connection failed:", error);
     return false;
   }
 };
@@ -659,48 +640,30 @@ const disconnectVPN = async () => {
 };
 const connectWireGuard = async () => {
   try {
-    console.log("🔍 Debug: Environment variables at startup:");
-    console.log(`  NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`  VPN_PROVIDER: ${process.env.VPN_PROVIDER}`);
-    console.log(`  WIREGUARD_CONFIG_PATH: ${process.env.WIREGUARD_CONFIG_PATH}`);
-    console.log(`  WIREGUARD_ENDPOINT: ${process.env.WIREGUARD_ENDPOINT}`);
     const configPath = process.env.WIREGUARD_CONFIG_PATH || "./config/wireguard-australia.conf";
     const resolvedPath = path.resolve(configPath);
-    console.log(`🔍 Resolved config path: ${resolvedPath}`);
     try {
       await promises.access(resolvedPath);
-      console.log("✅ Config file found");
     } catch (error) {
-      console.log("❌ Config file not found:", error);
-      console.log("📝 This is OK - config file not required for detection");
     }
     const platformInfo = getPlatformInfo();
-    console.log(`🔌 Checking WireGuard connection on ${platformInfo.displayName}...`);
     const isConnected = await checkWireGuardConnection();
     if (isConnected) {
-      console.log("✅ WireGuard is connected and active");
-      console.log("✅ VPN connected successfully - unrestricted access enabled");
       return true;
     }
-    console.log("🔄 Attempting to establish WireGuard connection...");
     const connectionResult = await establishWireGuardConnection(resolvedPath);
     if (connectionResult) {
-      console.log("✅ WireGuard connection established successfully");
       const verifyConnection = await checkWireGuardConnection();
       if (verifyConnection) {
-        console.log("✅ VPN auto-connected successfully");
         return true;
       } else {
-        console.log("⚠️ Connection established but IP location verification failed");
         return false;
       }
     } else {
-      console.log("❌ WireGuard connection failed.");
       printPlatformInstructions(resolvedPath);
       return false;
     }
   } catch (error) {
-    console.error("❌ WireGuard setup error:", error);
     return false;
   }
 };
@@ -719,13 +682,11 @@ const establishWireGuardConnection = async (configPath) => {
         return false;
     }
   } catch (error) {
-    console.error(`❌ Failed to connect on ${platform}:`, error);
     return false;
   }
 };
 const connectWireGuardLinux = async (configPath) => {
   return new Promise((resolve) => {
-    console.log("🐧 Using Linux wg-quick...");
     const process2 = spawn("wg-quick", ["up", configPath], {
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -733,7 +694,6 @@ const connectWireGuardLinux = async (configPath) => {
       resolve(code === 0);
     });
     process2.on("error", (error) => {
-      console.error("❌ wg-quick error:", error);
       resolve(false);
     });
     setTimeout(() => resolve(false), 3e4);
@@ -741,7 +701,6 @@ const connectWireGuardLinux = async (configPath) => {
 };
 const connectWireGuardMacOS = async (configPath) => {
   return new Promise((resolve) => {
-    console.log("🍎 Using macOS wg-quick...");
     const process2 = spawn("wg-quick", ["up", configPath], {
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -749,15 +708,12 @@ const connectWireGuardMacOS = async (configPath) => {
       resolve(code === 0);
     });
     process2.on("error", () => {
-      console.log("🍎 Trying WireGuard macOS app...");
       resolve(false);
     });
     setTimeout(() => resolve(false), 3e4);
   });
 };
 const connectWireGuardWindows = async (configPath) => {
-  console.log("🪟 Windows detected - checking existing connection...");
-  console.log(`   Config available at: ${configPath}`);
   return false;
 };
 const checkWireGuardConnection = async () => {
@@ -790,7 +746,6 @@ const checkWireGuardLinux = async () => {
     });
     process2.on("exit", (code) => {
       if (code === 0 && output.trim()) {
-        console.log("🐧 WireGuard active on Linux");
         resolve(true);
       } else {
         resolve(false);
@@ -811,7 +766,6 @@ const checkWireGuardMacOS = async () => {
     });
     process2.on("exit", (code) => {
       if (code === 0 && output.trim()) {
-        console.log("🍎 WireGuard active on macOS");
         resolve(true);
       } else {
         checkMacOSNetworkInterfaces().then(resolve);
@@ -841,34 +795,20 @@ const checkMacOSNetworkInterfaces = async () => {
   });
 };
 const checkWireGuardWindows = async () => {
-  console.log("🪟 Starting comprehensive Windows VPN detection...");
-  console.log("🔍 PRIMARY CHECK: IP geolocation (mandatory)...");
   const ipResult = await checkCurrentIP();
   if (!ipResult) {
-    console.log("❌ IP geolocation check FAILED - not connected to Australian VPN");
-    console.log("🚨 CRITICAL: User appears to be browsing from non-Australian IP");
-    console.log("🔍 Running diagnostic checks for troubleshooting...");
     await checkWireGuardCLI();
     await checkWindowsNetworkInterfaces();
     await checkRoutingTable();
-    console.log("⚠️  Note: Ping connectivity to VPN server does not indicate active VPN connection");
     return false;
   }
-  console.log("✅ IP geolocation check PASSED - Australian VPN confirmed");
-  console.log("🔍 Running secondary verification checks...");
-  const cliResult = await checkWireGuardCLI();
-  const interfaceResult = await checkWindowsNetworkInterfaces();
-  const routingResult = await checkRoutingTable();
-  if (cliResult || interfaceResult || routingResult) {
-    console.log("✅ Secondary checks confirm WireGuard is properly configured");
-  } else {
-    console.log("⚠️  Secondary checks inconclusive, but IP location confirms VPN is working");
-  }
+  await checkWireGuardCLI();
+  await checkWindowsNetworkInterfaces();
+  await checkRoutingTable();
   return true;
 };
 const checkWireGuardCLI = async () => {
   return new Promise((resolve) => {
-    console.log("🔍 Checking WireGuard CLI...");
     const wgProcess = spawn("wg", ["show"], {
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -877,28 +817,22 @@ const checkWireGuardCLI = async () => {
       wgOutput += data.toString();
     });
     wgProcess.on("exit", (code) => {
-      console.log(`🔍 WireGuard CLI exit code: ${code}`);
-      console.log(`🔍 WireGuard CLI output: "${wgOutput.trim()}"`);
       if (code === 0 && wgOutput.trim()) {
-        console.log("🪟 WireGuard active on Windows (CLI)");
         resolve(true);
         return;
       }
       resolve(false);
     });
     wgProcess.on("error", (error) => {
-      console.log("🔍 WireGuard CLI error:", error.message);
       resolve(false);
     });
     setTimeout(() => {
-      console.log("🔍 WireGuard CLI check timed out");
       resolve(false);
     }, 3e3);
   });
 };
 const checkWindowsNetworkInterfaces = async () => {
   return new Promise((resolve) => {
-    console.log("🔍 Checking network interfaces via netsh...");
     const netshProcess = spawn("netsh", ["interface", "show", "interface"], {
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -907,31 +841,21 @@ const checkWindowsNetworkInterfaces = async () => {
       output += data.toString();
     });
     netshProcess.on("exit", () => {
-      console.log("🔍 Network interfaces output:");
-      console.log(output);
       const hasWireGuard = output.toLowerCase().includes("wireguard") || output.toLowerCase().includes("wg") || output.toLowerCase().includes("tun");
-      console.log(`🔍 WireGuard interface found: ${hasWireGuard}`);
-      if (hasWireGuard) {
-        console.log("🪟 WireGuard interface detected on Windows");
-      }
       resolve(hasWireGuard);
     });
     netshProcess.on("error", (error) => {
-      console.log("🔍 Network interface check error:", error.message);
       resolve(false);
     });
     setTimeout(() => {
-      console.log("🔍 Network interface check timed out");
       resolve(false);
     }, 3e3);
   });
 };
 const checkRoutingTable = async () => {
   return new Promise((resolve) => {
-    console.log("🔍 Checking routing table...");
     const endpoint = process.env.WIREGUARD_ENDPOINT || "134.199.169.102:59926";
     const serverIP = endpoint.split(":")[0];
-    console.log(`🔍 Looking for routes to server: ${serverIP}`);
     const routeProcess = spawn("route", ["print"], {
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -941,25 +865,18 @@ const checkRoutingTable = async () => {
     });
     routeProcess.on("exit", () => {
       const hasServerRoute = output.includes(serverIP);
-      console.log(`🔍 Route to VPN server found: ${hasServerRoute}`);
-      if (hasServerRoute) {
-        console.log(`🪟 Found route to VPN server ${serverIP}`);
-      }
       resolve(hasServerRoute);
     });
     routeProcess.on("error", (error) => {
-      console.log("🔍 Route check error:", error.message);
       resolve(false);
     });
     setTimeout(() => {
-      console.log("🔍 Route check timed out");
       resolve(false);
     }, 3e3);
   });
 };
 const checkCurrentIP = async () => {
   return new Promise((resolve) => {
-    console.log("🔍 Checking current public IP and location...");
     const psCommand = `(Invoke-WebRequest -Uri "https://ipinfo.io/json" -UseBasicParsing).Content | ConvertFrom-Json | ConvertTo-Json -Compress`;
     const psProcess = spawn("powershell", ["-Command", psCommand], {
       stdio: ["pipe", "pipe", "pipe"]
@@ -975,19 +892,12 @@ const checkCurrentIP = async () => {
         const country = ipInfo.country;
         const region = ipInfo.region;
         const city = ipInfo.city;
-        console.log(`🔍 Current public IP: ${currentIP}`);
-        console.log(`🔍 Location: ${city}, ${region}, ${country}`);
         const isAustralianIP = country === "AU" || country === "Australia";
         if (isAustralianIP) {
-          console.log("🇦🇺 ✅ Connected via Australian VPN!");
-          console.log(`📍 Australian location detected: ${city}, ${region}`);
         } else {
-          console.log(`❌ Not connected to Australian VPN. Current location: ${country}`);
         }
         resolve(isAustralianIP);
       } catch (error) {
-        console.log("🔍 Failed to parse IP info:", error);
-        console.log("🔍 Raw output:", output);
         const ipOnlyCommand = `(Invoke-WebRequest -Uri "https://ipinfo.io/ip" -UseBasicParsing).Content.Trim()`;
         const fallbackProcess = spawn("powershell", ["-Command", ipOnlyCommand], {
           stdio: ["pipe", "pipe", "pipe"]
@@ -998,9 +908,7 @@ const checkCurrentIP = async () => {
         });
         fallbackProcess.on("exit", () => {
           const ip = fallbackOutput.trim();
-          console.log(`🔍 Fallback IP check: ${ip}`);
           const isNotLocalIP = !ip.startsWith("192.168.") && !ip.startsWith("10.") && !ip.startsWith("172.") && ip !== "127.0.0.1";
-          console.log(`🔍 Assuming VPN status based on non-local IP: ${isNotLocalIP}`);
           resolve(isNotLocalIP);
         });
         fallbackProcess.on("error", () => {
@@ -1009,11 +917,9 @@ const checkCurrentIP = async () => {
       }
     });
     psProcess.on("error", (error) => {
-      console.log("🔍 IP check error:", error.message);
       resolve(false);
     });
     setTimeout(() => {
-      console.log("🔍 IP check timed out");
       resolve(false);
     }, 1e4);
   });
@@ -1023,7 +929,6 @@ const disconnectWireGuard = async () => {
     const configPath = process.env.WIREGUARD_CONFIG_PATH || "./config/wireguard-australia.conf";
     const resolvedPath = path.resolve(configPath);
     const platform = process.platform;
-    console.log(`🔌 Disconnecting WireGuard on ${platform}...`);
     switch (platform) {
       case "linux":
       case "darwin":
@@ -1047,7 +952,6 @@ const disconnectWireGuardUnix = async (configPath) => {
     downProcess.on("exit", (code) => {
       wireguardProcess = null;
       if (code === 0) {
-        console.log("✅ WireGuard disconnected successfully");
         resolve(true);
       } else {
         console.error(`❌ WireGuard disconnection failed with code: ${code}`);
@@ -1062,9 +966,6 @@ const disconnectWireGuardUnix = async (configPath) => {
   });
 };
 const disconnectWireGuardWindows = async () => {
-  console.log("🪟 On Windows, please disconnect manually via WireGuard GUI");
-  console.log("   1. Open WireGuard application");
-  console.log('   2. Click "Deactivate" on your tunnel');
   return true;
 };
 const configureSecureSession = () => {
@@ -1081,17 +982,14 @@ const configureSecureSession = () => {
       return;
     }
     if (url.includes("clerk.dev") || url.includes("clerk.com") || url.includes("clerk.accounts.dev")) {
-      console.log("✅ Allowing Clerk auth request:", details.url);
       callback({ cancel: false });
       return;
     }
     if (url.startsWith("http://")) {
-      console.log("🚫 Blocking insecure HTTP request:", details.url);
       callback({ cancel: true });
       return;
     }
     if (url.startsWith("https://")) {
-      console.log("✅ Allowing HTTPS auth request:", details.url);
       callback({ cancel: false });
       return;
     }
@@ -1106,7 +1004,6 @@ const configureSecureSession = () => {
       requestHeaders: {
         ...details.requestHeaders,
         "User-Agent": userAgent,
-        // Add additional headers for OAuth compatibility
         "Sec-Fetch-Site": "cross-site",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Dest": "document"
@@ -1114,14 +1011,7 @@ const configureSecureSession = () => {
     });
   });
   const handleDownload = (event, item, sessionName) => {
-    console.log("🎯 Download detected from", sessionName, ":", {
-      filename: item.getFilename(),
-      url: item.getURL(),
-      size: item.getTotalBytes(),
-      blocked: process.env.SECURITY_BLOCK_DOWNLOADS === "true"
-    });
     if (process.env.SECURITY_BLOCK_DOWNLOADS === "true") {
-      console.log("🚫 Blocking download (SECURITY_BLOCK_DOWNLOADS=true):", item.getFilename());
       event.preventDefault();
       windows.forEach((window2) => {
         if (window2 && !window2.isDestroyed()) {
@@ -1134,7 +1024,6 @@ const configureSecureSession = () => {
       });
       return;
     }
-    console.log("✅ Download allowed from", sessionName, ":", item.getFilename());
     const downloadId = `download_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const downloadStartedData = {
       id: downloadId,
@@ -1142,7 +1031,6 @@ const configureSecureSession = () => {
       url: item.getURL(),
       totalBytes: item.getTotalBytes()
     };
-    console.log("📤 Sending download-started event from", sessionName, ":", downloadStartedData);
     windows.forEach((window2) => {
       if (window2 && !window2.isDestroyed()) {
         window2.webContents.send("download-started", downloadStartedData);
@@ -1157,11 +1045,6 @@ const configureSecureSession = () => {
         totalBytes: item.getTotalBytes(),
         speed: item.getCurrentBytesPerSecond ? item.getCurrentBytesPerSecond() : 0
       };
-      console.log("📤 Sending download-progress event:", {
-        id: downloadId,
-        progress: `${progressData.receivedBytes}/${progressData.totalBytes}`,
-        percent: Math.round(progressData.receivedBytes / progressData.totalBytes * 100)
-      });
       windows.forEach((window2) => {
         if (window2 && !window2.isDestroyed()) {
           window2.webContents.send("download-progress", progressData);
@@ -1175,7 +1058,6 @@ const configureSecureSession = () => {
         state,
         filePath: state === "completed" ? item.getSavePath() : null
       };
-      console.log("📤 Sending download-completed event:", completedData);
       windows.forEach((window2) => {
         if (window2 && !window2.isDestroyed()) {
           window2.webContents.send("download-completed", completedData);
@@ -1184,27 +1066,23 @@ const configureSecureSession = () => {
     });
   };
   defaultSession.on("will-download", (event, item) => {
-    handleDownload(event, item, "default-session");
+    handleDownload(event, item);
   });
   sharedAuthSession.on("will-download", (event, item) => {
-    handleDownload(event, item, "shared-auth-session");
+    handleDownload(event, item);
   });
   const webviewSession = session.fromPartition("persist:main");
   webviewSession.on("will-download", (event, item) => {
-    handleDownload(event, item, "webview-session");
+    handleDownload(event, item);
   });
   const enable1PasswordExtension = async () => {
     try {
       const extensionPath = await find1PasswordExtension();
       if (extensionPath) {
         await defaultSession.loadExtension(extensionPath);
-        console.log("✅ 1Password extension loaded successfully on default session");
       } else {
-        console.log("📝 1Password extension not found - users can install it manually");
       }
     } catch (error) {
-      console.warn("⚠️ Could not load 1Password extension on default session:", error);
-      console.log("📝 Users can install 1Password extension manually from their browser");
     }
   };
   const enable1PasswordExtensionForSession = async (targetSession) => {
@@ -1212,13 +1090,10 @@ const configureSecureSession = () => {
       const extensionPath = await find1PasswordExtension();
       if (extensionPath) {
         await targetSession.loadExtension(extensionPath);
-        console.log("✅ 1Password extension loaded successfully on shared auth session");
       } else {
-        console.log("📝 1Password extension not found for shared session - users can install it manually");
       }
     } catch (error) {
       console.warn("⚠️ Could not load 1Password extension on shared session:", error);
-      console.log("📝 Users can install 1Password extension manually from their browser");
     }
   };
   const find1PasswordExtension = async () => {
@@ -1265,12 +1140,10 @@ const configureSecureSession = () => {
       return;
     }
     if (url.startsWith("http://")) {
-      console.log("🚫 Blocking insecure HTTP request:", details.url);
       callback({ cancel: true });
       return;
     }
     if (url.startsWith("https://")) {
-      console.log("✅ Allowing HTTPS request:", details.url);
       callback({ cancel: false });
       return;
     }
@@ -1311,7 +1184,6 @@ const configureSecureSession = () => {
       requestHeaders: {
         ...details.requestHeaders,
         "User-Agent": userAgent,
-        // Add additional headers for OAuth compatibility
         "Sec-Fetch-Site": "cross-site",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Dest": "document"
@@ -1374,7 +1246,6 @@ function createBrowserWindow(isMain = false) {
       "https://major-snipe-9.clerk.accounts.dev"
     ];
     if (oauthProviders.some((provider) => url.startsWith(provider))) {
-      console.log("🔐 Opening OAuth in system browser:", url);
       shell.openExternal(url);
       return { action: "deny" };
     }
@@ -1383,11 +1254,9 @@ function createBrowserWindow(isMain = false) {
   newWindow.webContents.on("before-input-event", (event, input) => {
     if (input.type === "keyDown" && (input.modifiers.includes("control") || input.modifiers.includes("meta"))) {
       const key = input.key.toLowerCase();
-      console.log("⌨️ [MAIN] Intercepting keyboard shortcut:", key, input.modifiers);
       const criticalShortcuts = ["t", "n", "w", "r", "h", "j", "=", "+", "-", "_", "0"];
       const isShiftShortcut = input.modifiers.includes("shift") && ["o", "i", "t"].includes(key);
       if (criticalShortcuts.includes(key) || isShiftShortcut) {
-        console.log("⌨️ [MAIN] Preventing webview from handling critical shortcut:", key);
         event.preventDefault();
         let shortcutAction = "";
         switch (key) {
@@ -1431,7 +1300,6 @@ function createBrowserWindow(isMain = false) {
             break;
         }
         if (shortcutAction) {
-          console.log("⌨️ [MAIN] Sending shortcut action to renderer:", shortcutAction);
           setTimeout(() => {
             newWindow.webContents.send("keyboard-shortcut", shortcutAction);
           }, 10);
@@ -1460,11 +1328,8 @@ function createBrowserWindow(isMain = false) {
       (provider) => navigationUrl.startsWith(provider)
     );
     if (!isAllowed) {
-      console.log("🚫 Blocking window navigation to:", navigationUrl);
       event.preventDefault();
-    } else if (oauthProviders.some((provider) => navigationUrl.startsWith(provider))) {
-      console.log("🔐 Allowing OAuth navigation to:", navigationUrl);
-    }
+    } else if (oauthProviders.some((provider) => navigationUrl.startsWith(provider))) ;
   });
   if (VITE_DEV_SERVER_URL) {
     newWindow.loadURL(VITE_DEV_SERVER_URL);
@@ -1485,23 +1350,17 @@ function createBrowserWindow(isMain = false) {
       try {
         const alreadyConnected = await checkWireGuardConnection();
         if (alreadyConnected) {
-          console.log("✅ VPN is already connected during app initialization");
           updateVPNStatus(true);
         } else if (process.env.VPN_AUTO_CONNECT === "true") {
-          console.log("🔄 VPN not connected, attempting auto-connect...");
           const connected = await connectVPN();
           updateVPNStatus(connected);
           if (connected) {
-            console.log("✅ VPN auto-connected successfully");
           } else {
-            console.warn("⚠️ VPN auto-connect failed");
           }
         } else {
-          console.log("⚠️ VPN not connected and auto-connect disabled");
           updateVPNStatus(false);
         }
       } catch (error) {
-        console.error("❌ VPN initialization error:", error);
         updateVPNStatus(false);
       }
     }, 500);
@@ -1516,7 +1375,6 @@ function createBrowserWindow(isMain = false) {
         mainWindow = windows[0];
       } else {
         disconnectVPN().catch((error) => {
-          console.error("❌ Error disconnecting VPN on app close:", error);
         });
         mainWindow = null;
       }
@@ -1532,7 +1390,6 @@ function createWindow() {
 }
 ipcMain.handle("sharepoint-get-oauth-token", async () => {
   try {
-    console.log("🔄 Acquiring SharePoint OAuth token in main process...");
     const clientId = process.env.MSAL_CLIENT_ID;
     const tenantId = process.env.MSAL_TENANT_ID;
     const clientSecret = process.env.MSAL_CLIENT_SECRET;
@@ -1545,8 +1402,6 @@ ipcMain.handle("sharepoint-get-oauth-token", async () => {
     params.append("client_secret", clientSecret);
     params.append("scope", "https://graph.microsoft.com/.default");
     params.append("grant_type", "client_credentials");
-    console.log("📡 Making OAuth request to:", tokenUrl);
-    console.log("🔑 Client ID:", clientId.substring(0, 8) + "...");
     const response = await fetch(tokenUrl, {
       method: "POST",
       headers: {
@@ -1555,12 +1410,9 @@ ipcMain.handle("sharepoint-get-oauth-token", async () => {
       body: params.toString()
     });
     const responseText = await response.text();
-    console.log("📊 OAuth Response Status:", response.status);
     if (response.ok) {
       const tokenData = JSON.parse(responseText);
       if (tokenData.access_token) {
-        console.log("✅ OAuth token acquired successfully in main process");
-        console.log("⏱ Token expires in:", tokenData.expires_in, "seconds");
         return {
           success: true,
           accessToken: tokenData.access_token,
@@ -1577,12 +1429,9 @@ ipcMain.handle("sharepoint-get-oauth-token", async () => {
         errorDetails = `${errorData.error}: ${errorData.error_description}`;
       } catch {
       }
-      console.error("❌ OAuth failed:", response.status, response.statusText);
-      console.error("📄 Error details:", errorDetails);
       throw new Error(`OAuth failed: ${response.status} ${response.statusText} - ${errorDetails}`);
     }
   } catch (error) {
-    console.error("❌ Error in sharepoint-get-oauth-token:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error"
@@ -1592,7 +1441,6 @@ ipcMain.handle("sharepoint-get-oauth-token", async () => {
 ipcMain.handle("sharepoint-graph-request", async (_, { endpoint, accessToken }) => {
   var _a, _b;
   try {
-    console.log("📡 Making Graph API request to:", endpoint);
     const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
       headers: {
         "Authorization": `Bearer ${accessToken}`,
@@ -1600,10 +1448,8 @@ ipcMain.handle("sharepoint-graph-request", async (_, { endpoint, accessToken }) 
       }
     });
     const responseText = await response.text();
-    console.log("📊 Graph API Response Status:", response.status);
     if (response.ok) {
       const data = JSON.parse(responseText);
-      console.log("✅ Graph API request successful");
       return {
         success: true,
         data
@@ -1676,46 +1522,34 @@ ipcMain.handle("system-get-environment", () => {
     LOG_LEVEL: process.env.LOG_LEVEL,
     LOG_FILE_PATH: process.env.LOG_FILE_PATH
   };
-  console.log("🔄 Environment variables requested from renderer:", {
-    NODE_ENV: envVars.NODE_ENV,
-    VPN_PROVIDER: envVars.VPN_PROVIDER,
-    WIREGUARD_ENDPOINT: envVars.WIREGUARD_ENDPOINT
-  });
   return JSON.stringify(envVars);
 });
 ipcMain.handle("vpn-get-status", async () => {
-  console.log("🔍 VPN status requested - running comprehensive check...");
   try {
     const isConnected = await checkWireGuardConnection();
     const status = isConnected ? "connected" : "disconnected";
-    console.log(`📊 VPN status check result: ${status}`);
     updateVPNStatus(isConnected);
     return status;
   } catch (error) {
-    console.error("❌ VPN status check error:", error);
     return "disconnected";
   }
 });
 ipcMain.handle("vpn-connect", async (_event, provider) => {
-  console.log(`🌐 VPN connect requested: ${provider}`);
   try {
     const success = await connectVPN();
     updateVPNStatus(success);
     return success;
   } catch (error) {
-    console.error("❌ VPN connection error:", error);
     updateVPNStatus(false);
     return false;
   }
 });
 ipcMain.handle("vpn-disconnect", async () => {
-  console.log("🌐 VPN disconnect requested");
   try {
     const success = await disconnectVPN();
     updateVPNStatus(false);
     return success;
   } catch (error) {
-    console.error("❌ VPN disconnection error:", error);
     return false;
   }
 });
@@ -1774,11 +1608,9 @@ const get1PasswordSecret = async (itemId) => {
   }
 };
 ipcMain.handle("vault-get-sharepoint-credentials", async () => {
-  console.log("🔑 SharePoint credentials requested from main process");
   try {
     const vaultProvider = process.env.VAULT_PROVIDER || "hashicorp";
     if (process.env.NODE_ENV === "development") {
-      console.log("🔧 Development mode: returning mock vault credentials");
       return {
         username: "dev-user@yourcompany.sharepoint.com",
         password: "dev-password-from-vault",
@@ -1786,7 +1618,6 @@ ipcMain.handle("vault-get-sharepoint-credentials", async () => {
       };
     }
     if (vaultProvider === "1password" || vaultProvider === "1password-cli") {
-      console.log("🔐 Using 1Password Service Account for credentials");
       const itemId = process.env.OP_SHAREPOINT_ITEM_ID || "SharePoint Service Account";
       const secrets = await get1PasswordSecret(itemId);
       return {
@@ -1796,7 +1627,6 @@ ipcMain.handle("vault-get-sharepoint-credentials", async () => {
         lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
       };
     } else {
-      console.log(`⚠️ Vault provider ${vaultProvider} not fully implemented`);
       return {
         username: "vault-user@yourcompany.sharepoint.com",
         password: "vault-retrieved-password",
@@ -1804,15 +1634,12 @@ ipcMain.handle("vault-get-sharepoint-credentials", async () => {
       };
     }
   } catch (error) {
-    console.error("❌ Vault credentials retrieval failed:", error);
     throw new Error(`Vault credentials unavailable: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 });
 ipcMain.handle("vault-rotate-credentials", async () => {
-  console.log("🔄 Vault credential rotation requested from main process");
   try {
     if (process.env.NODE_ENV === "development") {
-      console.log("🔧 Development mode: simulating credential rotation");
       return true;
     }
     return true;
@@ -1844,54 +1671,41 @@ ipcMain.handle("vault-get-status", async () => {
         }
       });
       if (response.ok) {
-        console.log("✅ 1Password Service Account access verified");
         return "connected";
       } else {
-        console.error("❌ 1Password Service Account access failed:", response.status);
         return "error: Cannot access SharePoint credentials in 1Password";
       }
     } else {
       return "connected";
     }
   } catch (error) {
-    console.error("❌ Vault status check failed:", error);
     return `error: ${error instanceof Error ? error.message : "Unknown error"}`;
   }
 });
 ipcMain.handle("security-check-url", async (_event, url, accessLevel) => {
-  console.log(`🔒 URL check: ${url} (Level ${accessLevel})`);
   return true;
 });
 ipcMain.handle("security-log-navigation", async (_event, url, allowed, accessLevel) => {
-  console.log(`📝 Navigation log: ${url} - ${allowed ? "ALLOWED" : "BLOCKED"} (Level ${accessLevel})`);
 });
 ipcMain.handle("security-prevent-download", async (_event, filename) => {
-  console.log(`🚫 Download blocked: ${filename}`);
 });
 ipcMain.handle("shell-open-path", async (_event, filePath) => {
   try {
-    console.log("📁 Opening file with system default application:", filePath);
     const result = await shell.openPath(filePath);
     if (result) {
-      console.error("❌ Failed to open file:", result);
       return result;
     } else {
-      console.log("✅ File opened successfully");
       return null;
     }
   } catch (error) {
-    console.error("❌ Error opening file:", error);
     return error instanceof Error ? error.message : "Unknown error";
   }
 });
 ipcMain.handle("shell-show-item-in-folder", async (_event, filePath) => {
   try {
-    console.log("📂 Revealing file in system file manager:", filePath);
     shell.showItemInFolder(filePath);
-    console.log("✅ File revealed in explorer successfully");
     return null;
   } catch (error) {
-    console.error("❌ Error revealing file:", error);
     return error instanceof Error ? error.message : "Unknown error";
   }
 });
@@ -1923,13 +1737,11 @@ ipcMain.handle("save-page-as-pdf", async (_event) => {
     };
     const data = await focusedWindow.webContents.printToPDF(options);
     fs2.writeFileSync(result.filePath, data);
-    console.log(`✅ PDF saved to: ${result.filePath}`);
     return {
       success: true,
       filePath: result.filePath
     };
   } catch (error) {
-    console.error("❌ Error saving PDF:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error"
@@ -1957,7 +1769,6 @@ ipcMain.handle("extension-get-1password-status", async () => {
       };
     }
   } catch (error) {
-    console.error("❌ Error checking 1Password extension status:", error);
     return {
       installed: false,
       error: "Could not check extension status"
@@ -1965,7 +1776,6 @@ ipcMain.handle("extension-get-1password-status", async () => {
   }
 });
 ipcMain.handle("extension-install-1password", async () => {
-  console.log("🔧 1Password extension installation requested");
   return {
     success: false,
     message: "Please install 1Password extension manually",
@@ -1980,7 +1790,6 @@ ipcMain.handle("extension-install-1password", async () => {
   };
 });
 ipcMain.handle("sharepoint-inject-credentials", async (_event, webviewId) => {
-  console.log(`🔐 SharePoint credentials injection requested for: ${webviewId}`);
   return true;
 });
 ipcMain.handle("sharepoint-get-config", async () => {
@@ -1990,21 +1799,17 @@ ipcMain.handle("sharepoint-get-config", async () => {
   };
 });
 ipcMain.handle("sharepoint-validate-access", async (_event, url) => {
-  console.log(`🔍 SharePoint access validation: ${url}`);
   return true;
 });
 ipcMain.handle("window-create-new", async () => {
-  console.log("🪟 Creating new browser window...");
   try {
     const newWindow = createBrowserWindow(false);
-    console.log("✅ New window shares authentication state - no need to sign in again!");
     return {
       success: true,
       windowId: newWindow.id,
       message: "New browser window created successfully with shared authentication"
     };
   } catch (error) {
-    console.error("❌ Error creating new window:", error);
     return {
       success: false,
       error: "Failed to create new window"
@@ -2108,33 +1913,23 @@ ipcMain.handle("window-close", async (_event, windowId) => {
       return { success: false, error: "Could not identify current window" };
     }
   } catch (error) {
-    console.error("❌ Error closing window:", error);
     return { success: false, error: "Failed to close window" };
   }
 });
 app.whenReady().then(async () => {
-  console.log("🚀 Initializing Aussie Vault Browser...");
   if (process.platform === "darwin" && app.dock) {
     app.dock.setIcon(path.join(__dirname, "../build/icon.png"));
   }
   await loadEnvironmentVariables();
   configureSecureSession();
-  console.log("🔌 Starting VPN connection...");
   const vpnConnected2 = await connectVPN();
   updateVPNStatus(vpnConnected2);
-  if (!vpnConnected2) {
-    console.error("❌ VPN connection failed - starting with restricted access");
-  } else {
-    console.log("✅ VPN connected successfully - unrestricted access enabled");
-  }
   createWindow();
 }).catch((error) => {
-  console.error("❌ Failed to initialize app:", error);
   app.quit();
 });
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
-  console.log("🚫 Another instance is already running");
   app.quit();
 } else {
   app.on("second-instance", () => {
@@ -2146,7 +1941,6 @@ if (!gotTheLock) {
 }
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
-    console.log("🔐 Closing Aussie Vault Browser");
     app.quit();
   }
 });
@@ -2181,16 +1975,12 @@ app.on("web-contents-created", (_event, contents) => {
           (provider) => navigationUrl.startsWith(provider)
         );
         if (!isAllowed) {
-          console.log("🚫 Blocking main window navigation to:", navigationUrl);
           event.preventDefault();
         } else if (oauthProviders.some((provider) => navigationUrl.startsWith(provider))) {
-          console.log("🔐 Allowing OAuth navigation to:", navigationUrl);
         }
       } else {
-        console.log("🌐 Webview navigation allowed:", navigationUrl);
       }
     } catch (error) {
-      console.warn("⚠️ Failed to parse navigation URL:", navigationUrl, error);
       const isMainWindowContentsError = mainWindow && !mainWindow.isDestroyed() && contents === mainWindow.webContents;
       if (isMainWindowContentsError) {
         event.preventDefault();
@@ -2206,11 +1996,9 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient("secure-browser");
 }
 process.on("SIGINT", () => {
-  console.log("🔐 Received SIGINT, gracefully shutting down");
   app.quit();
 });
 process.on("SIGTERM", () => {
-  console.log("🔐 Received SIGTERM, gracefully shutting down");
   app.quit();
 });
 export {

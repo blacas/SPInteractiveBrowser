@@ -126,20 +126,20 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           if (restored.status === "downloading") {
             restored.status = "cancelled";
             restored.endTime = new Date();
-            console.log(
-              "📋 Restored interrupted download as cancelled:",
-              restored.filename
-            );
+            // console.log(
+            //   "📋 Restored interrupted download as cancelled:",
+            //   restored.filename
+            // );
           }
 
           return restored;
         });
 
-        console.log(
-          "📥 Restored",
-          restoredDownloads.length,
-          "downloads from localStorage"
-        );
+        // console.log(
+        //   "📥 Restored",
+        //   restoredDownloads.length,
+        //   "downloads from localStorage"
+        // );
         return restoredDownloads;
       }
     } catch (error) {
@@ -152,29 +152,31 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
   // Debug downloads state changes
   useEffect(() => {
-    console.log("📊 Downloads state changed:", {
-      total: downloads.length,
-      downloading: downloads.filter((d) => d.status === "downloading").length,
-      completed: downloads.filter((d) => d.status === "completed").length,
-      cancelled: downloads.filter((d) => d.status === "cancelled").length,
-      blocked: downloads.filter((d) => d.status === "blocked").length,
-      downloads: downloads.map((d) => ({
-        id: d.id,
-        filename: d.filename,
-        status: d.status,
-      })),
-    });
+    // console.log("📊 Downloads state changed:", {
+    //   total: downloads.length,
+    //   downloading: downloads.filter((d) => d.status === "downloading").length,
+    //   completed: downloads.filter((d) => d.status === "completed").length,
+    //   cancelled: downloads.filter((d) => d.status === "cancelled").length,
+    //   blocked: downloads.filter((d) => d.status === "blocked").length,
+    //   downloads: downloads.map((d) => ({
+    //     id: d.id,
+    //     filename: d.filename,
+    //     status: d.status,
+    //   })),
+    // });
   }, [downloads]);
 
   // Debug zoom level changes
   useEffect(() => {
-    console.log("🔍 [ZOOM STATE] Zoom level state changed:", zoomLevel + "%");
-    console.log("🔍 [ZOOM STATE] This should trigger UI updates in BrowserMenu");
-    
+    // console.log("🔍 [ZOOM STATE] Zoom level state changed:", zoomLevel + "%");
+    // console.log("🔍 [ZOOM STATE] This should trigger UI updates in BrowserMenu");
+
     // Force a re-render of the menu to ensure it shows the updated zoom level
-    const menuContainer = document.querySelector('[data-radix-dropdown-menu-content]');
+    const menuContainer = document.querySelector(
+      "[data-radix-dropdown-menu-content]"
+    );
     if (menuContainer) {
-      console.log("🔄 [ZOOM] Menu is open, should update zoom display automatically");
+      // console.log("🔄 [ZOOM] Menu is open, should update zoom display automatically");
     }
   }, [zoomLevel]);
 
@@ -182,11 +184,11 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   useEffect(() => {
     try {
       localStorage.setItem("app-downloads", JSON.stringify(downloads));
-      console.log(
-        "💾 Downloads saved to localStorage:",
-        downloads.length,
-        "items"
-      );
+      // console.log(
+      //   "💾 Downloads saved to localStorage:",
+      //   downloads.length,
+      //   "items"
+      // );
     } catch (error) {
       console.error("❌ Failed to save downloads to localStorage:", error);
 
@@ -203,13 +205,13 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             JSON.stringify(recentDownloads)
           );
           setDownloads(recentDownloads);
-          console.log(
-            "✅ Cleared old downloads, keeping",
-            recentDownloads.length,
-            "recent ones"
-          );
+          // console.log(
+          //   "✅ Cleared old downloads, keeping",
+          //   recentDownloads.length,
+          //   "recent ones"
+          // );
         } catch (retryError) {
-          console.error("❌ Failed to save even after cleanup:", retryError);
+          // console.error("❌ Failed to save even after cleanup:", retryError);
           localStorage.removeItem("app-downloads");
         }
       }
@@ -220,7 +222,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   useEffect(() => {
     if (user) {
       HistoryService.setCurrentUser(user);
-      console.log("✅ HistoryService initialized with user:", user.email);
+      // console.log("✅ HistoryService initialized with user:", user.email);
     }
   }, [user]);
 
@@ -273,10 +275,10 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     try {
       if (url && url.startsWith("http")) {
         await HistoryService.addHistoryEntry(url, title || "Untitled");
-        console.log("✅ Added to history:", { url, title });
+        // console.log("✅ Added to history:", { url, title });
       }
     } catch (error) {
-      console.error("❌ Failed to add to history:", error);
+      // console.error("❌ Failed to add to history:", error);
     }
   }, []);
 
@@ -327,7 +329,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   };
 
   const handleSettingsClick = () => {
-    console.log("Settings clicked");
+    // console.log("Settings clicked");
     setIsSettingsModalOpen(true);
   };
 
@@ -340,9 +342,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       const webview = webviewRefs.current[activeTab] as any;
       if (webview) {
         const zoomFactor = zoomPercent / 100;
-        console.log(
-          `🔍 [ZOOM] Applying zoom: ${zoomPercent}% (factor: ${zoomFactor}) to tab ${activeTab}`
-        );
+        // console.log(
+        //   `🔍 [ZOOM] Applying zoom: ${zoomPercent}% (factor: ${zoomFactor}) to tab ${activeTab}`
+        // );
 
         try {
           let applied = false;
@@ -353,7 +355,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             typeof webview.setZoomFactor === "function"
           ) {
             webview.setZoomFactor(zoomFactor);
-            console.log(`✅ [ZOOM] Applied via setZoomFactor: ${zoomPercent}%`);
+            // console.log(`✅ [ZOOM] Applied via setZoomFactor: ${zoomPercent}%`);
             applied = true;
           }
 
@@ -381,10 +383,10 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                  document.documentElement.style.zoom = '${zoomPercent}%';
                  document.body.style.zoom = '${zoomPercent}%';
                  
-                 console.log('Zoom applied via JavaScript: ${zoomPercent}%');
+                 // console.log('Zoom applied via JavaScript: ${zoomPercent}%');
                  return true;
                } catch (e) {
-                 console.error('Error applying zoom via JS:', e);
+                 // console.error('Error applying zoom via JS:', e);
                  return false;
                }
              })();
@@ -392,11 +394,11 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
             webview
               .executeJavaScript(jsCode)
-              .then((result:any) => {
-                console.log(`✅ [ZOOM] executeJavaScript result:`, result);
+              .then((result: any) => {
+                // console.log(`✅ [ZOOM] executeJavaScript result:`, result);
               })
-              .catch((error:any) => {
-                console.error(`❌ [ZOOM] executeJavaScript failed:`, error);
+              .catch((error: any) => {
+                // console.error(`❌ [ZOOM] executeJavaScript failed:`, error);
               });
             applied = true;
           }
@@ -413,98 +415,100 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
              }
            `;
             webview.insertCSS(zoomCSS);
-            console.log(`✅ [ZOOM] Applied via insertCSS: ${zoomPercent}%`);
+            // console.log(`✅ [ZOOM] Applied via insertCSS: ${zoomPercent}%`);
             applied = true;
           }
 
           if (!applied) {
             console.warn(`⚠️ [ZOOM] No zoom method available for webview`);
-            console.log(`⚠️ [ZOOM] Available methods:`, {
-              setZoomFactor: !!webview.setZoomFactor,
-              executeJavaScript: !!webview.executeJavaScript,
-              insertCSS: !!webview.insertCSS,
-            });
+            // console.log(`⚠️ [ZOOM] Available methods:`, {
+            //   setZoomFactor: !!webview.setZoomFactor,
+            //   executeJavaScript: !!webview.executeJavaScript,
+            //   insertCSS: !!webview.insertCSS,
+            // });
           }
         } catch (error) {
           console.error("❌ [ZOOM] Failed to apply zoom:", error);
         }
       } else {
         console.warn("⚠️ [ZOOM] No webview found for active tab:", activeTab);
-        console.log(
-          "⚠️ [ZOOM] Available webviews:",
-          Object.keys(webviewRefs.current)
-        );
+        // console.log(
+        //   "⚠️ [ZOOM] Available webviews:",
+        //   Object.keys(webviewRefs.current)
+        // );
       }
     },
     [activeTab]
   );
 
   const handleZoomIn = useCallback(() => {
-    console.log(`🔍 [ZOOM] === ZOOM IN FUNCTION CALLED ===`);
-    console.log(`🔍 [ZOOM] Current zoom level before change: ${zoomLevel}%`);
-    
+    // console.log(`🔍 [ZOOM] === ZOOM IN FUNCTION CALLED ===`);
+    // console.log(`🔍 [ZOOM] Current zoom level before change: ${zoomLevel}%`);
+
     setZoomLevel((prev) => {
       const newLevel = Math.min(prev + 5, 300);
-      console.log(`📈 [ZOOM] State update: ${prev}% -> ${newLevel}%`);
-      
+      // console.log(`📈 [ZOOM] State update: ${prev}% -> ${newLevel}%`);
+
       // Apply zoom immediately, not with setTimeout
-      console.log(`⏰ [ZOOM] Applying zoom level ${newLevel}% to active webview immediately`);
+      // console.log(`⏰ [ZOOM] Applying zoom level ${newLevel}% to active webview immediately`);
       setTimeout(() => applyZoomToActiveWebview(newLevel), 10);
-      
+
       return newLevel;
     });
-    
-    console.log(`🔍 [ZOOM] === ZOOM IN FUNCTION COMPLETED ===`);
+
+    // console.log(`🔍 [ZOOM] === ZOOM IN FUNCTION COMPLETED ===`);
   }, [applyZoomToActiveWebview]); // Remove zoomLevel from dependencies to avoid stale closures
 
   const handleZoomOut = useCallback(() => {
-    console.log(`🔍 [ZOOM] === ZOOM OUT FUNCTION CALLED ===`);
-    console.log(`🔍 [ZOOM] Current zoom level before change: ${zoomLevel}%`);
-    
+    // console.log(`🔍 [ZOOM] === ZOOM OUT FUNCTION CALLED ===`);
+    // console.log(`🔍 [ZOOM] Current zoom level before change: ${zoomLevel}%`);
+
     setZoomLevel((prev) => {
       const newLevel = Math.max(prev - 5, 25);
-      console.log(`📉 [ZOOM] State update: ${prev}% -> ${newLevel}%`);
-      
+      // console.log(`📉 [ZOOM] State update: ${prev}% -> ${newLevel}%`);
+
       // Apply zoom immediately, not with setTimeout
-      console.log(`⏰ [ZOOM] Applying zoom level ${newLevel}% to active webview immediately`);
+      // console.log(`⏰ [ZOOM] Applying zoom level ${newLevel}% to active webview immediately`);
       setTimeout(() => applyZoomToActiveWebview(newLevel), 10);
-      
+
       return newLevel;
     });
-    
-    console.log(`🔍 [ZOOM] === ZOOM OUT FUNCTION COMPLETED ===`);
+
+    // console.log(`🔍 [ZOOM] === ZOOM OUT FUNCTION COMPLETED ===`);
   }, [applyZoomToActiveWebview]); // Remove zoomLevel from dependencies to avoid stale closures
 
   const handleZoomReset = useCallback(() => {
-    console.log(`🔄 [ZOOM] Reset triggered - forcing 100% zoom (current: ${zoomLevel}%)`);
-    
+    // console.log(`🔄 [ZOOM] Reset triggered - forcing 100% zoom (current: ${zoomLevel}%)`);
+
     // Set zoom level to 100% first
     setZoomLevel(100);
-    
+
     // Force reset with multiple attempts for reliability
     const forceReset = () => {
       const webview = webviewRefs.current[activeTab] as any;
       if (webview) {
-        console.log(`🔧 [ZOOM] Force resetting webview zoom to 100%`);
-        
+        // console.log(`🔧 [ZOOM] Force resetting webview zoom to 100%`);
+
         // Method 1: Electron setZoomFactor (most reliable)
         if (webview.setZoomFactor) {
           webview.setZoomFactor(1.0);
-          console.log('✅ [ZOOM] setZoomFactor(1.0) applied');
+          // console.log('✅ [ZOOM] setZoomFactor(1.0) applied');
         }
-        
+
         // Method 2: Remove all zoom CSS and reset via JavaScript
         if (webview.executeJavaScript) {
-          webview.executeJavaScript(`
+          webview
+            .executeJavaScript(
+              `
             (function() {
               try {
-                console.log('🔧 [ZOOM] JavaScript zoom reset starting...');
+                // console.log('🔧 [ZOOM] JavaScript zoom reset starting...');
                 
                 // Remove any existing zoom CSS
                 var existingZoom = document.getElementById('aussie-browser-zoom');
                 if (existingZoom) {
                   existingZoom.remove();
-                  console.log('🗑️ Removed existing zoom CSS');
+                  // console.log('🗑️ Removed existing zoom CSS');
                 }
                 
                 // Remove all zoom styles from all elements
@@ -522,20 +526,23 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                 document.documentElement.style.transform = 'none';
                 document.body.style.transform = 'none';
                 
-                console.log('✅ [ZOOM] JavaScript zoom reset completed - 100%');
+                // console.log('✅ [ZOOM] JavaScript zoom reset completed - 100%');
                 return true;
               } catch (e) {
                 console.error('❌ [ZOOM] Error resetting zoom via JS:', e);
                 return false;
               }
             })();
-          `).then((result: any) => {
-            console.log('✅ [ZOOM] JavaScript execution result:', result);
-          }).catch((error: any) => {
-            console.error('❌ [ZOOM] JavaScript execution failed:', error);
-          });
+          `
+            )
+            .then((result: any) => {
+              // console.log('✅ [ZOOM] JavaScript execution result:', result);
+            })
+            .catch((error: any) => {
+              // console.error('❌ [ZOOM] JavaScript execution failed:', error);
+            });
         }
-        
+
         // Method 3: Insert CSS to force 100%
         if (webview.insertCSS) {
           webview.insertCSS(`
@@ -548,26 +555,26 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
               zoom: inherit !important;
             }
           `);
-          console.log('✅ [ZOOM] CSS reset applied');
+          // console.log('✅ [ZOOM] CSS reset applied');
         }
       } else {
-        console.warn('⚠️ [ZOOM] No webview found for zoom reset');
+        // console.warn('⚠️ [ZOOM] No webview found for zoom reset');
       }
     };
-    
+
     // Apply reset immediately and with multiple attempts
-    console.log('🔄 [ZOOM] Starting zoom reset sequence...');
+    // console.log('🔄 [ZOOM] Starting zoom reset sequence...');
     forceReset();
     setTimeout(() => {
-      console.log('🔄 [ZOOM] Retry zoom reset (50ms)');
+      // console.log('🔄 [ZOOM] Retry zoom reset (50ms)');
       forceReset();
     }, 50);
     setTimeout(() => {
-      console.log('🔄 [ZOOM] Final zoom reset (200ms)');
+      // console.log('🔄 [ZOOM] Final zoom reset (200ms)');
       forceReset();
     }, 200);
-    
-    console.log('✅ [ZOOM] Zoom reset sequence initiated');
+
+    // console.log('✅ [ZOOM] Zoom reset sequence initiated');
   }, [activeTab]);
 
   // Reapply zoom when pages finish loading on the active tab (but only if not 100%)
@@ -575,13 +582,13 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     const currentTab = tabs.find((tab) => tab.id === activeTab);
     if (currentTab && !currentTab.isLoading && zoomLevel !== 100) {
       setTimeout(() => {
-        console.log(
-          `🔧 Reapplying zoom (${zoomLevel}%) after page loaded for active tab: ${activeTab}`
-        );
+        // console.log(
+        //   `🔧 Reapplying zoom (${zoomLevel}%) after page loaded for active tab: ${activeTab}`
+        // );
         applyZoomToActiveWebview(zoomLevel);
       }, 300);
     } else if (currentTab && !currentTab.isLoading && zoomLevel === 100) {
-      console.log('🔧 Page loaded with 100% zoom - no reapplication needed');
+      // console.log('🔧 Page loaded with 100% zoom - no reapplication needed');
     }
   }, [
     tabs.find((tab) => tab.id === activeTab)?.isLoading,
@@ -670,16 +677,16 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       // For levels 2 and 3, treat non-URLs as search queries
       const userLevel = user?.accessLevel || 1;
       if (userLevel >= 2) {
-        console.log(
-          `🔍 Treating "${trimmedInput}" as search query for access level ${userLevel}`
-        );
+        // console.log(
+        //   `🔍 Treating "${trimmedInput}" as search query for access level ${userLevel}`
+        // );
         return constructSearchUrl(trimmedInput);
       }
 
       // For level 1 (restricted), only allow URLs, no search
-      console.log(
-        `⚠️ Search not allowed for access level ${userLevel}, treating as URL attempt`
-      );
+      // console.log(
+      //   `⚠️ Search not allowed for access level ${userLevel}, treating as URL attempt`
+      // );
       // Try to make it a URL anyway (will likely be blocked)
       if (
         !trimmedInput.startsWith("http://") &&
@@ -698,7 +705,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
       // For Level 3, always allow all URLs
       if (config.allowedDomains.includes("*")) {
-        console.log(`✅ Level 3 access - allowing all URLs: ${url}`);
+        // console.log(`✅ Level 3 access - allowing all URLs: ${url}`);
         return true;
       }
 
@@ -712,21 +719,21 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         const urlObj = new URL(fullUrl);
         const domain = urlObj.hostname.replace("www.", "");
 
-        console.log("Checking URL:", fullUrl);
-        console.log("Extracted domain:", domain);
-        console.log("Allowed domains:", config.allowedDomains);
-        console.log("User access level:", user?.accessLevel);
+        // console.log("Checking URL:", fullUrl);
+        // console.log("Extracted domain:", domain);
+        // console.log("Allowed domains:", config.allowedDomains);
+        // console.log("User access level:", user?.accessLevel);
 
         const isAllowed = config.allowedDomains.some((allowed) => {
           const match = domain === allowed || domain.endsWith("." + allowed);
-          console.log(`Checking ${domain} against ${allowed}: ${match}`);
+          // console.log(`Checking ${domain} against ${allowed}: ${match}`);
           return match;
         });
 
-        console.log("Final result:", isAllowed);
+        // console.log("Final result:", isAllowed);
         return isAllowed;
       } catch (error) {
-        console.error("URL parsing error:", error);
+        // console.error("URL parsing error:", error);
         return false;
       }
     },
@@ -763,9 +770,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
     // Log the type of navigation
     if (isSearchQuery) {
-      console.log(
-        `🔍 Performing Google search for: "${urlInput}" -> ${finalUrl}`
-      );
+      // console.log(
+      //   `🔍 Performing Google search for: "${urlInput}" -> ${finalUrl}`
+      // );
       SecureBrowserDatabaseService.logSecurityEvent(
         "unauthorized_access",
         `User performed search query: "${urlInput}" (Level ${user?.accessLevel})`,
@@ -773,18 +780,18 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         finalUrl
       );
     } else {
-      console.log(`🌐 Navigating to URL: ${finalUrl}`);
+      // console.log(`🌐 Navigating to URL: ${finalUrl}`);
     }
 
     // Debug: Log user access level and configuration
     const config = getAccessLevelConfig();
-    console.log(`🔍 Debug - User access level: ${user?.accessLevel}`);
-    console.log(`🔍 Debug - Access config:`, config);
-    console.log(`🔍 Debug - Final URL: ${finalUrl}`);
+    // console.log(`🔍 Debug - User access level: ${user?.accessLevel}`);
+    // console.log(`🔍 Debug - Access config:`, config);
+    // console.log(`🔍 Debug - Final URL: ${finalUrl}`);
 
     // Check if the final URL is allowed
     const urlAllowed = isUrlAllowed(finalUrl);
-    console.log(`🔍 Debug - URL allowed result: ${urlAllowed}`);
+    // console.log(`🔍 Debug - URL allowed result: ${urlAllowed}`);
 
     // Log navigation attempt
     SecureBrowserDatabaseService.logNavigation(
@@ -799,9 +806,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
     if (!urlAllowed) {
       // This should NEVER happen for Level 3 users
-      console.error(
-        `❌ CRITICAL: Level ${user?.accessLevel} user blocked from accessing: ${finalUrl}`
-      );
+      // console.error(
+      //   `❌ CRITICAL: Level ${user?.accessLevel} user blocked from accessing: ${finalUrl}`
+      // );
 
       // Log security event for blocked domain
       SecureBrowserDatabaseService.logSecurityEvent(
@@ -831,7 +838,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       return;
     }
 
-    console.log(`✅ URL allowed - proceeding with navigation to: ${finalUrl}`);
+    // console.log(`✅ URL allowed - proceeding with navigation to: ${finalUrl}`);
 
     // Log successful navigation
     SecureBrowserDatabaseService.logSecurityEvent(
@@ -848,6 +855,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     };
 
     if (webview) {
+      // For search queries, set a more descriptive title immediately
+      const newTitle = isSearchQuery ? `Search: ${urlInput}` : "Loading...";
+      
       // Update tab state with the final URL
       setTabs((tabs) =>
         tabs.map((tab) =>
@@ -856,7 +866,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                 ...tab,
                 url: finalUrl,
                 isLoading: true,
-                title: isSearchQuery ? `Search: ${urlInput}` : "Loading...",
+                title: newTitle,
               }
             : tab
         )
@@ -866,7 +876,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       setUrlInput(finalUrl);
 
       // Navigate webview
-      console.log(`🚀 Setting webview src to: ${finalUrl}`);
+      // console.log(`🚀 Setting webview src to: ${finalUrl}`);
       webview.src = finalUrl;
     }
   }, [
@@ -935,17 +945,16 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     try {
       const webview = webviewRefs.current[activeTab] as any;
       if (webview && webview.printToPDF) {
-        console.log("📄 Saving page as PDF...");
-
+        // console.log("📄 Saving page as PDF...");
         // Use Electron's IPC to handle PDF generation
         // const result = await window.electronAPI?.savePageAsPDF?.();
-        console.log("PDF save feature would be implemented here");
-        console.log("✅ PDF save triggered (functionality pending)");
+        // console.log("PDF save feature would be implemented here");
+        // console.log("✅ PDF save triggered (functionality pending)");
       } else {
-        console.error("❌ PDF functionality not available");
+        // console.error("❌ PDF functionality not available");
       }
     } catch (error) {
-      console.error("❌ Error saving PDF:", error);
+      // console.error("❌ Error saving PDF:", error);
     }
     hideContextMenu();
   }, [activeTab, hideContextMenu]);
@@ -962,7 +971,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     const currentTab = tabs.find((tab) => tab.id === activeTab);
     if (currentTab) {
       navigator.clipboard.writeText(currentTab.url);
-      console.log("📋 URL copied to clipboard");
+      // console.log("📋 URL copied to clipboard");
     }
     hideContextMenu();
   }, [activeTab, tabs, hideContextMenu]);
@@ -982,7 +991,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    console.log("🧪 Test download initiated");
+    // console.log("🧪 Test download initiated");
     hideContextMenu();
   }, [hideContextMenu]);
 
@@ -1024,14 +1033,14 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       // Check if download with this ID already exists
       const existingDownload = prev.find((d) => d.id === downloadData.id);
       if (existingDownload) {
-        console.log(
-          "⚠️ Download with ID already exists, skipping duplicate:",
-          downloadData.id
-        );
+        // console.log(
+        //   "⚠️ Download with ID already exists, skipping duplicate:",
+        //   downloadData.id
+        // );
         return prev; // Don't add duplicate
       }
 
-      console.log("📥 Added download to state:", newDownload.filename);
+      // console.log("📥 Added download to state:", newDownload.filename);
       return [...prev, newDownload];
     });
 
@@ -1057,9 +1066,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             progress: progress,
           };
 
-          console.log(
-            `📊 Updated download progress: ${updatedDownload.filename} - ${progress}%`
-          );
+          // console.log(
+          //   `📊 Updated download progress: ${updatedDownload.filename} - ${progress}%`
+          // );
           return updatedDownload;
         }
         return download;
@@ -1068,7 +1077,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   }, []);
 
   const cancelDownload = useCallback((id: string) => {
-    console.log("🚫 Cancelling download:", id);
+    // console.log("🚫 Cancelling download:", id);
 
     // Update UI state to mark as cancelled
     setDownloads((prev) =>
@@ -1079,25 +1088,25 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       )
     );
 
-    console.log("✅ Download marked as cancelled in UI:", id);
+    // console.log("✅ Download marked as cancelled in UI:", id);
   }, []);
 
   const viewFile = useCallback(async (filePath: string, filename: string) => {
     try {
-      console.log("📁 Opening file:", { filePath, filename });
+      // console.log("📁 Opening file:", { filePath, filename });
 
       // Use Electron's shell to open the file with the system's default application
       if (window.electronAPI?.shell?.openPath) {
         const result = await window.electronAPI.shell.openPath(filePath);
         if (result) {
-          console.error("❌ Failed to open file:", result);
+          // console.error("❌ Failed to open file:", result);
           alert(`Failed to open file: ${result}`);
         } else {
-          console.log("✅ File opened successfully");
+          // console.log("✅ File opened successfully");
         }
       } else {
         // Fallback: try to open using the browser (for blob URLs, etc.)
-        console.log("⚠️ Electron shell not available, trying browser fallback");
+        // console.log("⚠️ Electron shell not available, trying browser fallback");
         if (filePath.startsWith("blob:") || filePath.startsWith("data:")) {
           const link = document.createElement("a");
           link.href = filePath;
@@ -1105,16 +1114,16 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          console.log("✅ File downloaded via browser fallback");
+          // console.log("✅ File downloaded via browser fallback");
         } else {
-          console.error("❌ Cannot open file: No suitable method available");
+          // console.error("❌ Cannot open file: No suitable method available");
           alert(
             "Cannot open file: File opening is not supported in this environment"
           );
         }
       }
     } catch (error) {
-      console.error("❌ Error opening file:", error);
+      // console.error("❌ Error opening file:", error);
       alert(
         `Error opening file: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -1126,7 +1135,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   const revealInExplorer = useCallback(
     async (filePath: string, filename: string) => {
       try {
-        console.log("📂 Revealing file in explorer:", { filePath, filename });
+        // console.log("📂 Revealing file in explorer:", { filePath, filename });
 
         // Use Electron's shell to show the file in the system's file manager
         if (window.electronAPI?.shell?.showItemInFolder) {
@@ -1134,19 +1143,19 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             filePath
           );
           if (result) {
-            console.error("❌ Failed to reveal file:", result);
+            // console.error("❌ Failed to reveal file:", result);
             alert(`Failed to show file in folder: ${result}`);
           } else {
-            console.log("✅ File revealed in explorer successfully");
+            // console.log("✅ File revealed in explorer successfully");
           }
         } else {
-          console.error("❌ Cannot reveal file: Shell API not available");
+          // console.error("❌ Cannot reveal file: Shell API not available");
           alert(
             "Cannot show file in folder: This feature is not supported in this environment"
           );
         }
       } catch (error) {
-        console.error("❌ Error revealing file:", error);
+        // console.error("❌ Error revealing file:", error);
         alert(
           `Error showing file in folder: ${
             error instanceof Error ? error.message : "Unknown error"
@@ -1162,9 +1171,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     try {
       setDownloads([]);
       localStorage.removeItem("app-downloads");
-      console.log("🗑️ Downloads history cleared");
+      // console.log("🗑️ Downloads history cleared");
     } catch (error) {
-      console.error("❌ Failed to clear downloads:", error);
+      // console.error("❌ Failed to clear downloads:", error);
     }
   }, []);
 
@@ -1188,18 +1197,18 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   useEffect(() => {
     const handleDownloadStarted = (_event: any, downloadData: any) => {
       try {
-        console.log(
-          "🎯 [REACT] Download started event received:",
-          downloadData
-        );
-        console.log("🎯 [REACT] Current downloads state before adding:", {
-          total: downloads.length,
-          byId: downloads.map((d) => ({
-            id: d.id,
-            filename: d.filename,
-            status: d.status,
-          })),
-        });
+        // console.log(
+        //   "🎯 [REACT] Download started event received:",
+        //   downloadData
+        // );
+        // console.log("🎯 [REACT] Current downloads state before adding:", {
+        //   total: downloads.length,
+        //   byId: downloads.map((d) => ({
+        //     id: d.id,
+        //     filename: d.filename,
+        //     status: d.status,
+        //   })),
+        // });
 
         if (downloadData && downloadData.id && downloadData.filename) {
           addDownloadToState(downloadData);
@@ -1210,10 +1219,10 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           );
         }
       } catch (error) {
-        console.error(
-          "❌ [REACT] Error handling download started event:",
-          error
-        );
+        // console.error(
+        //   "❌ [REACT] Error handling download started event:",
+        //   error
+        // );
       }
     };
 
@@ -1225,34 +1234,34 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                 (progressData.receivedBytes / progressData.totalBytes) * 100
               )
             : 0;
-        console.log("🎯 [REACT] Download progress event received:", {
-          id: progressData.id,
-          progress: progressData.receivedBytes + "/" + progressData.totalBytes,
-          percent: percent + "%",
-        });
+        // console.log("🎯 [REACT] Download progress event received:", {
+        //   id: progressData.id,
+        //   progress: progressData.receivedBytes + "/" + progressData.totalBytes,
+        //   percent: percent + "%",
+        // });
 
         if (progressData && progressData.id) {
           updateDownloadProgress(progressData);
         } else {
-          console.warn(
-            "⚠️ [REACT] Invalid download progress data:",
-            progressData
-          );
+          // console.warn(
+          //   "⚠️ [REACT] Invalid download progress data:",
+          //   progressData
+          // );
         }
       } catch (error) {
-        console.error(
-          "❌ [REACT] Error handling download progress event:",
-          error
-        );
+        // console.error(
+        //   "❌ [REACT] Error handling download progress event:",
+        //   error
+        // );
       }
     };
 
     const handleDownloadCompleted = (_event: any, completedData: any) => {
       try {
-        console.log(
-          "🎯 [REACT] Download completed event received:",
-          completedData
-        );
+        // console.log(
+        //   "🎯 [REACT] Download completed event received:",
+        //   completedData
+        // );
 
         if (completedData && completedData.id) {
           setDownloads((prev) =>
@@ -1280,22 +1289,22 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             })
           );
         } else {
-          console.warn(
-            "⚠️ [REACT] Invalid download completed data:",
-            completedData
-          );
+          // console.warn(
+          //   "⚠️ [REACT] Invalid download completed data:",
+          //   completedData
+          // );
         }
       } catch (error) {
-        console.error(
-          "❌ [REACT] Error handling download completed event:",
-          error
-        );
+        // console.error(
+        //   "❌ [REACT] Error handling download completed event:",
+        //   error
+        // );
       }
     };
 
     const handleDownloadBlocked = (_event: any, blockedData: any) => {
       try {
-        console.log("🎯 [REACT] Download blocked event received:", blockedData);
+        // console.log("🎯 [REACT] Download blocked event received:", blockedData);
 
         if (blockedData && blockedData.filename) {
           // First check if this is an existing download that got blocked
@@ -1309,10 +1318,10 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
             if (existingDownload) {
               // Update existing download to blocked status
-              console.log(
-                "📋 Updating existing download to blocked status:",
-                blockedData.filename
-              );
+              // console.log(
+              //   "📋 Updating existing download to blocked status:",
+              //   blockedData.filename
+              // );
               return prev.map((download) =>
                 download.id === existingDownload.id
                   ? {
@@ -1337,62 +1346,64 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                 startTime: new Date(),
                 progress: 0,
               };
-              console.log(
-                "📥 Created new blocked download entry:",
-                blockedData.filename
-              );
+              // console.log(
+              //   "📥 Created new blocked download entry:",
+              //   blockedData.filename
+              // );
               return [...prev, blockedDownload];
             }
           });
         } else {
-          console.warn(
-            "⚠️ [REACT] Invalid download blocked data:",
-            blockedData
-          );
+          // console.warn(
+          // //   "⚠️ [REACT] Invalid download blocked data:",
+          // //   blockedData
+          // );
         }
       } catch (error) {
-        console.error(
-          "❌ [REACT] Error handling download blocked event:",
-          error
-        );
+        // console.error(
+        //   "❌ [REACT] Error handling download blocked event:",
+        //   error
+        // );
       }
     };
 
     // Set up actual download IPC listeners with error handling
     try {
-      console.log("🔧 [REACT] Setting up download IPC listeners...");
-      console.log("🔧 [REACT] secureBrowser availability:", {
-        exists: !!window.secureBrowser,
-        onMethod: !!window.secureBrowser?.on,
-        removeListenerMethod: !!window.secureBrowser?.removeListener,
-      });
+      // console.log("🔧 [REACT] Setting up download IPC listeners...");
+      // console.log("🔧 [REACT] secureBrowser availability:", {
+      //   exists: !!window.secureBrowser,
+      //   onMethod: !!window.secureBrowser?.on,
+      //   removeListenerMethod: !!window.secureBrowser?.removeListener,
+      // });
 
       if (window.secureBrowser?.on) {
-        console.log("🔧 [REACT] Attaching download event listeners...");
+        // console.log("🔧 [REACT] Attaching download event listeners...");
         window.secureBrowser.on("download-started", handleDownloadStarted);
         window.secureBrowser.on("download-progress", handleDownloadProgress);
         window.secureBrowser.on("download-completed", handleDownloadCompleted);
         window.secureBrowser.on("download-blocked", handleDownloadBlocked);
-        console.log("✅ [REACT] Download IPC listeners attached successfully");
+        // console.log("✅ [REACT] Download IPC listeners attached successfully");
 
         // Test connection with a simple IPC call
         window.secureBrowser.system
           ?.getEnvironment?.()
-          .then(() => console.log("✅ [REACT] IPC connection test successful"))
-          .catch((err) =>
-            console.warn("⚠️ [REACT] IPC connection test failed:", err)
-          );
+          .then(() => {
+            // console.log("✅ [REACT] IPC connection test successful")
+          })
+          .catch((err) => {
+            // console.warn("⚠️ [REACT] IPC connection test failed:", err)
+          });
       } else {
-        console.warn(
-          "⚠️ [REACT] secureBrowser.on not available - download events will not work"
-        );
-        console.warn(
-          "⚠️ [REACT] Available methods:",
-          Object.keys(window.secureBrowser || {})
-        );
+        // console.warn(
+        //   "⚠️ [REACT] secureBrowser.on not available - download events will not work"
+        // );
+        // console.warn(
+        //   "⚠️ [REACT] Available methods:",
+        //   Object.keys(window.secureBrowser || {})
+        // );
       }
     } catch (error) {
-      console.error("❌ [REACT] Failed to set up download listeners:", error);
+      // console.error("❌ [REACT] Failed to set up download listeners:", error);
     }
 
     return () => {
@@ -1415,13 +1426,13 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             "download-blocked",
             handleDownloadBlocked
           );
-          console.log("🧹 [REACT] Download listeners cleaned up successfully");
+          // console.log("🧹 [REACT] Download listeners cleaned up successfully");
         }
       } catch (error) {
-        console.error(
-          "❌ [REACT] Error during download listener cleanup:",
-          error
-        );
+        // console.error(
+        //   "❌ [REACT] Error during download listener cleanup:",
+        //   error
+        // );
       }
     };
   }, [addDownloadToState, updateDownloadProgress]);
@@ -1521,12 +1532,12 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
       const result = await window.secureBrowser.window.createNew();
       if (result.success) {
-        console.log(
-          "✅ New browser window created successfully:",
-          result.windowId
-        );
+        // console.log(
+        //   "✅ New browser window created successfully:",
+        //   result.windowId
+        // );
       } else {
-        console.error("❌ Failed to create new window:", result.error);
+        // console.error("❌ Failed to create new window:", result.error);
 
         // Log window creation failure
         SecureBrowserDatabaseService.logSecurityEvent(
@@ -1560,89 +1571,17 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       setUrlInput(currentTab.url);
       // Apply the current zoom level to the newly active tab
       setTimeout(() => {
-        console.log(
-          `🔄 Applying current zoom (${zoomLevel}%) to newly active tab: ${activeTab}`
-        );
+        // console.log(
+        //   `🔄 Applying current zoom (${zoomLevel}%) to newly active tab: ${activeTab}`
+        // );
         applyZoomToActiveWebview(zoomLevel);
       }, 100); // Small delay to ensure webview is ready
     }
   }, [activeTab, tabs, zoomLevel, applyZoomToActiveWebview]);
 
   // Webview event handlers
-  // Auto-inject SharePoint credentials when navigating to SharePoint
-  useEffect(() => {
-    const webview = webviewRefs.current[activeTab];
-    if (webview) {
-      const handleNavigation = async (event: Event & { url?: string }) => {
-        const url = event.url || webview.getAttribute("src") || "";
-
-        // Log all navigation events for monitoring
-        SecureBrowserDatabaseService.logNavigation(url, true);
-
-        // Update URL input if this is the active tab
-        const currentTabId = Object.keys(webviewRefs.current).find(
-          tabId => webviewRefs.current[tabId] === webview
-        );
-        if (currentTabId === activeTab) {
-          setUrlInput(url);
-          console.log('🔄 URL updated in navigation handler:', url);
-        }
-
-        // Check if navigating to SharePoint/Office365
-        if (
-          url.includes("sharepoint.com") ||
-          url.includes("login.microsoftonline.com") ||
-          url.includes("office.com")
-        ) {
-          console.log("SharePoint detected - preparing credential injection");
-
-          // Log SharePoint access
-          SecureBrowserDatabaseService.logSecurityEvent(
-            "unauthorized_access",
-            "User accessed SharePoint/Office365 site",
-            "low",
-            url
-          );
-
-          // Wait for page load, then inject credentials
-          setTimeout(async () => {
-            try {
-              await injectSharePointCredentials(webview);
-              console.log("SharePoint credentials injected successfully");
-
-              // Log successful credential injection
-              SecureBrowserDatabaseService.logSecurityEvent(
-                "unauthorized_access",
-                "SharePoint credentials automatically injected",
-                "low",
-                url
-              );
-            } catch (error) {
-              console.error("Failed to inject SharePoint credentials:", error);
-
-              // Log credential injection failure
-              SecureBrowserDatabaseService.logSecurityEvent(
-                "unauthorized_access",
-                `Failed to inject SharePoint credentials: ${
-                  error instanceof Error ? error.message : "Unknown error"
-                }`,
-                "medium",
-                url
-              );
-            }
-          }, 2000);
-        }
-      };
-
-      webview.addEventListener("did-navigate", handleNavigation);
-      webview.addEventListener("did-navigate-in-page", handleNavigation);
-
-      return () => {
-        webview.removeEventListener("did-navigate", handleNavigation);
-        webview.removeEventListener("did-navigate-in-page", handleNavigation);
-      };
-    }
-  }, [activeTab]);
+  // SharePoint credential injection is now handled in setupWebviewEvents
+  // This useEffect was removed to prevent duplicate navigation handlers
 
   const setupWebviewEvents = useCallback(
     (webview: HTMLElement, tabId: string) => {
@@ -1654,7 +1593,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       webviewInitialized.current[tabId] = true;
 
       // 🔐 SIMPLE WEBVIEW SETUP: No complex focus management needed with global shortcuts
-      console.log('🔧 Setting up webview for tab:', tabId);
+      // console.log("🔧 Setting up webview for tab:", tabId);
 
       type WebviewEvent = Event & {
         url: string;
@@ -1669,6 +1608,15 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             tab.id === tabId ? { ...tab, isLoading: true } : tab
           )
         );
+        
+        // Safeguard: Clear loading state after 10 seconds if it gets stuck
+        setTimeout(() => {
+          setTabs((tabs) =>
+            tabs.map((tab) =>
+              tab.id === tabId && tab.isLoading ? { ...tab, isLoading: false } : tab
+            )
+          );
+        }, 10000);
       });
 
       webview.addEventListener("did-stop-loading", () => {
@@ -1682,9 +1630,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       // Handle page load failures
       webview.addEventListener("did-fail-load", (event: Event) => {
         const failEvent = event as WebviewEvent;
-        console.error(
-          `❌ Page failed to load: ${failEvent.url}, Error: ${failEvent.errorCode} - ${failEvent.errorDescription}`
-        );
+        // console.error(
+        //   `❌ Page failed to load: ${failEvent.url}, Error: ${failEvent.errorCode} - ${failEvent.errorDescription}`
+        // );
 
         // Update tab title to show error
         setTabs((tabs) =>
@@ -1735,15 +1683,57 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         // Add to history for navigation
         addToHistory(webviewEvent.url, "Loading...");
 
-        // Only update URL input if this is the active tab
+        // Only update URL input and tab state if this is the active tab
         if (tabId === activeTab) {
           setUrlInput(webviewEvent.url);
         }
+        
+        // Update tab URL but don't reset loading state - let did-stop-loading handle that
         setTabs((tabs) =>
           tabs.map((tab) =>
             tab.id === tabId ? { ...tab, url: webviewEvent.url } : tab
           )
         );
+
+        // Check if navigating to SharePoint/Office365 for credential injection
+        if (
+          webviewEvent.url.includes("sharepoint.com") ||
+          webviewEvent.url.includes("login.microsoftonline.com") ||
+          webviewEvent.url.includes("office.com")
+        ) {
+          // Log SharePoint access
+          SecureBrowserDatabaseService.logSecurityEvent(
+            "unauthorized_access",
+            "User accessed SharePoint/Office365 site",
+            "low",
+            webviewEvent.url
+          );
+
+          // Wait for page load, then inject credentials
+          setTimeout(async () => {
+            try {
+              await injectSharePointCredentials(webview);
+              
+              // Log successful credential injection
+              SecureBrowserDatabaseService.logSecurityEvent(
+                "unauthorized_access",
+                "SharePoint credentials automatically injected",
+                "low",
+                webviewEvent.url
+              );
+            } catch (error) {
+              // Log credential injection failure
+              SecureBrowserDatabaseService.logSecurityEvent(
+                "unauthorized_access",
+                `Failed to inject SharePoint credentials: ${
+                  error instanceof Error ? error.message : "Unknown error"
+                }`,
+                "medium",
+                webviewEvent.url
+              );
+            }
+          }, 2000);
+        }
       });
 
       webview.addEventListener("did-navigate-in-page", (event: Event) => {
@@ -1792,11 +1782,11 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         mouseEvent.preventDefault();
         mouseEvent.stopPropagation();
 
-        console.log(
-          "🖱️ Webview context menu triggered at:",
-          mouseEvent.clientX,
-          mouseEvent.clientY
-        );
+        // console.log(
+        //   "🖱️ Webview context menu triggered at:",
+        //   mouseEvent.clientX,
+        //   mouseEvent.clientY
+        // );
 
         setContextMenu({
           visible: true,
@@ -1811,7 +1801,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       // Also handle the Electron webview's context-menu event
       if ((webview as any).addEventListener) {
         (webview as any).addEventListener("context-menu", (e: any) => {
-          console.log("🖱️ Electron webview context-menu event:", e);
+          // console.log("🖱️ Electron webview context-menu event:", e);
           e.preventDefault();
 
           setContextMenu({
@@ -1827,11 +1817,11 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         const mouseEvent = event as MouseEvent;
         if (mouseEvent.button === 2) {
           // Right mouse button
-          console.log(
-            "🖱️ Right mouse button detected on webview at:",
-            mouseEvent.clientX,
-            mouseEvent.clientY
-          );
+          // console.log(
+          //   "🖱️ Right mouse button detected on webview at:",
+          //   mouseEvent.clientX,
+          //   mouseEvent.clientY
+          // );
           mouseEvent.preventDefault();
 
           setContextMenu({
@@ -1864,112 +1854,119 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
   // 🔐 IPC KEYBOARD HANDLER: Set up global keyboard shortcuts via main process
   const lastShortcutTime = useRef<{ [key: string]: number }>({});
-  
+
   useEffect(() => {
     const handleIPCKeyboardShortcut = (_event: any, shortcut: string) => {
-      console.log('⌨️ [IPC] Received keyboard shortcut from main process:', shortcut);
-      
+      // console.log(
+      //   "⌨️ [IPC] Received keyboard shortcut from main process:",
+      //   shortcut
+      // );
+
       // Debounce: prevent duplicate shortcuts within 100ms
       const now = Date.now();
       const lastTime = lastShortcutTime.current[shortcut] || 0;
       if (now - lastTime < 100) {
-        console.log('⚠️ [IPC] Debouncing duplicate shortcut:', shortcut);
+        // console.log("⚠️ [IPC] Debouncing duplicate shortcut:", shortcut);
         return;
       }
       lastShortcutTime.current[shortcut] = now;
-      
+
       switch (shortcut) {
-        case 'zoom-in':
+        case "zoom-in":
           handleZoomIn();
           break;
-        case 'zoom-out':
+        case "zoom-out":
           handleZoomOut();
           break;
-        case 'zoom-reset':
-          console.log('⌨️ [IPC] Zoom reset via IPC');
+        case "zoom-reset":
+          // console.log("⌨️ [IPC] Zoom reset via IPC");
           handleZoomReset();
           break;
-        case 'new-tab':
-          console.log('⌨️ [IPC] Creating new tab via IPC');
+        case "new-tab":
+          // console.log("⌨️ [IPC] Creating new tab via IPC");
           createNewTab();
           break;
-        case 'new-window':
+        case "new-window":
           createNewWindow();
           break;
-        case 'close-tab':
+        case "close-tab":
           if (tabs.length > 1) {
             closeTab(activeTab);
           }
           break;
-        case 'reload':
+        case "reload":
           reload();
           break;
-        case 'history':
+        case "history":
           handleHistoryClick();
           break;
-        case 'downloads':
+        case "downloads":
           handleDownloadsClick();
           break;
-        case 'bookmarks':
+        case "bookmarks":
           handleBookmarksClick();
           break;
-        case 'task-manager':
+        case "task-manager":
           handleTaskManagerClick();
           break;
         default:
-          console.log('⚠️ [IPC] Unknown shortcut:', shortcut);
+          // console.log("⚠️ [IPC] Unknown shortcut:", shortcut);
       }
     };
 
     // Listen for IPC keyboard shortcuts from main process
     if (window.ipcRenderer?.on) {
-      window.ipcRenderer.on('keyboard-shortcut', handleIPCKeyboardShortcut);
-      console.log('✅ [IPC] Keyboard shortcut listener attached');
+      window.ipcRenderer.on("keyboard-shortcut", handleIPCKeyboardShortcut);
+      // console.log("✅ [IPC] Keyboard shortcut listener attached");
     } else {
-      console.warn('⚠️ [IPC] ipcRenderer not available, using fallback');
+      // console.warn("⚠️ [IPC] ipcRenderer not available, using fallback");
     }
 
     return () => {
       if (window.ipcRenderer?.off) {
-        window.ipcRenderer.off('keyboard-shortcut', handleIPCKeyboardShortcut);
-        console.log('🧹 [IPC] Keyboard shortcut listener removed');
+        window.ipcRenderer.off("keyboard-shortcut", handleIPCKeyboardShortcut);
+        // console.log("🧹 [IPC] Keyboard shortcut listener removed");
       }
     };
   }, [
-    handleZoomIn, 
-    handleZoomOut, 
-    handleZoomReset, 
-    createNewTab, 
-    createNewWindow, 
-    tabs.length, 
-    activeTab, 
-    closeTab, 
+    handleZoomIn,
+    handleZoomOut,
+    handleZoomReset,
+    createNewTab,
+    createNewWindow,
+    tabs.length,
+    activeTab,
+    closeTab,
     reload,
     handleHistoryClick,
     handleDownloadsClick,
     handleBookmarksClick,
-    handleTaskManagerClick
+    handleTaskManagerClick,
   ]);
 
   useEffect(() => {
     // 🔐 FALLBACK KEYBOARD HANDLER: Only active if IPC is not available
-    const hasIPCSupport = !!(window.ipcRenderer?.on);
-    
+    const hasIPCSupport = !!window.ipcRenderer?.on;
+
     if (hasIPCSupport) {
-      console.log('⌨️ [FALLBACK] IPC is available, using IPC for all shortcuts - no fallback needed');
+      // console.log(
+      //   "⌨️ [FALLBACK] IPC is available, using IPC for all shortcuts - no fallback needed"
+      // );
       return; // Don't set up any keyboard listeners if IPC is available
     }
-    
-    console.log('⌨️ [FALLBACK] IPC not available, setting up fallback keyboard handlers');
-    
+
+    // console.log(
+    //   "⌨️ [FALLBACK] IPC not available, setting up fallback keyboard handlers"
+    // );
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      console.log('⌨️ [FALLBACK] Keyboard event:', {
-        key: event.key,
-        ctrlKey: event.ctrlKey,
-        metaKey: event.metaKey,
-        target: (event.target as HTMLElement)?.tagName,
-        activeElement: (document.activeElement as HTMLElement)?.tagName
-      });
+      // console.log("⌨️ [FALLBACK] Keyboard event:", {
+      //   key: event.key,
+      //   ctrlKey: event.ctrlKey,
+      //   metaKey: event.metaKey,
+      //   target: (event.target as HTMLElement)?.tagName,
+      //   activeElement: (document.activeElement as HTMLElement)?.tagName,
+      // });
 
       // Check for Ctrl/Cmd key
       const isModifierPressed = event.ctrlKey || event.metaKey;
@@ -1983,7 +1980,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           case "+":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [FALLBACK] Keyboard zoom in triggered");
+            // console.log("⌨️ [FALLBACK] Keyboard zoom in triggered");
             handleZoomIn();
             handled = true;
             break;
@@ -1991,51 +1988,51 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           case "_":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [FALLBACK] Keyboard zoom out triggered");
+            // console.log("⌨️ [FALLBACK] Keyboard zoom out triggered");
             handleZoomOut();
             handled = true;
             break;
           case "0":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [FALLBACK] Keyboard zoom reset triggered");
+            // console.log("⌨️ [FALLBACK] Keyboard zoom reset triggered");
             handleZoomReset();
             handled = true;
             break;
-          
+
           // Navigation shortcuts
           case "t":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [FALLBACK] New tab triggered (Ctrl+T)");
+            // console.log("⌨️ [FALLBACK] New tab triggered (Ctrl+T)");
             createNewTab();
             handled = true;
             break;
           case "n":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [FALLBACK] New window triggered (Ctrl+N)");
+            // console.log("⌨️ [FALLBACK] New window triggered (Ctrl+N)");
             createNewWindow();
             handled = true;
             break;
           case "h":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [FALLBACK] History triggered (Ctrl+H)");
+            // console.log("⌨️ [FALLBACK] History triggered (Ctrl+H)");
             handleHistoryClick();
             handled = true;
             break;
           case "j":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [FALLBACK] Downloads triggered (Ctrl+J)");
+            // console.log("⌨️ [FALLBACK] Downloads triggered (Ctrl+J)");
             handleDownloadsClick();
             handled = true;
             break;
           case "w":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [FALLBACK] Close tab triggered (Ctrl+W)");
+            // console.log("⌨️ [FALLBACK] Close tab triggered (Ctrl+W)");
             if (tabs.length > 1) {
               closeTab(activeTab);
             }
@@ -2044,33 +2041,37 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           case "r":
             event.preventDefault();
             event.stopPropagation();
-            console.log("⌨️ [FALLBACK] Reload triggered (Ctrl+R)");
+            // console.log("⌨️ [FALLBACK] Reload triggered (Ctrl+R)");
             reload();
             handled = true;
             break;
         }
-        
+
         // Handle Ctrl+Shift combinations
         if (event.shiftKey) {
           switch (event.key.toLowerCase()) {
             case "o":
               event.preventDefault();
               event.stopPropagation();
-              console.log("⌨️ [FALLBACK] Bookmarks triggered (Ctrl+Shift+O)");
+              // console.log("⌨️ [FALLBACK] Bookmarks triggered (Ctrl+Shift+O)");
               handleBookmarksClick();
               handled = true;
               break;
             case "i":
               event.preventDefault();
               event.stopPropagation();
-              console.log("⌨️ [FALLBACK] Developer tools triggered (Ctrl+Shift+I)");
-              // TODO: Implement developer tools
+                // console.log(
+                //   "⌨️ [FALLBACK] Developer tools triggered (Ctrl+Shift+I)"
+                // );
+                // TODO: Implement developer tools
               handled = true;
               break;
             case "t":
               event.preventDefault();
               event.stopPropagation();
-              console.log("⌨️ [FALLBACK] Task manager triggered (Ctrl+Shift+T)");
+              // console.log(
+              //   "⌨️ [FALLBACK] Task manager triggered (Ctrl+Shift+T)"
+              // );
               handleTaskManagerClick();
               handled = true;
               break;
@@ -2080,19 +2081,21 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         if (handled) {
           // Force focus back to the browser window to ensure subsequent key events work
           setTimeout(() => {
-            const browserWindow = document.querySelector('.browser-window-container');
+            const browserWindow = document.querySelector(
+              ".browser-window-container"
+            );
             if (browserWindow) {
               (browserWindow as HTMLElement).focus();
             }
           }, 10);
         }
       }
-      
+
       // Handle function keys (no modifier needed)
-      if (event.key === 'F12') {
+      if (event.key === "F12") {
         event.preventDefault();
         event.stopPropagation();
-        console.log("⌨️ [FALLBACK] Developer tools triggered (F12)");
+        // console.log("⌨️ [FALLBACK] Developer tools triggered (F12)");
         // TODO: Implement developer tools
       }
     };
@@ -2105,7 +2108,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         event.preventDefault();
         event.stopPropagation();
 
-        console.log("🖱️ [ZOOM] Mouse wheel zoom triggered");
+        // console.log("🖱️ [ZOOM] Mouse wheel zoom triggered");
 
         if (event.deltaY < 0) {
           // Scroll up - zoom in
@@ -2121,10 +2124,19 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     const addListeners = () => {
       document.addEventListener("keydown", handleKeyDown, true);
       window.addEventListener("keydown", handleKeyDown, true);
-      document.addEventListener("wheel", handleWheel, { passive: false, capture: true });
-      window.addEventListener("wheel", handleWheel, { passive: false, capture: true });
-      
-             console.log("🔧 [KEYBOARD] Event listeners attached, IPC support:", !!(window.secureBrowser?.on));
+      document.addEventListener("wheel", handleWheel, {
+        passive: false,
+        capture: true,
+      });
+      window.addEventListener("wheel", handleWheel, {
+        passive: false,
+        capture: true,
+      });
+
+        // console.log(
+        //   "🔧 [KEYBOARD] Event listeners attached, IPC support:",
+        //   !!window.secureBrowser?.on
+        // );
     };
 
     const removeListeners = () => {
@@ -2132,8 +2144,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       window.removeEventListener("keydown", handleKeyDown, true);
       document.removeEventListener("wheel", handleWheel, true);
       window.removeEventListener("wheel", handleWheel, true);
-      
-      console.log("🧹 [KEYBOARD] All keyboard/mouse listeners removed");
+
+      // console.log("🧹 [KEYBOARD] All keyboard/mouse listeners removed");
     };
 
     addListeners();
@@ -2141,19 +2153,19 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     // Cleanup
     return removeListeners;
   }, [
-    handleZoomIn, 
-    handleZoomOut, 
-    handleZoomReset, 
-    createNewTab, 
-    createNewWindow, 
-    handleHistoryClick, 
-    handleDownloadsClick, 
-    handleBookmarksClick, 
+    handleZoomIn,
+    handleZoomOut,
+    handleZoomReset,
+    createNewTab,
+    createNewWindow,
+    handleHistoryClick,
+    handleDownloadsClick,
+    handleBookmarksClick,
     handleTaskManagerClick,
-    tabs.length, 
-    activeTab, 
-    closeTab, 
-    reload
+    tabs.length,
+    activeTab,
+    closeTab,
+    reload,
   ]);
 
   // 🔐 SIMPLE CONTEXT MENU CLOSER: Only handle context menu closing
@@ -2161,11 +2173,11 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     const handleClick = () => {
       hideContextMenu();
     };
-    
-    document.addEventListener('click', handleClick);
-    
+
+    document.addEventListener("click", handleClick);
+
     return () => {
-      document.removeEventListener('click', handleClick);
+      document.removeEventListener("click", handleClick);
     };
   }, [hideContextMenu]);
 
@@ -2178,13 +2190,13 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       <div className="flex items-center gap-3 p-3 border-b bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg flex-shrink-0">
         {/* App Logo */}
         <div className="flex items-center gap-2 mr-2">
-          <img 
-            src="/assets/aussie-browser-logo-32.png" 
-            alt="Aussie Vault Browser" 
+          <img
+            src="/assets/aussie-browser-logo-32.png"
+            alt="Aussie Vault Browser"
             className="h-7 w-7 rounded-md"
           />
         </div>
-        
+
         <div className="flex items-center gap-0.5 bg-slate-700/50 rounded-lg p-1">
           <Button
             variant="ghost"
@@ -2214,11 +2226,11 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           >
             <Home className="h-4 w-4" />
           </Button>
-          
+
           {/* Bookmark Button */}
           <BookmarkButton
             url={urlInput}
-            title={tabs.find(tab => tab.id === activeTab)?.title || urlInput}
+            title={tabs.find((tab) => tab.id === activeTab)?.title || urlInput}
             userId={user?.dbId || 0}
             accessLevel={user?.accessLevel || 1}
             onNavigate={navigateToUrl}
@@ -2288,14 +2300,14 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             title="Current zoom level (debug indicator)"
           >
             🔍 {zoomLevel}%
-            <button 
+            <button
               onClick={handleZoomIn}
               className="ml-1 px-1 bg-green-200 hover:bg-green-300 rounded text-xs"
               title="Test zoom in"
             >
               +
             </button>
-            <button 
+            <button
               onClick={handleZoomOut}
               className="ml-1 px-1 bg-green-200 hover:bg-green-300 rounded text-xs"
               title="Test zoom out"
@@ -2744,7 +2756,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         isOpen={isSharePointSidebarOpen}
         onClose={() => setIsSharePointSidebarOpen(false)}
         onFileSelect={(file) => {
-          console.log('Selected SharePoint file:', file);
+          // console.log("Selected SharePoint file:", file);
           // Could navigate to file or perform other actions
         }}
       />

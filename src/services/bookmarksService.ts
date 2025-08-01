@@ -29,7 +29,7 @@ export class BookmarksService {
   // Check if a URL is bookmarked
   async isBookmarked(url: string, userId: number): Promise<boolean> {
     try {
-      console.log('🔍 Checking bookmark status:', { url, userId });
+      // console.log('🔍 Checking bookmark status:', { url, userId });
       
       const { data, error } = await supabase
         .from('bookmarks')
@@ -39,15 +39,15 @@ export class BookmarksService {
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
-        console.error('❌ Error checking bookmark status:', error);
+        // console.error('❌ Error checking bookmark status:', error);
         return false;
       }
 
       const isBookmarked = !!data;
-      console.log('✅ Bookmark status checked:', { url, userId, isBookmarked });
+      // console.log('✅ Bookmark status checked:', { url, userId, isBookmarked });
       return isBookmarked;
     } catch (error) {
-      console.error('❌ Error checking bookmark status:', error);
+      // console.error('❌ Error checking bookmark status:', error);
       return false;
     }
   }
@@ -55,12 +55,12 @@ export class BookmarksService {
   // Add a bookmark
   async addBookmark(bookmark: Bookmark, userId: number): Promise<boolean> {
     try {
-      console.log('📌 Adding bookmark:', { bookmark, userId });
+      // console.log('📌 Adding bookmark:', { bookmark, userId });
       
       // Check if bookmark already exists
       const exists = await this.isBookmarked(bookmark.url, userId);
       if (exists) {
-        console.log('✅ Bookmark already exists');
+        // console.log('✅ Bookmark already exists');
         return true;
       }
 
@@ -77,7 +77,7 @@ export class BookmarksService {
         device_id: bookmark.device_id
       };
 
-      console.log('📌 Inserting bookmark data:', bookmarkData);
+      // console.log('📌 Inserting bookmark data:', bookmarkData);
 
       const { data, error } = await supabase
         .from('bookmarks')
@@ -86,20 +86,20 @@ export class BookmarksService {
         .single();
 
       if (error) {
-        console.error('❌ Error adding bookmark:', error);
-        console.error('❌ Error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
+        // console.error('❌ Error adding bookmark:', error);
+        // console.error('❌ Error details:', {
+        //   code: error.code,
+        //   message: error.message,
+        //   details: error.details,
+        //   hint: error.hint
+        // });
         return false;
       }
 
-      console.log('✅ Bookmark added successfully:', data);
+      // console.log('✅ Bookmark added successfully:', data);
       return true;
     } catch (error) {
-      console.error('❌ Error adding bookmark:', error);
+      // console.error('❌ Error adding bookmark:', error);
       return false;
     }
   }
@@ -114,14 +114,14 @@ export class BookmarksService {
         .eq('url', url);
 
       if (error) {
-        console.error('Error removing bookmark:', error);
+        // console.error('Error removing bookmark:', error);
         return false;
       }
 
-      console.log('✅ Bookmark removed successfully');
+      // console.log('✅ Bookmark removed successfully');
       return true;
     } catch (error) {
-      console.error('Error removing bookmark:', error);
+      // console.error('Error removing bookmark:', error);
       return false;
     }
   }
@@ -136,13 +136,13 @@ export class BookmarksService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching user bookmarks:', error);
+        // console.error('Error fetching user bookmarks:', error);
         return [];
       }
 
       return data || [];
     } catch (error) {
-      console.error('Error fetching user bookmarks:', error);
+      // console.error('Error fetching user bookmarks:', error);
       return [];
     }
   }
@@ -157,14 +157,14 @@ export class BookmarksService {
         .not('folder_name', 'is', null);
 
       if (error) {
-        console.error('Error fetching user folders:', error);
+        // console.error('Error fetching user folders:', error);
         return [];
       }
 
       const folders = [...new Set(data?.map(item => item.folder_name).filter(Boolean) || [])];
       return folders.sort();
     } catch (error) {
-      console.error('Error fetching user folders:', error);
+      // console.error('Error fetching user folders:', error);
       return [];
     }
   }
@@ -190,13 +190,13 @@ export class BookmarksService {
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error searching bookmarks:', error);
+        // console.error('Error searching bookmarks:', error);
         return [];
       }
 
       return data || [];
     } catch (error) {
-      console.error('Error searching bookmarks:', error);
+      // console.error('Error searching bookmarks:', error);
       return [];
     }
   }
@@ -212,13 +212,13 @@ export class BookmarksService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching bookmarks by folder:', error);
+        // console.error('Error fetching bookmarks by folder:', error);
         return [];
       }
 
       return data || [];
     } catch (error) {
-      console.error('Error fetching bookmarks by folder:', error);
+      // console.error('Error fetching bookmarks by folder:', error);
       return [];
     }
   }
@@ -233,14 +233,14 @@ export class BookmarksService {
         .eq('user_id', userId);
 
       if (error) {
-        console.error('Error updating bookmark:', error);
+        // console.error('Error updating bookmark:', error);
         return false;
       }
 
-      console.log('✅ Bookmark updated successfully');
+      // console.log('✅ Bookmark updated successfully');
       return true;
     } catch (error) {
-      console.error('Error updating bookmark:', error);
+      // console.error('Error updating bookmark:', error);
       return false;
     }
   }
@@ -281,24 +281,24 @@ export class BookmarksService {
         private: (total || 0) - (publicCount || 0)
       };
     } catch (error) {
-      console.error('Error getting bookmark stats:', error);
+      // console.error('Error getting bookmark stats:', error);
       return { total: 0, folders: 0, public: 0, private: 0 };
     }
   }
 
   // Toggle bookmark status
   async toggleBookmark(url: string, title: string, userId: number, accessLevel: number): Promise<boolean> {
-    console.log('🔄 Toggle bookmark called:', { url, title, userId, accessLevel });
+    // console.log('🔄 Toggle bookmark called:', { url, title, userId, accessLevel });
     
     try {
       const isCurrentlyBookmarked = await this.isBookmarked(url, userId);
-      console.log('📊 Current bookmark status:', isCurrentlyBookmarked);
+      // console.log('📊 Current bookmark status:', isCurrentlyBookmarked);
       
       if (isCurrentlyBookmarked) {
-        console.log('🗑️ Removing existing bookmark...');
+        // console.log('🗑️ Removing existing bookmark...');
         return await this.removeBookmark(url, userId);
       } else {
-        console.log('➕ Adding new bookmark...');
+        // console.log('➕ Adding new bookmark...');
         const bookmark: Bookmark = {
           url,
           title,
@@ -310,7 +310,7 @@ export class BookmarksService {
         return await this.addBookmark(bookmark, userId);
       }
     } catch (error) {
-      console.error('❌ Error in toggleBookmark:', error);
+      // console.error('❌ Error in toggleBookmark:', error);
       return false;
     }
   }

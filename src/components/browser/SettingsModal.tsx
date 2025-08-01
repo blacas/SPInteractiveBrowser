@@ -52,7 +52,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSave = () => {
     // TODO: Implement actual settings save to local storage or config
-    console.log('Saving settings:', settings);
+    // console.log('Saving settings:', settings);
     onClose();
   };
 
