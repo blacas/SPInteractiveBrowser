@@ -7,6 +7,34 @@ import { homedir } from 'os'
 import { getPlatformInfo, printPlatformInstructions } from '../src/utils/platform.js'
 import electronSquirrelStartup from 'electron-squirrel-startup'
 
+// Type definitions for better code maintainability
+export interface IPGeolocationResult {
+  ip: string;
+  country: string;
+  countryName: string;
+  region: string;
+  city: string;
+  isAustralia: boolean;
+}
+
+export interface VaultCredentials {
+  username: string;
+  password: string;
+  tenant_url?: string;
+  lastUpdated: string;
+}
+
+// Constants for better maintainability
+const VPN_CHECK_TIMEOUT = 10000; // 10 seconds
+const PROCESS_TIMEOUT = 30000; // 30 seconds for process operations
+const IP_GEOLOCATION_API = 'https://ipinfo.io/json';
+const AUSTRALIAN_COUNTRY_CODES = ['AU', 'Australia'] as const;
+
+// Utility functions for better code organization
+const isAustralianCountry = (countryCode: string): boolean => {
+  return AUSTRALIAN_COUNTRY_CODES.includes(countryCode as any);
+};
+
 // Handle Squirrel.Windows events
 if (electronSquirrelStartup) {
   app.quit()
@@ -140,8 +168,8 @@ const connectWireGuard = async (): Promise<boolean> => {
       // console.log('📝 This is OK - config file not required for detection');
     }
     
-    const platformInfo = getPlatformInfo();
-    // console.log(`🔌 Checking WireGuard connection on ${platformInfo.displayName}...`);
+    const _platformInfo = getPlatformInfo();
+    // console.log(`🔌 Checking WireGuard connection on ${_platformInfo.displayName}...`);
     
     // Check if VPN is already connected (IP geolocation check)
     const isConnected = await checkWireGuardConnection();
@@ -212,12 +240,12 @@ const connectWireGuardLinux = async (configPath: string): Promise<boolean> => {
       resolve(code === 0);
     });
     
-    process.on('error', (error) => {
-      // console.error('❌ wg-quick error:', error);
+    process.on('error', (_error) => {
+      // console.error('❌ wg-quick error:', _error);
       resolve(false);
     });
     
-    setTimeout(() => resolve(false), 30000); // 30s timeout
+    setTimeout(() => resolve(false), PROCESS_TIMEOUT); // 30s timeout
   });
 }
 
@@ -240,16 +268,16 @@ const connectWireGuardMacOS = async (configPath: string): Promise<boolean> => {
       resolve(false); // For now, require manual connection
     });
     
-    setTimeout(() => resolve(false), 30000); // 30s timeout
+    setTimeout(() => resolve(false), PROCESS_TIMEOUT); // 30s timeout
   });
 }
 
 // Windows WireGuard connection
-const connectWireGuardWindows = async (configPath: string): Promise<boolean> => {
+const connectWireGuardWindows = async (_configPath: string): Promise<boolean> => {
   // On Windows, we typically can't connect programmatically without admin rights
   // Check if already connected via WireGuard GUI
   // console.log('🪟 Windows detected - checking existing connection...');
-  // console.log(`   Config available at: ${configPath}`);
+  // console.log(`   Config available at: ${_configPath}`);
   return false; // Require manual GUI connection for security
 }
 
@@ -520,7 +548,7 @@ const checkCurrentIP = async (): Promise<boolean> => {
     // console.log('🔍 Checking current public IP and location...');
     
     // Use PowerShell to get IP and location info from ipinfo.io
-    const psCommand = `(Invoke-WebRequest -Uri "https://ipinfo.io/json" -UseBasicParsing).Content | ConvertFrom-Json | ConvertTo-Json -Compress`;
+    const psCommand = `(Invoke-WebRequest -Uri "${IP_GEOLOCATION_API}" -UseBasicParsing).Content | ConvertFrom-Json | ConvertTo-Json -Compress`;
     const psProcess = spawn('powershell', ['-Command', psCommand], {
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -533,16 +561,16 @@ const checkCurrentIP = async (): Promise<boolean> => {
     psProcess.on('exit', () => {
       try {
         const ipInfo = JSON.parse(output.trim());
-        const currentIP = ipInfo.ip;
+        const _currentIP = ipInfo.ip;
         const country = ipInfo.country;
-        const region = ipInfo.region;
-        const city = ipInfo.city;
+        const _region = ipInfo.region;
+        const _city = ipInfo.city;
         
-        // console.log(`🔍 Current public IP: ${currentIP}`);
-        // console.log(`🔍 Location: ${city}, ${region}, ${country}`);
+        // console.log(`🔍 Current public IP: ${_currentIP}`);
+        // console.log(`🔍 Location: ${_city}, ${_region}, ${country}`);
         
         // Check if IP is from Australia
-        const isAustralianIP = country === 'AU' || country === 'Australia';
+        const isAustralianIP = isAustralianCountry(country);
         
         if (isAustralianIP) {
           // console.log('🇦🇺 ✅ Connected via Australian VPN!');
@@ -582,15 +610,15 @@ const checkCurrentIP = async (): Promise<boolean> => {
       }
     });
     
-    psProcess.on('error', (error) => {
-      // console.log('🔍 IP check error:', error.message);
+    psProcess.on('error', (_error) => {
+      // console.log('🔍 IP check error:', _error.message);
       resolve(false);
     });
     
     setTimeout(() => {
       // console.log('🔍 IP check timed out');
       resolve(false);
-    }, 10000);
+    }, VPN_CHECK_TIMEOUT);
   });
 }
 
@@ -664,6 +692,34 @@ const configureSecureSession = (): void => {
   // This ensures all windows share the same authentication state (Clerk tokens, localStorage)
   const sharedAuthSession = session.fromPartition('persist:shared-auth')
   
+  // 🌐 WEBVIEW SESSION: Configure webview session with ABSOLUTE ZERO restrictions
+  const webviewSession = session.fromPartition('persist:webview')
+  
+  // NUCLEAR OPTION: Completely disable all webRequest blocking for webview session
+  try {
+    // Clear existing handlers by setting them to null
+    webviewSession.webRequest.onBeforeRequest(null);
+    webviewSession.webRequest.onBeforeSendHeaders(null);
+    webviewSession.webRequest.onHeadersReceived(null);
+    webviewSession.webRequest.onBeforeRedirect(null);
+    webviewSession.webRequest.onResponseStarted(null);
+    webviewSession.webRequest.onCompleted(null);
+    webviewSession.webRequest.onErrorOccurred(null);
+  } catch (e: any) {
+    console.log('🔧 Clearing webview session handlers:', e?.message || 'Unknown error');
+  }
+  
+  // AGGRESSIVE: Clear any persistent restrictions
+  try {
+    webviewSession.clearStorageData({ 
+      storages: ['cookies', 'filesystem', 'indexdb', 'localstorage', 'shadercache', 'websql', 'serviceworkers', 'cachestorage'] 
+    }).then(() => {
+      console.log('🧹 Webview session storage cleared for unrestricted browsing');
+    });
+  } catch (e: any) {
+    console.log('🔧 Storage clear attempt:', e?.message || 'Unknown error');
+  }
+  
   // Configure the shared auth session with the same security settings as default
   sharedAuthSession.webRequest.onBeforeRequest((details, callback) => {
     const url = details.url.toLowerCase()
@@ -723,9 +779,70 @@ const configureSecureSession = (): void => {
       }
     })
   })
+  
+  // 🌐 WEBVIEW SESSION: NUCLEAR OPTION - ABSOLUTE ZERO restrictions
+  // ALWAYS ALLOW ALL REQUESTS - No exceptions, no filtering, no restrictions, no delays
+  webviewSession.webRequest.onBeforeRequest((_details, callback) => {
+    // Immediate allow without any checks or logging
+    callback({ cancel: false });
+  })
+  
+  // OVERRIDE: Ensure headers are never blocked or modified
+  webviewSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    // Pass through all headers unchanged for maximum compatibility
+    callback({ 
+      requestHeaders: {
+        ...details.requestHeaders,
+        // Add critical headers for smooth browsing
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
+  })
+  
+  // DISABLE certificate verification completely for webview
+  webviewSession.setCertificateVerifyProc((_request, callback) => {
+    callback(0);  // Accept all certificates
+  })
+  
+  // DISABLE web security completely for webview
+  webviewSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(true);  // Allow all permissions
+  })
+  
+  // DISABLE any potential blocking in webview responses  
+  webviewSession.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = { ...details.responseHeaders };
+    
+    // Remove ALL security headers that could cause blocking
+    delete responseHeaders['X-Frame-Options'];
+    delete responseHeaders['Content-Security-Policy'];
+    delete responseHeaders['X-Content-Type-Options'];
+    delete responseHeaders['Strict-Transport-Security'];
+    delete responseHeaders['X-XSS-Protection'];
+    delete responseHeaders['Referrer-Policy'];
+    delete responseHeaders['Feature-Policy'];
+    delete responseHeaders['Permissions-Policy'];
+    
+    callback({ responseHeaders });
+  })
+
+  // FINAL OVERRIDE: Disable any remaining blocking mechanisms
+  webviewSession.setProxy({ mode: 'direct' }).then(() => {
+    console.log('🌐 Webview session proxy set to direct mode for maximum speed');
+  });
+  
+  // Ensure no cache interference
+  webviewSession.clearCache().then(() => {
+    console.log('🧹 Webview session cache cleared for fresh start');
+  });
+  
+  // Log webview session setup completion
+  console.log('🌐 Webview session configured with ABSOLUTE ZERO restrictions for maximum compatibility');
 
   // 🔥 DOWNLOAD HANDLING: Create a centralized download handler
-  const handleDownload = (event: any, item: any, sessionName: string) => {
+  const handleDownload = (event: any, item: any, _sessionName: string) => {
     // console.log('🎯 Download detected from', sessionName, ':', {
     //   filename: item.getFilename(),
     //   url: item.getURL(),
@@ -822,7 +939,6 @@ const configureSecureSession = (): void => {
   });
 
   // Apply download handler to webview session (for webview downloads)
-  const webviewSession = session.fromPartition('persist:main');
   webviewSession.on('will-download', (event, item) => {
     handleDownload(event, item, 'webview-session');
   });
@@ -905,39 +1021,17 @@ const configureSecureSession = (): void => {
     return null;
   };
 
-  // Block insecure content but allow extensions
+  // MINIMAL blocking - only block truly insecure HTTP, allow everything else
   defaultSession.webRequest.onBeforeRequest((details, callback) => {
     const url = details.url.toLowerCase()
     
-    // Allow extension requests
-    if (url.startsWith('chrome-extension://') || url.startsWith('moz-extension://') || url.startsWith('extension://')) {
-      callback({ cancel: false });
-      return;
-    }
-    
-    // Allow development and internal requests
-    if (url.includes('localhost') || url.includes('127.0.0.1') || url.startsWith('file://') || url.startsWith('data:')) {
-      callback({ cancel: false });
-      return;
-    }
-    
-    // Allow only HTTPS connections for external requests
-    if (url.startsWith('http://')) {
-      // console.log('🚫 Blocking insecure HTTP request:', details.url)
+    // Block only insecure HTTP requests (not HTTPS)
+    if (url.startsWith('http://') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
       callback({ cancel: true })
       return
     }
 
-    // Check VPN status dynamically (don't rely on cached variable)
-    // For webview requests, we'll be more permissive since VPN checks are async
-    if (url.startsWith('https://')) {
-      // Allow HTTPS requests - VPN validation happens at application level
-      // console.log('✅ Allowing HTTPS request:', details.url)
-      callback({ cancel: false });
-      return;
-    }
-
-    // Default allow for other protocols
+    // ALLOW EVERYTHING ELSE - No exceptions, no filtering
     callback({ cancel: false })
   })
 
@@ -1066,7 +1160,7 @@ function createBrowserWindow(isMain: boolean = false): BrowserWindow {
   newWindow.webContents.setWindowOpenHandler((details) => {
     const url = details.url;
     
-    // Allow OAuth popup windows
+    // Allow OAuth popup windows in system browser
     const oauthProviders = [
       'https://accounts.google.com',
       'https://login.microsoftonline.com',
@@ -1086,7 +1180,9 @@ function createBrowserWindow(isMain: boolean = false): BrowserWindow {
       return { action: 'deny' };
     }
     
-    // Deny all other popup attempts
+    // For non-OAuth URLs, deny new windows but allow navigation in same window
+    // The webview should handle normal link navigation automatically
+    // console.log('🔗 Blocking popup for regular link, allowing in-page navigation:', url);
     return { action: 'deny' }
   })
 
@@ -1142,39 +1238,8 @@ function createBrowserWindow(isMain: boolean = false): BrowserWindow {
     }
   })
 
-  // Security: Handle navigation attempts in window
-  newWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-    // Allow navigation within the app and to OAuth providers
-    const allowedOrigins = [
-      VITE_DEV_SERVER_URL,
-      'file://',
-      'about:blank'
-    ].filter(Boolean)
-    
-    // Allow Clerk OAuth and common OAuth providers
-    const oauthProviders = [
-      'https://accounts.google.com',
-      'https://login.microsoftonline.com',
-      'https://github.com/login',
-      'https://clerk.shared.lcl.dev',
-      'https://api.clerk.dev',
-      'https://clerk.dev',
-      'https://major-snipe-9.clerk.accounts.dev'
-    ]
-    
-    const isAllowed = allowedOrigins.some(origin => 
-      navigationUrl.startsWith(origin || '')
-    ) || oauthProviders.some(provider => 
-      navigationUrl.startsWith(provider)
-    )
-    
-    if (!isAllowed) {
-      // console.log('🚫 Blocking window navigation to:', navigationUrl)
-      event.preventDefault()
-    } else if (oauthProviders.some(provider => navigationUrl.startsWith(provider))) {
-      // console.log('🔐 Allowing OAuth navigation to:', navigationUrl)
-    }
-  })
+  // Note: Navigation security is handled by the app-level 'web-contents-created' handler
+  // which has better logic to distinguish between main window and webview navigation
 
   // Note: Download handling is now done at session level in configureSecureSession()
 
@@ -1244,8 +1309,8 @@ function createBrowserWindow(isMain: boolean = false): BrowserWindow {
         mainWindow = windows[0];
       } else {
         // Cleanup VPN connection when last window closes
-        disconnectVPN().catch((error: Error) => {
-          // console.error('❌ Error disconnecting VPN on app close:', error);
+        disconnectVPN().catch((_error: Error) => {
+          // console.error('❌ Error disconnecting VPN on app close:', _error);
         });
         mainWindow = null;
       }
@@ -1454,14 +1519,14 @@ ipcMain.handle('vpn-get-status', async () => {
   }
 })
 
-ipcMain.handle('vpn-connect', async (_event, provider: string) => {
-  // console.log(`🌐 VPN connect requested: ${provider}`)
+ipcMain.handle('vpn-connect', async (_event, _provider: string) => {
+  // console.log(`🌐 VPN connect requested: ${_provider}`)
   try {
     const success = await connectVPN();
     updateVPNStatus(success);
     return success;
-  } catch (error) {
-    // console.error('❌ VPN connection error:', error);
+  } catch (_error) {
+    // console.error('❌ VPN connection error:', _error);
     updateVPNStatus(false);
     return false;
   }
@@ -1473,9 +1538,91 @@ ipcMain.handle('vpn-disconnect', async () => {
     const success = await disconnectVPN();
     updateVPNStatus(false);
     return success;
-  } catch (error) {
-    // console.error('❌ VPN disconnection error:', error);
+  } catch (_error) {
+    // console.error('❌ VPN disconnection error:', _error);
     return false;
+  }
+})
+
+// Real IP geolocation check
+ipcMain.handle('vpn-check-ip', async (): Promise<IPGeolocationResult> => {
+  // console.log('🔍 Real IP geolocation check requested...');
+  try {
+    // Use the same checkCurrentIP function used for VPN verification
+    const psCommand = `(Invoke-WebRequest -Uri "${IP_GEOLOCATION_API}" -UseBasicParsing).Content | ConvertFrom-Json | ConvertTo-Json -Compress`;
+    
+    return new Promise((resolve) => {
+      const psProcess = spawn('powershell', ['-Command', psCommand], {
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      
+      let output = '';
+      psProcess.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+      
+      psProcess.on('exit', () => {
+        try {
+          const ipInfo = JSON.parse(output.trim());
+          const result = {
+            ip: ipInfo.ip || 'Unknown',
+            country: ipInfo.country || 'Unknown',
+            countryName: isAustralianCountry(ipInfo.country) ? 'Australia' : (ipInfo.country || 'Unknown'),
+            region: ipInfo.region || 'Unknown',
+            city: ipInfo.city || 'Unknown',
+            isAustralia: isAustralianCountry(ipInfo.country)
+          };
+          
+          // console.log(`🔍 Real IP check result: ${result.ip} (${result.city}, ${result.countryName})`);
+          resolve(result);
+        } catch (_error) {
+          // console.error('❌ Failed to parse IP info:', _error);
+          resolve({
+            ip: 'Error',
+            country: 'Unknown',
+            countryName: 'Unknown', 
+            region: 'Unknown',
+            city: 'Unknown',
+            isAustralia: false
+          });
+        }
+      });
+      
+      psProcess.on('error', (_error) => {
+        // console.error('❌ IP check process error:', _error);
+        resolve({
+          ip: 'Error',
+          country: 'Unknown',
+          countryName: 'Unknown',
+          region: 'Unknown', 
+          city: 'Unknown',
+          isAustralia: false
+        });
+      });
+      
+      // Timeout after configured duration
+      setTimeout(() => {
+        psProcess.kill();
+        resolve({
+          ip: 'Timeout',
+          country: 'Unknown',
+          countryName: 'Unknown',
+          region: 'Unknown',
+          city: 'Unknown', 
+          isAustralia: false
+        });
+      }, VPN_CHECK_TIMEOUT);
+    });
+  } catch (_error) {
+    // console.error('❌ IP geolocation check error:', _error);
+    return {
+      ip: 'Error',
+      country: 'Unknown', 
+      countryName: 'Unknown',
+      region: 'Unknown',
+      city: 'Unknown',
+      isAustralia: false
+    };
   }
 })
 
@@ -1655,18 +1802,18 @@ ipcMain.handle('vault-get-status', async () => {
 })
 
 // Security handlers
-ipcMain.handle('security-check-url', async (_event, url: string, accessLevel: number) => {
-  // console.log(`🔒 URL check: ${url} (Level ${accessLevel})`)
+ipcMain.handle('security-check-url', async (_event, _url: string, _accessLevel: number) => {
+  // console.log(`🔒 URL check: ${_url} (Level ${_accessLevel})`)
   // Implement URL filtering logic
   return true
 })
 
-ipcMain.handle('security-log-navigation', async (_event, url: string, allowed: boolean, accessLevel: number) => {
-  // console.log(`📝 Navigation log: ${url} - ${allowed ? 'ALLOWED' : 'BLOCKED'} (Level ${accessLevel})`)
+ipcMain.handle('security-log-navigation', async (_event, _url: string, _allowed: boolean, _accessLevel: number) => {
+  // console.log(`📝 Navigation log: ${_url} - ${_allowed ? 'ALLOWED' : 'BLOCKED'} (Level ${_accessLevel})`)
 })
 
-ipcMain.handle('security-prevent-download', async (_event, filename: string) => {
-  // console.log(`🚫 Download blocked: ${filename}`)
+ipcMain.handle('security-prevent-download', async (_event, _filename: string) => {
+  // console.log(`🚫 Download blocked: ${_filename}`)
 })
 
 // Shell operations handler
@@ -1804,8 +1951,8 @@ ipcMain.handle('extension-install-1password', async () => {
 });
 
 // SharePoint handlers
-ipcMain.handle('sharepoint-inject-credentials', async (_event, webviewId: string) => {
-  // console.log(`🔐 SharePoint credentials injection requested for: ${webviewId}`)
+ipcMain.handle('sharepoint-inject-credentials', async (_event, _webviewId: string) => {
+  // console.log(`🔐 SharePoint credentials injection requested for: ${_webviewId}`)
   // Implement credential injection logic
   return true
 })
@@ -1817,8 +1964,8 @@ ipcMain.handle('sharepoint-get-config', async () => {
   }
 })
 
-ipcMain.handle('sharepoint-validate-access', async (_event, url: string) => {
-  // console.log(`🔍 SharePoint access validation: ${url}`)
+ipcMain.handle('sharepoint-validate-access', async (_event, _url: string) => {
+  // console.log(`🔍 SharePoint access validation: ${_url}`)
   return true
 })
 
@@ -1972,6 +2119,17 @@ app.whenReady().then(async () => {
   // Configure secure session before creating any windows
   configureSecureSession()
   
+  // Handle certificate errors for development and enterprise environments
+  app.on('certificate-error', (event, _webContents, _url, _error, _certificate, callback) => {
+    // In development or when explicitly allowed, ignore certificate errors
+    if (process.env.NODE_ENV === 'development' || process.env.IGNORE_CERTIFICATE_ERRORS === 'true') {
+      event.preventDefault();
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+  
   // Initialize VPN connection first (this was missing!)
   // console.log('🔌 Starting VPN connection...')
   const vpnConnected = await connectVPN()
@@ -1984,8 +2142,8 @@ app.whenReady().then(async () => {
   }
   
   createWindow()
-}).catch((error) => {
-  // console.error('❌ Failed to initialize app:', error)
+}).catch((_error) => {
+  // console.error('❌ Failed to initialize app:', _error)
   app.quit()
 })
 

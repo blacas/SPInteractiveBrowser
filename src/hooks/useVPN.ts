@@ -12,6 +12,14 @@ interface VPNConnection {
 interface ElectronVPNAPI {
   connect: (provider: string) => Promise<boolean>;
   getStatus: () => Promise<string>;
+  checkIP: () => Promise<{
+    ip: string;
+    country: string;
+    countryName: string;
+    region: string;
+    city: string;
+    isAustralia: boolean;
+  }>;
 }
 
 interface ElectronAPI {
@@ -28,48 +36,48 @@ declare global {
   }
 }
 
-// Function to check actual IP geolocation - optimized for speed
+// Function to check actual IP geolocation - uses REAL Electron main process API
 const checkIPGeolocation = async (): Promise<{ country: string; ip: string; isAustralia: boolean }> => {
   try {
-    // Use fastest service with short timeout for speed
-    const response = await Promise.race([
-      fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(2000) }),
-      fetch('https://ip-api.com/json/', { signal: AbortSignal.timeout(2000) })
-    ]);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    // Use the real Electron API for IP checking
+    if (window.electronAPI?.vpn?.checkIP) {
+      try {
+        // console.log('🔍 Making REAL IP geolocation check...');
+        const result = await window.electronAPI.vpn.checkIP();
+        
+        return { 
+          country: result.countryName, 
+          ip: result.ip, 
+          isAustralia: result.isAustralia 
+        };
+      } catch (error) {
+        // console.warn('⚠️ Real IP check failed:', error);
+        return { 
+          country: 'Error', 
+          ip: 'Failed to check', 
+          isAustralia: false 
+        };
+      }
     }
     
-    const data = await response.json();
-    
-    let country = '';
-    let ip = '';
-    
-    // Parse response based on service URL
-    if (response.url.includes('ipapi.co')) {
-      country = data.country_name || data.country || '';
-      ip = data.ip || '';
-    } else if (response.url.includes('ip-api.com')) {
-      country = data.country || '';
-      ip = data.query || '';
-    }
-    
-    const isAustralia = country.toLowerCase().includes('australia') || 
-                       country.toLowerCase() === 'au' ||
-                       country.toLowerCase() === 'aus';
-    
-    // console.log(`🌍 Fast IP Check: IP=${ip}, Country=${country}, IsAustralia=${isAustralia}`);
-    
-    return { country, ip, isAustralia };
+    // Fallback if Electron API is not available
+    // console.warn('⚠️ Electron API not available for IP checking');
+    return { 
+      country: 'API Unavailable', 
+      ip: 'Unknown', 
+      isAustralia: false 
+    };
   } catch (error) {
-    // console.warn('⚠️ IP check failed, allowing WireGuard status to determine connection:', error);
-    // If IP check fails, rely on WireGuard status
-    return { country: 'Checking...', ip: 'Checking...', isAustralia: true };
+    // console.warn('⚠️ IP check failed:', error);
+    return { 
+      country: 'Error', 
+      ip: 'Failed', 
+      isAustralia: false 
+    };
   }
 };
 
-export const useVPN = () => {
+export const useVPN = (userAccessLevel?: number) => {
   const [vpnStatus, setVpnStatus] = useState<VPNStatus>("disconnected");
   const [connection, setConnection] = useState<VPNConnection>({
     endpoint: "au-sydney-01.vpn.provider.com",
@@ -135,13 +143,12 @@ export const useVPN = () => {
 
   // Auto-reconnect function
   const autoReconnectVPN = useCallback(async (): Promise<void> => {
-    if (isAutoReconnecting || vpnStatus === "connecting") {
-      return; // Prevent multiple concurrent reconnection attempts
-    }
-
-    setIsAutoReconnecting(true);
+    setIsAutoReconnecting(prev => {
+      if (prev) return prev; // Already reconnecting
+      return true;
+    });
+    
     setAutoReconnectAttempts(prev => prev + 1);
-    // console.log(`🔄 Auto-reconnect attempt ${autoReconnectAttempts + 1}...`);
 
     try {
       // Use IPC to connect VPN via main process
@@ -152,7 +159,6 @@ export const useVPN = () => {
         setRetryCount(0);
         setAutoReconnectAttempts(0);
         setIsAutoReconnecting(false);
-        // console.log("✅ VPN Auto-reconnected successfully");
 
         // Update connection info
         setConnection(prev => ({
@@ -164,27 +170,25 @@ export const useVPN = () => {
         throw new Error("Auto-reconnection failed");
       }
     } catch (error) {
-      // console.error("❌ VPN auto-reconnection failed:", error);
       setIsAutoReconnecting(false);
       
-      // If we've tried too many times, give up auto-reconnect
-      if (autoReconnectAttempts >= 5) {
-        // console.log("❌ Auto-reconnect failed after 5 attempts, stopping");
-        setVpnStatus("failed");
-        setLastError("Auto-reconnection failed after multiple attempts");
-      }
+      // Use functional update to avoid dependency
+      setAutoReconnectAttempts(prev => {
+        if (prev >= 5) {
+          setVpnStatus("failed");
+          setLastError("Auto-reconnection failed after multiple attempts");
+        }
+        return prev;
+      });
     }
-  }, [isAutoReconnecting, vpnStatus, autoReconnectAttempts]);
+  }, []); // No dependencies to break the loop
 
   // Fast VPN status check - prioritizes WireGuard status over IP geolocation
   const checkVPNStatus = useCallback(async (): Promise<void> => {
     setIsCheckingStatus(true);
     try {
-      // console.log("🔍 Fast VPN status check...");
-      
       // Check WireGuard status first (faster and more reliable)
       const status = await window.electronAPI?.vpn?.getStatus();
-      // console.log(`📊 WireGuard status: ${status}`);
       
       if (status === 'connected') {
         // If WireGuard says connected, trust it immediately for speed
@@ -205,11 +209,8 @@ export const useVPN = () => {
             ipAddress: ipInfo.ip,
             latency: Math.floor(Math.random() * 30) + 15
           }));
-          
-          // console.log(`✅ VPN Connected: ${ipInfo.country} (${ipInfo.ip})`);
         });
         
-        // console.log("✅ WireGuard VPN Connected - allowing browsing immediately");
         return;
       }
       
@@ -231,30 +232,19 @@ export const useVPN = () => {
           latency: undefined
         }));
         
-        // Fast auto-reconnect for better UX
-        if (!isAutoReconnecting && autoReconnectAttempts < 3) {
-          setTimeout(() => {
-            autoReconnectVPN();
-          }, 2000); // Faster reconnect - 2 seconds
-        }
-        
-        // console.log(`❌ VPN disconnected: ${ipInfo.country} (${ipInfo.ip})`);
       } else if (status === 'connecting') {
         setVpnStatus("connecting");
-        // console.log("🔄 VPN connecting...");
       } else {
         setVpnStatus("failed");
         setLastError(`VPN status error: ${status}`);
-        // console.log(`❌ VPN failed: ${status}`);
       }
     } catch (error) {
-      // console.error("❌ VPN status check failed:", error);
       setVpnStatus("failed");
       setLastError("Failed to check VPN status");
     } finally {
       setIsCheckingStatus(false);
     }
-  }, [vpnStatus, isAutoReconnecting, autoReconnectAttempts, autoReconnectVPN]);
+  }, []); // No dependencies to break the loop
 
   // Fast initial VPN check on mount
   useEffect(() => {
@@ -302,9 +292,9 @@ export const useVPN = () => {
           setVpnStatus("connecting");
           // console.log("🔄 Initial check: WireGuard connecting...");
           
-          // Check again soon
+          // Check again soon by calling this function recursively
           setTimeout(() => {
-            if (mounted) checkVPNStatus();
+            if (mounted) checkInitialStatus();
           }, 2000);
         } else {
           // If not connected, do a quick IP check
@@ -343,35 +333,34 @@ export const useVPN = () => {
     };
   }, []);
 
-  // Faster periodic VPN status check
+  // Periodic VPN status check - reduced frequency to minimize system load
   useEffect(() => {
     const interval = setInterval(() => {
-      // Check more frequently for better responsiveness
-      if (vpnStatus === "connected" || (vpnStatus === "disconnected" && !isAutoReconnecting)) {
-        checkVPNStatus();
-      }
-    }, 15000); // Check every 15 seconds instead of 45
+      checkVPNStatus();
+    }, 60000); // Check every 60 seconds (reduced from 15s to prevent API spam)
 
     return () => clearInterval(interval);
-  }, [vpnStatus, checkVPNStatus, isAutoReconnecting]);
+  }, [checkVPNStatus]);
 
-  // Fast auto-reconnect logic
+  // Auto-reconnect logic - triggered when status changes to disconnected
   useEffect(() => {
-    let autoReconnectTimeout: NodeJS.Timeout;
+    if (vpnStatus === "disconnected") {
+      const autoReconnectTimeout = setTimeout(() => {
+        // Check current state and attempt reconnect if conditions are met
+        setAutoReconnectAttempts(currentAttempts => {
+          setIsAutoReconnecting(currentReconnecting => {
+            if (currentAttempts < 3 && !currentReconnecting) {
+              autoReconnectVPN();
+            }
+            return currentReconnecting;
+          });
+          return currentAttempts;
+        });
+      }, 5000);
 
-    if (vpnStatus === "disconnected" && autoReconnectAttempts < 3 && !isAutoReconnecting) {
-      // console.log(`⏰ Fast auto-reconnect attempt ${autoReconnectAttempts + 1} in 5 seconds...`);
-      autoReconnectTimeout = setTimeout(() => {
-        autoReconnectVPN();
-      }, 5000); // Much faster reconnect - 5 seconds instead of 30
+      return () => clearTimeout(autoReconnectTimeout);
     }
-
-    return () => {
-      if (autoReconnectTimeout) {
-        clearTimeout(autoReconnectTimeout);
-      }
-    };
-  }, [vpnStatus, autoReconnectAttempts, isAutoReconnecting, autoReconnectVPN]);
+  }, [vpnStatus]); // Only depend on vpnStatus
 
   return {
     vpnStatus,
@@ -390,7 +379,7 @@ export const useVPN = () => {
     actualIP,
     actualCountry,
     ipVerified,
-    // Allow browsing if WireGuard is connected (trust WireGuard status for speed)
-    allowBrowsing: vpnStatus === "connected",
+    // Allow browsing if WireGuard is connected OR if user has Level 3 access (unrestricted)
+    allowBrowsing: vpnStatus === "connected" || userAccessLevel === 3,
   };
 }; 

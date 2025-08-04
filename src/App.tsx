@@ -338,36 +338,44 @@ function AppContent() {
   // Monitor VPN status changes and log to database
   useEffect(() => {
     const handleVPNStatusChange = async () => {
-      if (vpnStatus && vpnStatusInfo) {
+      if (vpnStatus) {
         const isCurrentlyConnected = vpnStatus === 'connected';
-        const wasConnected = vpnStatusInfo.connected;
         
-        // Only log if status actually changed
-        if (isCurrentlyConnected !== wasConnected) {
-          if (isCurrentlyConnected) {
-            // console.log('✅ VPN reconnected detected');
-            await SecureBrowserDatabaseService.logSecurityEvent(
-              'vpn_disconnected', // Using this type but with positive message
-              'VPN connection restored',
-              'low'
-            );
-          } else {
-            // console.warn('⚠️ VPN disconnection detected');
-            await SecureBrowserDatabaseService.logSecurityEvent(
-              'vpn_disconnected',
-              'VPN connection lost during session',
-              'high'
-            );
+        // Use functional update to avoid dependency on vpnStatusInfo
+        setVpnStatusInfo(prev => {
+          if (!prev) {
+            return { connected: isCurrentlyConnected };
           }
           
-          // Update VPN status info
-          setVpnStatusInfo(prev => prev ? { ...prev, connected: isCurrentlyConnected } : null);
-        }
+          const wasConnected = prev.connected;
+          
+          // Only log if status actually changed
+          if (isCurrentlyConnected !== wasConnected) {
+            // Log async without blocking
+            (async () => {
+              if (isCurrentlyConnected) {
+                await SecureBrowserDatabaseService.logSecurityEvent(
+                  'vpn_disconnected', // Using this type but with positive message
+                  'VPN connection restored',
+                  'low'
+                );
+              } else {
+                await SecureBrowserDatabaseService.logSecurityEvent(
+                  'vpn_disconnected',
+                  'VPN connection lost during session',
+                  'high'
+                );
+              }
+            })();
+          }
+          
+          return { ...prev, connected: isCurrentlyConnected };
+        });
       }
     };
     
     handleVPNStatusChange();
-  }, [vpnStatus, vpnStatusInfo]);
+  }, [vpnStatus]);
 
   const handleAccessLevelChange = async (newLevel: 1 | 2 | 3) => {
     if (user) {

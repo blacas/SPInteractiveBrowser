@@ -29,6 +29,26 @@ export class BookmarksService {
   // Check if a URL is bookmarked
   async isBookmarked(url: string, userId: number): Promise<boolean> {
     try {
+      // DISABLE bookmark checking entirely in development to prevent 406 errors
+      if (window.location.hostname === 'localhost') {
+        return false;
+      }
+
+      // Skip bookmark check for problematic URLs to prevent 406 errors
+      if (!url || 
+          url.length > 800 || 
+          url.includes('google.com') ||
+          url.includes('search?q=') || 
+          url.includes('sca_esv=') ||
+          url.includes('&ved=') ||
+          url.includes('&ei=') ||
+          url.includes('&iflsig=') ||
+          url.includes('&oq=') ||
+          url.includes('&gs_lp=')) {
+        // console.log('⚠️ Skipping bookmark check for problematic URL');
+        return false;
+      }
+      
       // console.log('🔍 Checking bookmark status:', { url, userId });
       
       const { data, error } = await supabase

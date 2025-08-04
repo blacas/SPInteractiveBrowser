@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getStatus: () => ipcRenderer.invoke('vpn-get-status'),
     connect: (provider: string) => ipcRenderer.invoke('vpn-connect', provider),
     disconnect: () => ipcRenderer.invoke('vpn-disconnect'),
+    checkIP: () => ipcRenderer.invoke('vpn-check-ip'),
     onStatusChange: (callback: (status: string) => void) => {
       ipcRenderer.on('vpn-status-changed', (_, status) => callback(status))
     },
@@ -46,6 +47,7 @@ contextBridge.exposeInMainWorld('secureBrowser', {
     getStatus: () => ipcRenderer.invoke('vpn-get-status'),
     connect: (provider: string) => ipcRenderer.invoke('vpn-connect', provider),
     disconnect: () => ipcRenderer.invoke('vpn-disconnect'),
+    checkIP: () => ipcRenderer.invoke('vpn-check-ip'),
     onStatusChange: (callback: (status: string) => void) => {
       ipcRenderer.on('vpn-status-changed', (_, status) => callback(status))
     },

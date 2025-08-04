@@ -573,6 +573,13 @@ function requireElectronSquirrelStartup() {
 }
 var electronSquirrelStartupExports = requireElectronSquirrelStartup();
 const electronSquirrelStartup = /* @__PURE__ */ getDefaultExportFromCjs(electronSquirrelStartupExports);
+const VPN_CHECK_TIMEOUT = 1e4;
+const PROCESS_TIMEOUT = 3e4;
+const IP_GEOLOCATION_API = "https://ipinfo.io/json";
+const AUSTRALIAN_COUNTRY_CODES = ["AU", "Australia"];
+const isAustralianCountry = (countryCode) => {
+  return AUSTRALIAN_COUNTRY_CODES.includes(countryCode);
+};
 if (electronSquirrelStartup) {
   app.quit();
 }
@@ -646,7 +653,7 @@ const connectWireGuard = async () => {
       await promises.access(resolvedPath);
     } catch (error) {
     }
-    const platformInfo = getPlatformInfo();
+    const _platformInfo = getPlatformInfo();
     const isConnected = await checkWireGuardConnection();
     if (isConnected) {
       return true;
@@ -693,10 +700,10 @@ const connectWireGuardLinux = async (configPath) => {
     process2.on("exit", (code) => {
       resolve(code === 0);
     });
-    process2.on("error", (error) => {
+    process2.on("error", (_error) => {
       resolve(false);
     });
-    setTimeout(() => resolve(false), 3e4);
+    setTimeout(() => resolve(false), PROCESS_TIMEOUT);
   });
 };
 const connectWireGuardMacOS = async (configPath) => {
@@ -710,10 +717,10 @@ const connectWireGuardMacOS = async (configPath) => {
     process2.on("error", () => {
       resolve(false);
     });
-    setTimeout(() => resolve(false), 3e4);
+    setTimeout(() => resolve(false), PROCESS_TIMEOUT);
   });
 };
-const connectWireGuardWindows = async (configPath) => {
+const connectWireGuardWindows = async (_configPath) => {
   return false;
 };
 const checkWireGuardConnection = async () => {
@@ -877,7 +884,7 @@ const checkRoutingTable = async () => {
 };
 const checkCurrentIP = async () => {
   return new Promise((resolve) => {
-    const psCommand = `(Invoke-WebRequest -Uri "https://ipinfo.io/json" -UseBasicParsing).Content | ConvertFrom-Json | ConvertTo-Json -Compress`;
+    const psCommand = `(Invoke-WebRequest -Uri "${IP_GEOLOCATION_API}" -UseBasicParsing).Content | ConvertFrom-Json | ConvertTo-Json -Compress`;
     const psProcess = spawn("powershell", ["-Command", psCommand], {
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -888,11 +895,11 @@ const checkCurrentIP = async () => {
     psProcess.on("exit", () => {
       try {
         const ipInfo = JSON.parse(output.trim());
-        const currentIP = ipInfo.ip;
+        const _currentIP = ipInfo.ip;
         const country = ipInfo.country;
-        const region = ipInfo.region;
-        const city = ipInfo.city;
-        const isAustralianIP = country === "AU" || country === "Australia";
+        const _region = ipInfo.region;
+        const _city = ipInfo.city;
+        const isAustralianIP = isAustralianCountry(country);
         if (isAustralianIP) {
         } else {
         }
@@ -916,12 +923,12 @@ const checkCurrentIP = async () => {
         });
       }
     });
-    psProcess.on("error", (error) => {
+    psProcess.on("error", (_error) => {
       resolve(false);
     });
     setTimeout(() => {
       resolve(false);
-    }, 1e4);
+    }, VPN_CHECK_TIMEOUT);
   });
 };
 const disconnectWireGuard = async () => {
@@ -971,6 +978,27 @@ const disconnectWireGuardWindows = async () => {
 const configureSecureSession = () => {
   const defaultSession = session.defaultSession;
   const sharedAuthSession = session.fromPartition("persist:shared-auth");
+  const webviewSession = session.fromPartition("persist:webview");
+  try {
+    webviewSession.webRequest.onBeforeRequest(null);
+    webviewSession.webRequest.onBeforeSendHeaders(null);
+    webviewSession.webRequest.onHeadersReceived(null);
+    webviewSession.webRequest.onBeforeRedirect(null);
+    webviewSession.webRequest.onResponseStarted(null);
+    webviewSession.webRequest.onCompleted(null);
+    webviewSession.webRequest.onErrorOccurred(null);
+  } catch (e) {
+    console.log("🔧 Clearing webview session handlers:", (e == null ? void 0 : e.message) || "Unknown error");
+  }
+  try {
+    webviewSession.clearStorageData({
+      storages: ["cookies", "filesystem", "indexdb", "localstorage", "shadercache", "websql", "serviceworkers", "cachestorage"]
+    }).then(() => {
+      console.log("🧹 Webview session storage cleared for unrestricted browsing");
+    });
+  } catch (e) {
+    console.log("🔧 Storage clear attempt:", (e == null ? void 0 : e.message) || "Unknown error");
+  }
   sharedAuthSession.webRequest.onBeforeRequest((details, callback) => {
     const url = details.url.toLowerCase();
     if (url.startsWith("chrome-extension://") || url.startsWith("moz-extension://") || url.startsWith("extension://")) {
@@ -1010,7 +1038,46 @@ const configureSecureSession = () => {
       }
     });
   });
-  const handleDownload = (event, item, sessionName) => {
+  webviewSession.webRequest.onBeforeRequest((_details, callback) => {
+    callback({ cancel: false });
+  });
+  webviewSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    callback({
+      requestHeaders: {
+        ...details.requestHeaders,
+        // Add critical headers for smooth browsing
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      }
+    });
+  });
+  webviewSession.setCertificateVerifyProc((_request, callback) => {
+    callback(0);
+  });
+  webviewSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(true);
+  });
+  webviewSession.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = { ...details.responseHeaders };
+    delete responseHeaders["X-Frame-Options"];
+    delete responseHeaders["Content-Security-Policy"];
+    delete responseHeaders["X-Content-Type-Options"];
+    delete responseHeaders["Strict-Transport-Security"];
+    delete responseHeaders["X-XSS-Protection"];
+    delete responseHeaders["Referrer-Policy"];
+    delete responseHeaders["Feature-Policy"];
+    delete responseHeaders["Permissions-Policy"];
+    callback({ responseHeaders });
+  });
+  webviewSession.setProxy({ mode: "direct" }).then(() => {
+    console.log("🌐 Webview session proxy set to direct mode for maximum speed");
+  });
+  webviewSession.clearCache().then(() => {
+    console.log("🧹 Webview session cache cleared for fresh start");
+  });
+  console.log("🌐 Webview session configured with ABSOLUTE ZERO restrictions for maximum compatibility");
+  const handleDownload = (event, item, _sessionName) => {
     if (process.env.SECURITY_BLOCK_DOWNLOADS === "true") {
       event.preventDefault();
       windows.forEach((window2) => {
@@ -1071,7 +1138,6 @@ const configureSecureSession = () => {
   sharedAuthSession.on("will-download", (event, item) => {
     handleDownload(event, item);
   });
-  const webviewSession = session.fromPartition("persist:main");
   webviewSession.on("will-download", (event, item) => {
     handleDownload(event, item);
   });
@@ -1131,20 +1197,8 @@ const configureSecureSession = () => {
   };
   defaultSession.webRequest.onBeforeRequest((details, callback) => {
     const url = details.url.toLowerCase();
-    if (url.startsWith("chrome-extension://") || url.startsWith("moz-extension://") || url.startsWith("extension://")) {
-      callback({ cancel: false });
-      return;
-    }
-    if (url.includes("localhost") || url.includes("127.0.0.1") || url.startsWith("file://") || url.startsWith("data:")) {
-      callback({ cancel: false });
-      return;
-    }
-    if (url.startsWith("http://")) {
+    if (url.startsWith("http://") && !url.includes("localhost") && !url.includes("127.0.0.1")) {
       callback({ cancel: true });
-      return;
-    }
-    if (url.startsWith("https://")) {
-      callback({ cancel: false });
       return;
     }
     callback({ cancel: false });
@@ -1307,30 +1361,6 @@ function createBrowserWindow(isMain = false) {
       }
     }
   });
-  newWindow.webContents.on("will-navigate", (event, navigationUrl) => {
-    const allowedOrigins = [
-      VITE_DEV_SERVER_URL,
-      "file://",
-      "about:blank"
-    ].filter(Boolean);
-    const oauthProviders = [
-      "https://accounts.google.com",
-      "https://login.microsoftonline.com",
-      "https://github.com/login",
-      "https://clerk.shared.lcl.dev",
-      "https://api.clerk.dev",
-      "https://clerk.dev",
-      "https://major-snipe-9.clerk.accounts.dev"
-    ];
-    const isAllowed = allowedOrigins.some(
-      (origin) => navigationUrl.startsWith(origin || "")
-    ) || oauthProviders.some(
-      (provider) => navigationUrl.startsWith(provider)
-    );
-    if (!isAllowed) {
-      event.preventDefault();
-    } else if (oauthProviders.some((provider) => navigationUrl.startsWith(provider))) ;
-  });
   if (VITE_DEV_SERVER_URL) {
     newWindow.loadURL(VITE_DEV_SERVER_URL);
     if (process.env.NODE_ENV === "development") {
@@ -1374,7 +1404,7 @@ function createBrowserWindow(isMain = false) {
       if (windows.length > 0) {
         mainWindow = windows[0];
       } else {
-        disconnectVPN().catch((error) => {
+        disconnectVPN().catch((_error) => {
         });
         mainWindow = null;
       }
@@ -1534,12 +1564,12 @@ ipcMain.handle("vpn-get-status", async () => {
     return "disconnected";
   }
 });
-ipcMain.handle("vpn-connect", async (_event, provider) => {
+ipcMain.handle("vpn-connect", async (_event, _provider) => {
   try {
     const success = await connectVPN();
     updateVPNStatus(success);
     return success;
-  } catch (error) {
+  } catch (_error) {
     updateVPNStatus(false);
     return false;
   }
@@ -1549,8 +1579,75 @@ ipcMain.handle("vpn-disconnect", async () => {
     const success = await disconnectVPN();
     updateVPNStatus(false);
     return success;
-  } catch (error) {
+  } catch (_error) {
     return false;
+  }
+});
+ipcMain.handle("vpn-check-ip", async () => {
+  try {
+    const psCommand = `(Invoke-WebRequest -Uri "${IP_GEOLOCATION_API}" -UseBasicParsing).Content | ConvertFrom-Json | ConvertTo-Json -Compress`;
+    return new Promise((resolve) => {
+      const psProcess = spawn("powershell", ["-Command", psCommand], {
+        stdio: ["pipe", "pipe", "pipe"]
+      });
+      let output = "";
+      psProcess.stdout.on("data", (data) => {
+        output += data.toString();
+      });
+      psProcess.on("exit", () => {
+        try {
+          const ipInfo = JSON.parse(output.trim());
+          const result = {
+            ip: ipInfo.ip || "Unknown",
+            country: ipInfo.country || "Unknown",
+            countryName: isAustralianCountry(ipInfo.country) ? "Australia" : ipInfo.country || "Unknown",
+            region: ipInfo.region || "Unknown",
+            city: ipInfo.city || "Unknown",
+            isAustralia: isAustralianCountry(ipInfo.country)
+          };
+          resolve(result);
+        } catch (_error) {
+          resolve({
+            ip: "Error",
+            country: "Unknown",
+            countryName: "Unknown",
+            region: "Unknown",
+            city: "Unknown",
+            isAustralia: false
+          });
+        }
+      });
+      psProcess.on("error", (_error) => {
+        resolve({
+          ip: "Error",
+          country: "Unknown",
+          countryName: "Unknown",
+          region: "Unknown",
+          city: "Unknown",
+          isAustralia: false
+        });
+      });
+      setTimeout(() => {
+        psProcess.kill();
+        resolve({
+          ip: "Timeout",
+          country: "Unknown",
+          countryName: "Unknown",
+          region: "Unknown",
+          city: "Unknown",
+          isAustralia: false
+        });
+      }, VPN_CHECK_TIMEOUT);
+    });
+  } catch (_error) {
+    return {
+      ip: "Error",
+      country: "Unknown",
+      countryName: "Unknown",
+      region: "Unknown",
+      city: "Unknown",
+      isAustralia: false
+    };
   }
 });
 const get1PasswordSecret = async (itemId) => {
@@ -1682,12 +1779,12 @@ ipcMain.handle("vault-get-status", async () => {
     return `error: ${error instanceof Error ? error.message : "Unknown error"}`;
   }
 });
-ipcMain.handle("security-check-url", async (_event, url, accessLevel) => {
+ipcMain.handle("security-check-url", async (_event, _url, _accessLevel) => {
   return true;
 });
-ipcMain.handle("security-log-navigation", async (_event, url, allowed, accessLevel) => {
+ipcMain.handle("security-log-navigation", async (_event, _url, _allowed, _accessLevel) => {
 });
-ipcMain.handle("security-prevent-download", async (_event, filename) => {
+ipcMain.handle("security-prevent-download", async (_event, _filename) => {
 });
 ipcMain.handle("shell-open-path", async (_event, filePath) => {
   try {
@@ -1789,7 +1886,7 @@ ipcMain.handle("extension-install-1password", async () => {
     webStoreUrl: "https://chromewebstore.google.com/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa"
   };
 });
-ipcMain.handle("sharepoint-inject-credentials", async (_event, webviewId) => {
+ipcMain.handle("sharepoint-inject-credentials", async (_event, _webviewId) => {
   return true;
 });
 ipcMain.handle("sharepoint-get-config", async () => {
@@ -1798,7 +1895,7 @@ ipcMain.handle("sharepoint-get-config", async () => {
     libraryPath: "/sites/documents/Shared Documents"
   };
 });
-ipcMain.handle("sharepoint-validate-access", async (_event, url) => {
+ipcMain.handle("sharepoint-validate-access", async (_event, _url) => {
   return true;
 });
 ipcMain.handle("window-create-new", async () => {
@@ -1922,10 +2019,18 @@ app.whenReady().then(async () => {
   }
   await loadEnvironmentVariables();
   configureSecureSession();
+  app.on("certificate-error", (event, _webContents, _url, _error, _certificate, callback) => {
+    if (process.env.NODE_ENV === "development" || process.env.IGNORE_CERTIFICATE_ERRORS === "true") {
+      event.preventDefault();
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
   const vpnConnected2 = await connectVPN();
   updateVPNStatus(vpnConnected2);
   createWindow();
-}).catch((error) => {
+}).catch((_error) => {
   app.quit();
 });
 const gotTheLock = app.requestSingleInstanceLock();

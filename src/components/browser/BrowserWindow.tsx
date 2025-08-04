@@ -55,6 +55,7 @@ interface BrowserWindowProps {
 }
 
 const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
+
   const {
     vpnStatus,
     allowBrowsing,
@@ -66,19 +67,31 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     lastError,
     actualIP,
     actualCountry,
-  } = useVPN();
+  } = useVPN(user?.accessLevel);
+  
+  // Wait for user to be loaded before setting default URL
+  const defaultUrl = user?.accessLevel ? getDefaultUrl(user.accessLevel) : "https://www.google.com";
+  
   const [tabs, setTabs] = useState<Tab[]>([
     {
       id: "1",
       title: "New Tab",
-      url: getDefaultUrl(user?.accessLevel || 1),
+      url: defaultUrl,
       isLoading: false,
     },
   ]);
   const [activeTab, setActiveTab] = useState("1");
-  const [urlInput, setUrlInput] = useState(
-    getDefaultUrl(user?.accessLevel || 1)
-  );
+  
+  // Enhanced setActiveTab that also syncs URL bar
+  const setActiveTabWithSync = useCallback((tabId: string) => {
+    setActiveTab(tabId);
+    // Immediately sync URL bar with the new active tab
+    const tab = tabs.find(t => t.id === tabId);
+    if (tab && tab.url) {
+      setUrlInput(tab.url);
+    }
+  }, [tabs]);
+  const [urlInput, setUrlInput] = useState(defaultUrl);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isDownloadsModalOpen, setIsDownloadsModalOpen] = useState(false);
   const [isBookmarksModalOpen, setIsBookmarksModalOpen] = useState(false);
@@ -143,7 +156,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         return restoredDownloads;
       }
     } catch (error) {
-      console.warn("⚠️ Failed to load downloads from localStorage:", error);
+      // Error loading downloads from localStorage
     }
     return [];
   });
@@ -190,13 +203,10 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       //   "items"
       // );
     } catch (error) {
-      console.error("❌ Failed to save downloads to localStorage:", error);
+      // Failed to save downloads to localStorage
 
       // Handle quota exceeded error by clearing old downloads
       if (error instanceof Error && error.name === "QuotaExceededError") {
-        console.warn(
-          "⚠️ localStorage quota exceeded, clearing old downloads..."
-        );
         try {
           // Keep only the last 50 downloads
           const recentDownloads = downloads.slice(-50);
@@ -226,15 +236,47 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     }
   }, [user]);
 
-  // Get default URL based on access level (SharePoint-focused)
+  // Update default URL when user access level changes
+  useEffect(() => {
+    if (user?.accessLevel) {
+      const newDefaultUrl = getDefaultUrl(user.accessLevel);
+      
+      // Update the first tab if it's still on the old default URL
+      setTabs(prevTabs => 
+        prevTabs.map((tab, index) => 
+          index === 0 && (tab.url === "https://www.google.com" || tab.url.includes("office.com"))
+            ? { ...tab, url: newDefaultUrl }
+            : tab
+        )
+      );
+      
+      // Update URL input if it matches the old default (using functional update)
+      setUrlInput(prevUrlInput => {
+        if (prevUrlInput === "https://www.google.com" || prevUrlInput.includes("office.com")) {
+          return newDefaultUrl;
+        }
+        return prevUrlInput;
+      });
+    }
+  }, [user?.accessLevel]);
+
+  // Sync URL bar with active tab's current URL
+  useEffect(() => {
+    const activeTabData = tabs.find(tab => tab.id === activeTab);
+    if (activeTabData && activeTabData.url && activeTabData.url !== urlInput) {
+      setUrlInput(activeTabData.url);
+    }
+  }, [activeTab, tabs]);
+
+  // Get default URL based on access level
   function getDefaultUrl(accessLevel: number): string {
     switch (accessLevel) {
       case 3:
-        return "https://www.office.com"; // Full access starts at Office
+        return "https://www.google.com"; // Full access starts at Google for unrestricted browsing
       case 2:
-        return "https://www.office.com"; // Manager level
+        return "https://www.office.com"; // Manager level starts with Office
       default:
-        return "https://www.office.com"; // All levels start with SharePoint/Office
+        return "https://www.office.com"; // Restricted level starts with SharePoint/Office
     }
   }
 
@@ -308,34 +350,34 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   );
 
   // Menu handlers
-  const handleHistoryClick = () => {
+  const handleHistoryClick = useCallback(() => {
     setIsHistoryModalOpen(true);
-  };
+  }, []);
 
-  const handleDownloadsClick = () => {
+  const handleDownloadsClick = useCallback(() => {
     setIsDownloadsModalOpen(true);
-  };
+  }, []);
 
-  const handleBookmarksClick = () => {
+  const handleBookmarksClick = useCallback(() => {
     setIsBookmarksModalOpen(true);
-  };
+  }, []);
 
-  const handleTaskManagerClick = () => {
+  const handleTaskManagerClick = useCallback(() => {
     setIsTaskManagerModalOpen(true);
-  };
+  }, []);
 
-  const handleDebugAuthClick = () => {
+  const handleDebugAuthClick = useCallback(() => {
     setIsDebugAuthModalOpen(true);
-  };
+  }, []);
 
-  const handleSettingsClick = () => {
+  const handleSettingsClick = useCallback(() => {
     // console.log("Settings clicked");
     setIsSettingsModalOpen(true);
-  };
+  }, []);
 
-  const handleSharePointClick = () => {
+  const handleSharePointClick = useCallback(() => {
     setIsSharePointSidebarOpen(true);
-  };
+  }, []);
 
   const applyZoomToActiveWebview = useCallback(
     (zoomPercent: number) => {
@@ -420,18 +462,13 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           }
 
           if (!applied) {
-            console.warn(`⚠️ [ZOOM] No zoom method available for webview`);
-            // console.log(`⚠️ [ZOOM] Available methods:`, {
-            //   setZoomFactor: !!webview.setZoomFactor,
-            //   executeJavaScript: !!webview.executeJavaScript,
-            //   insertCSS: !!webview.insertCSS,
-            // });
+            // No zoom method available for webview
           }
         } catch (error) {
-          console.error("❌ [ZOOM] Failed to apply zoom:", error);
+          // Failed to apply zoom
         }
       } else {
-        console.warn("⚠️ [ZOOM] No webview found for active tab:", activeTab);
+        // No webview found for active tab
         // console.log(
         //   "⚠️ [ZOOM] Available webviews:",
         //   Object.keys(webviewRefs.current)
@@ -529,7 +566,6 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                 // console.log('✅ [ZOOM] JavaScript zoom reset completed - 100%');
                 return true;
               } catch (e) {
-                console.error('❌ [ZOOM] Error resetting zoom via JS:', e);
                 return false;
               }
             })();
@@ -577,41 +613,40 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     // console.log('✅ [ZOOM] Zoom reset sequence initiated');
   }, [activeTab]);
 
-  // Reapply zoom when pages finish loading on the active tab (but only if not 100%)
+  // Reapply zoom when pages finish loading (stable version - no auto-refresh triggers)
   useEffect(() => {
     const currentTab = tabs.find((tab) => tab.id === activeTab);
     if (currentTab && !currentTab.isLoading && zoomLevel !== 100) {
-      setTimeout(() => {
-        // console.log(
-        //   `🔧 Reapplying zoom (${zoomLevel}%) after page loaded for active tab: ${activeTab}`
-        // );
+      // Use longer delay to prevent interference with navigation
+      const timeoutId = setTimeout(() => {
         applyZoomToActiveWebview(zoomLevel);
-      }, 300);
-    } else if (currentTab && !currentTab.isLoading && zoomLevel === 100) {
-      // console.log('🔧 Page loaded with 100% zoom - no reapplication needed');
+      }, 1000);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [
+    // Only watch loading state changes to prevent excessive triggering
     tabs.find((tab) => tab.id === activeTab)?.isLoading,
     activeTab,
     zoomLevel,
     applyZoomToActiveWebview,
   ]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     if (onLogout) {
       onLogout();
     }
-  };
+  }, [onLogout]);
 
   const getHomeUrl = useCallback((): string => {
     const level = user?.accessLevel || 1;
     switch (level) {
       case 3:
-        return "https://www.google.com";
+        return "https://www.google.com"; // Consistent with getDefaultUrl - full access starts at Google
       case 2:
-        return "https://github.com";
+        return "https://www.office.com"; // Consistent with getDefaultUrl - manager starts at Office
       default:
-        return "https://www.office.com";
+        return "https://www.office.com"; // Consistent with getDefaultUrl - restricted starts at Office
     }
   }, [user?.accessLevel]);
 
@@ -701,11 +736,15 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
 
   const isUrlAllowed = useCallback(
     (url: string): boolean => {
+      // ALWAYS ALLOW ALL URLs for Level 3 users - NO RESTRICTIONS
+      if (user?.accessLevel === 3) {
+        return true;
+      }
+
       const config = getAccessLevelConfig();
 
       // For Level 3, always allow all URLs
       if (config.allowedDomains.includes("*")) {
-        // console.log(`✅ Level 3 access - allowing all URLs: ${url}`);
         return true;
       }
 
@@ -719,21 +758,12 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         const urlObj = new URL(fullUrl);
         const domain = urlObj.hostname.replace("www.", "");
 
-        // console.log("Checking URL:", fullUrl);
-        // console.log("Extracted domain:", domain);
-        // console.log("Allowed domains:", config.allowedDomains);
-        // console.log("User access level:", user?.accessLevel);
-
         const isAllowed = config.allowedDomains.some((allowed) => {
           const match = domain === allowed || domain.endsWith("." + allowed);
-          // console.log(`Checking ${domain} against ${allowed}: ${match}`);
           return match;
         });
-
-        // console.log("Final result:", isAllowed);
         return isAllowed;
       } catch (error) {
-        // console.error("URL parsing error:", error);
         return false;
       }
     },
@@ -741,7 +771,38 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
   );
 
   const handleUrlSubmit = useCallback(() => {
-    // Block navigation if VPN is not connected (fail-closed behavior)
+    // Process the input to determine final URL
+    const finalUrl = processInput(urlInput);
+    const isSearchQuery =
+      !isValidUrl(urlInput.trim()) && (user?.accessLevel || 1) >= 2;
+
+    // LEVEL 3 USERS: SKIP ALL VALIDATION INCLUDING VPN - Navigate immediately like Chrome
+    if (user?.accessLevel === 3) {
+      
+      // Update tab state immediately
+      setTabs((tabs) =>
+        tabs.map((tab) =>
+          tab.id === activeTab
+            ? {
+                ...tab,
+                url: finalUrl,
+                isLoading: true,
+                title: isSearchQuery ? `Search: ${urlInput}` : "Loading...",
+              }
+            : tab
+        )
+      );
+
+      // Update URL input immediately  
+      setUrlInput(finalUrl);
+
+      // Let React handle the webview src update automatically via the src={tab.url} prop
+      return; // Exit early for Level 3 users
+    }
+
+    // For Level 1 and 2 users, do the normal validation including VPN check
+    
+    // Block navigation if VPN is not connected (fail-closed behavior for Level 1 & 2)
     if (!allowBrowsing) {
       // Log blocked navigation due to VPN
       SecureBrowserDatabaseService.logNavigation(
@@ -763,35 +824,18 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       return;
     }
 
-    // Process the input to determine final URL
-    const finalUrl = processInput(urlInput);
-    const isSearchQuery =
-      !isValidUrl(urlInput.trim()) && (user?.accessLevel || 1) >= 2;
-
     // Log the type of navigation
     if (isSearchQuery) {
-      // console.log(
-      //   `🔍 Performing Google search for: "${urlInput}" -> ${finalUrl}`
-      // );
       SecureBrowserDatabaseService.logSecurityEvent(
         "unauthorized_access",
         `User performed search query: "${urlInput}" (Level ${user?.accessLevel})`,
         "low",
         finalUrl
       );
-    } else {
-      // console.log(`🌐 Navigating to URL: ${finalUrl}`);
     }
-
-    // Debug: Log user access level and configuration
-    const config = getAccessLevelConfig();
-    // console.log(`🔍 Debug - User access level: ${user?.accessLevel}`);
-    // console.log(`🔍 Debug - Access config:`, config);
-    // console.log(`🔍 Debug - Final URL: ${finalUrl}`);
 
     // Check if the final URL is allowed
     const urlAllowed = isUrlAllowed(finalUrl);
-    // console.log(`🔍 Debug - URL allowed result: ${urlAllowed}`);
 
     // Log navigation attempt
     SecureBrowserDatabaseService.logNavigation(
@@ -1009,7 +1053,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           isLoading: false,
         },
       ]);
-      setActiveTab(newTabId);
+      setActiveTabWithSync(newTabId);
     }
     hideContextMenu();
   }, [activeTab, tabs, hideContextMenu]);
@@ -1213,10 +1257,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         if (downloadData && downloadData.id && downloadData.filename) {
           addDownloadToState(downloadData);
         } else {
-          console.warn(
-            "⚠️ [REACT] Invalid download started data:",
-            downloadData
-          );
+          // Invalid download started data
         }
       } catch (error) {
         // console.error(
@@ -1435,7 +1476,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         // );
       }
     };
-  }, [addDownloadToState, updateDownloadProgress]);
+  }, []); // Remove dependencies to prevent re-attachment
 
   const goHome = useCallback(() => {
     const homeUrl = getHomeUrl();
@@ -1500,7 +1541,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       delete webviewInitialized.current[tabId];
 
       if (activeTab === tabId) {
-        setActiveTab(newTabs[0].id);
+        setActiveTabWithSync(newTabs[0].id);
         setUrlInput(newTabs[0].url);
       }
     },
@@ -1549,7 +1590,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         alert(`Failed to create new window: ${result.error}`);
       }
     } catch (error) {
-      console.error("❌ Error creating new window:", error);
+      // Error creating new window
 
       // Log window creation error
       SecureBrowserDatabaseService.logSecurityEvent(
@@ -1564,20 +1605,24 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
     }
   }, [allowBrowsing, vpnStatus]);
 
-  // Update URL input when switching tabs and apply current zoom
+  // Update URL input when switching tabs (stable version - prevents auto-navigation)
   useEffect(() => {
     const currentTab = tabs.find((tab) => tab.id === activeTab);
     if (currentTab) {
       setUrlInput(currentTab.url);
-      // Apply the current zoom level to the newly active tab
-      setTimeout(() => {
-        // console.log(
-        //   `🔄 Applying current zoom (${zoomLevel}%) to newly active tab: ${activeTab}`
-        // );
-        applyZoomToActiveWebview(zoomLevel);
-      }, 100); // Small delay to ensure webview is ready
     }
-  }, [activeTab, tabs, zoomLevel, applyZoomToActiveWebview]);
+  }, [activeTab, tabs]);
+
+  // Apply zoom to newly active tab (separate effect to prevent conflicts)
+  useEffect(() => {
+    if (zoomLevel !== 100) {
+      const timeoutId = setTimeout(() => {
+        applyZoomToActiveWebview(zoomLevel);
+      }, 200); // Balanced delay for responsiveness without conflicts
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [activeTab, applyZoomToActiveWebview, zoomLevel]);
 
   // Webview event handlers
   // SharePoint credential injection is now handled in setupWebviewEvents
@@ -1608,15 +1653,6 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             tab.id === tabId ? { ...tab, isLoading: true } : tab
           )
         );
-        
-        // Safeguard: Clear loading state after 10 seconds if it gets stuck
-        setTimeout(() => {
-          setTabs((tabs) =>
-            tabs.map((tab) =>
-              tab.id === tabId && tab.isLoading ? { ...tab, isLoading: false } : tab
-            )
-          );
-        }, 10000);
       });
 
       webview.addEventListener("did-stop-loading", () => {
@@ -1683,12 +1719,12 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         // Add to history for navigation
         addToHistory(webviewEvent.url, "Loading...");
 
-        // Only update URL input and tab state if this is the active tab
+        // ALWAYS update URL input when navigation occurs - this fixes the URL bar not updating
         if (tabId === activeTab) {
           setUrlInput(webviewEvent.url);
         }
         
-        // Update tab URL but don't reset loading state - let did-stop-loading handle that
+        // Update tab URL without affecting loading state
         setTabs((tabs) =>
           tabs.map((tab) =>
             tab.id === tabId ? { ...tab, url: webviewEvent.url } : tab
@@ -1742,7 +1778,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         // Log in-page navigation for monitoring
         SecureBrowserDatabaseService.logNavigation(webviewEvent.url, true);
 
-        // Only update URL input if this is the active tab
+        // ALWAYS update URL input for in-page navigation - this fixes URL bar not updating
         if (tabId === activeTab) {
           setUrlInput(webviewEvent.url);
         }
@@ -1750,6 +1786,32 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           tabs.map((tab) =>
             tab.id === tabId ? { ...tab, url: webviewEvent.url } : tab
           )
+        );
+      });
+
+      // Handle new-window events - COMPLETELY DISABLED FOR LEVEL 3 USERS
+      webview.addEventListener("new-window", (event: Event) => {
+        const newWindowEvent = event as Event & {
+          url: string;
+          frameName: string;
+          disposition: string;
+        };
+
+        // LEVEL 3 USERS: NO RESTRICTIONS - Let them navigate freely like Chrome
+        if (user?.accessLevel === 3) {
+          // Don't prevent anything - let it work like a normal browser
+          return;
+        }
+        
+        // Only block for Level 1 and 2 users
+        event.preventDefault();
+        
+        // Log that we blocked a popup attempt
+        SecureBrowserDatabaseService.logSecurityEvent(
+          "unauthorized_access",
+          `Popup window blocked for security: ${newWindowEvent.url}`,
+          "low",
+          newWindowEvent.url
         );
       });
 
@@ -1928,21 +1990,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         // console.log("🧹 [IPC] Keyboard shortcut listener removed");
       }
     };
-  }, [
-    handleZoomIn,
-    handleZoomOut,
-    handleZoomReset,
-    createNewTab,
-    createNewWindow,
-    tabs.length,
-    activeTab,
-    closeTab,
-    reload,
-    handleHistoryClick,
-    handleDownloadsClick,
-    handleBookmarksClick,
-    handleTaskManagerClick,
-  ]);
+  }, []); // Remove dependencies to prevent re-attachment
 
   useEffect(() => {
     // 🔐 FALLBACK KEYBOARD HANDLER: Only active if IPC is not available
@@ -2522,7 +2570,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       {/* Tabs - Fixed/Sticky */}
       <Tabs
         value={activeTab}
-        onValueChange={setActiveTab}
+        onValueChange={setActiveTabWithSync}
         className="flex-1 flex flex-col"
       >
         <div className="flex items-center border-b bg-gradient-to-r from-slate-100 to-slate-200 shadow-sm flex-shrink-0">
@@ -2576,23 +2624,55 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
               value={tab.id}
               className="h-full m-0 data-[state=active]:block"
             >
-              {!allowBrowsing ? (
-                <div className="overflow-y-auto max-h-[70vh]">
-                  {/* Show VPN Connection Error when VPN is not connected */}
-                  <VPNConnectionError
-                    onRetry={connectVPN}
-                    onCheckStatus={checkVPNStatus}
-                    isRetrying={isConnecting}
-                    isChecking={isCheckingStatus}
-                    errorDetails={
-                      lastError || `WireGuard endpoint: ${connection.endpoint}`
-                    }
-                    actualIP={actualIP}
-                    actualCountry={actualCountry}
-                  />
-                </div>
-              ) : isCheckingStatus ||
-                (tab.isLoading && !tab.url.startsWith("http")) ? (
+              {(() => {
+                // LEVEL 3 USERS: SKIP ALL CHECKS - Always show webview like Chrome
+                if (user?.accessLevel === 3) {
+                  return (
+                    <webview
+                      key={`webview-${tab.id}`}
+                      ref={createWebviewRef(tab.id)}
+                      src={tab.url}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        border: "none",
+                      }}
+                      partition="persist:webview"
+                      allowpopups
+                      webpreferences="webSecurity=no,nodeIntegration=no,contextIsolation=no,allowRunningInsecureContent=yes,javascript=yes,plugins=yes,images=yes,java=yes,experimentalFeatures=yes,nativeWindowOpen=yes,backgroundThrottling=no,offscreen=no,sandbox=no"
+                      useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                      httpreferrer=""
+                      disablewebsecurity
+                    />
+                  );
+                }
+
+                // For Level 1 and 2 users, do the normal checks
+                const shouldShowVPN = !allowBrowsing;
+                const shouldShowLoader = isCheckingStatus || (tab.isLoading && !tab.url.startsWith("http"));
+                const shouldShowRestriction = !isUrlAllowed(tab.url);
+                
+                if (shouldShowVPN) {
+                  return (
+                    <div className="overflow-y-auto max-h-[70vh]">
+                      {/* Show VPN Connection Error when VPN is not connected */}
+                      <VPNConnectionError
+                        onRetry={connectVPN}
+                        onCheckStatus={checkVPNStatus}
+                        isRetrying={isConnecting}
+                        isChecking={isCheckingStatus}
+                        errorDetails={
+                          lastError || `WireGuard endpoint: ${connection.endpoint}`
+                        }
+                        actualIP={actualIP}
+                        actualCountry={actualCountry}
+                      />
+                    </div>
+                  );
+                }
+                
+                if (shouldShowLoader) {
+                  return (
                 /* Show beautiful loader while determining permissions or loading */
                 <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 min-h-full">
                   <div className="text-center">
@@ -2659,8 +2739,12 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                     </div>
                   </div>
                 </div>
-              ) : !isUrlAllowed(tab.url) ? (
-                /* Show URL restriction error for blocked domains */
+                  );
+                }
+                
+                if (shouldShowRestriction) {
+                  return (
+                /* Show URL restriction error for blocked domains (NEVER for Level 3) */
                 <div className="flex-1 flex items-center justify-center bg-gray-50">
                   <div className="text-center max-w-md">
                     <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
@@ -2681,27 +2765,28 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                     </div>
                   </div>
                 </div>
-              ) : (
-                /* Show webview when VPN is connected and URL is allowed */
-                <webview
-                  ref={createWebviewRef(tab.id)}
-                  src={tab.url}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    border: "none",
-                  }}
-                  partition="persist:main"
-                  allowpopups={true}
-                  webpreferences={`javascript=yes,plugins=yes,webSecurity=${
-                    user?.accessLevel === 3 ? "no" : "yes"
-                  },nodeIntegration=no,contextIsolation=yes,allowRunningInsecureContent=${
-                    user?.accessLevel === 3 ? "yes" : "no"
-                  },experimentalFeatures=yes`}
-                  useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
-                  httpreferrer=""
-                />
-              )}
+                  );
+                }
+                
+                // Default case for Level 1/2: show webview only if all checks pass
+                return (
+                  <webview
+                    ref={createWebviewRef(tab.id)}
+                    src={tab.url}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      border: "none",
+                    }}
+                    partition="persist:webview"
+                    allowpopups={user?.accessLevel === 3}
+                    webpreferences="webSecurity=no,nodeIntegration=no,contextIsolation=no,allowRunningInsecureContent=yes,javascript=yes,plugins=yes,images=yes,java=yes,experimentalFeatures=yes,nativeWindowOpen=yes,backgroundThrottling=no,offscreen=no,sandbox=no"
+                    useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    httpreferrer=""
+                    disablewebsecurity
+                  />
+                );
+              })()}
             </TabsContent>
           ))}
         </div>

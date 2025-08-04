@@ -23,6 +23,7 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
     getStatus: () => electron.ipcRenderer.invoke("vpn-get-status"),
     connect: (provider) => electron.ipcRenderer.invoke("vpn-connect", provider),
     disconnect: () => electron.ipcRenderer.invoke("vpn-disconnect"),
+    checkIP: () => electron.ipcRenderer.invoke("vpn-check-ip"),
     onStatusChange: (callback) => {
       electron.ipcRenderer.on("vpn-status-changed", (_, status) => callback(status));
     },
@@ -41,6 +42,7 @@ electron.contextBridge.exposeInMainWorld("secureBrowser", {
     getStatus: () => electron.ipcRenderer.invoke("vpn-get-status"),
     connect: (provider) => electron.ipcRenderer.invoke("vpn-connect", provider),
     disconnect: () => electron.ipcRenderer.invoke("vpn-disconnect"),
+    checkIP: () => electron.ipcRenderer.invoke("vpn-check-ip"),
     onStatusChange: (callback) => {
       electron.ipcRenderer.on("vpn-status-changed", (_, status) => callback(status));
     },

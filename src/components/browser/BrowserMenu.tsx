@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,20 +9,20 @@ import {
   DropdownMenuLabel,
   DropdownMenuShortcut,
 } from '@/components/ui/dropdown-menu';
-import {
-  MoreVertical,
-  History,
-  Download,
-  Bookmark,
-  Settings,
-  HelpCircle,
-  Info,
-  LogOut,
-  User,
-  Shield,
-  Zap,
-  Globe,
-  RefreshCw,
+import { 
+  MoreVertical, 
+  History, 
+  Download, 
+  Bookmark, 
+  Settings, 
+  HelpCircle, 
+  Info, 
+  LogOut, 
+  User, 
+  Shield, 
+  Zap, 
+  Globe, 
+  RefreshCw, 
   Archive,
   File
 } from 'lucide-react';
@@ -64,86 +64,20 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onZoomReset,
   className = ""
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Simple webview click detection that doesn't interfere with dropdown behavior
-  useEffect(() => {
-    const handleWebviewClick = () => {
-      if (isOpen) {
-        setIsOpen(false);
-      }
-    };
-
-    const handleDocumentClick = (event: MouseEvent) => {
-      // Check if click is on webview or inside webview
-      const target = event.target as HTMLElement;
-      
-      // Multiple ways to detect webview/content area clicks
-      const isWebview = target.tagName === 'WEBVIEW';
-      const isInWebviewContainer = target.closest('webview') !== null;
-      const isInTabsContent = target.closest('[role="tabpanel"]') !== null;
-      const isInBrowserContent = target.closest('.browser-window-container') !== null && 
-                                !target.closest('.dropdown-menu') && 
-                                !target.closest('button') &&
-                                !target.closest('[role="toolbar"]');
-      
-      // Check for common browser content selectors
-      const isInContentArea = target.closest('[class*="TabsContent"]') ||
-                             target.closest('[data-state="active"]') ||
-                             target.closest('[class*="webview"]') ||
-                             target.closest('[id*="webview"]');
-      
-      if ((isWebview || isInWebviewContainer || isInTabsContent || isInBrowserContent || isInContentArea) && isOpen) {
-        // console.log('🖱️ Browser content area clicked, closing menu');
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      // Listen for direct webview clicks
-      const webviews = document.querySelectorAll('webview');
-      webviews.forEach(webview => {
-        webview.addEventListener('click', handleWebviewClick);
-        webview.addEventListener('mousedown', handleWebviewClick);
-      });
-
-      // Also listen for document clicks to catch webview area clicks
-      document.addEventListener('click', handleDocumentClick, true);
-      
-      // Listen for focus events on webviews
-      document.addEventListener('focusin', (event) => {
-        if (event.target && (event.target as HTMLElement).tagName === 'WEBVIEW' && isOpen) {
-          setIsOpen(false);
-        }
-      });
-    }
-
-    return () => {
-      const webviews = document.querySelectorAll('webview');
-      webviews.forEach(webview => {
-        webview.removeEventListener('click', handleWebviewClick);
-        webview.removeEventListener('mousedown', handleWebviewClick);
-      });
-      document.removeEventListener('click', handleDocumentClick, true);
-    };
-  }, [isOpen]);
-
   const handleMenuClick = (action: () => void) => {
     action();
-    setIsOpen(false);
+    // Let Radix UI handle closing the menu naturally
   };
 
   const handleZoomClick = (action: () => void, event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    // console.log('🔍 [MENU] Zoom control clicked, calling action function');
     action();
-    // console.log('🔍 [MENU] Zoom action function completed');
     // Keep the menu open by preventing the dropdown from closing
   };
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -159,13 +93,7 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
         align="end" 
         className="w-72 bg-white border border-slate-200 shadow-lg rounded-lg p-2"
         sideOffset={8}
-        onInteractOutside={(event) => {
-          // Close menu when clicking outside, including on webviews
-          const target = event.target as HTMLElement;
-          if (target.tagName === 'WEBVIEW' || target.closest('webview')) {
-            setIsOpen(false);
-          }
-        }}
+
       >
         {/* User Info */}
         <DropdownMenuLabel className="flex items-center gap-3 px-3 py-2 text-slate-700 border-b border-slate-100 mb-2">

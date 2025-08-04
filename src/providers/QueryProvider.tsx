@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { toast } from 'sonner'
 
-import { DatabaseService, RealtimeService, UserSession } from '@/lib/supabase'
+import { DatabaseService, RealtimeService, type UserSession } from '@/lib/supabase'
 
 interface QueryProviderProps {
   children: React.ReactNode
@@ -137,59 +137,52 @@ export function useSystemSettings(category?: string) {
 export function useUserSessionsRealtime(userId: number) {
   const queryClient = useQueryClient()
   
-  useQuery({
-    queryKey: ['userSessionsRealtime', userId],
-    queryFn: () => {
-      const subscription = RealtimeService.subscribeToUserSessions(userId, (_payload) => {
-        queryClient.invalidateQueries({ queryKey: ['userSessions', userId] })
-      })
-      
-      return () => subscription.unsubscribe()
-    },
-    enabled: !!userId,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  })
+  React.useEffect(() => {
+    if (!userId) return
+    
+    const subscription = RealtimeService.subscribeToUserSessions(userId, (_payload) => {
+      queryClient.invalidateQueries({ queryKey: ['userSessions', userId] })
+    })
+    
+    return () => {
+      subscription.unsubscribe().catch(console.error)
+    }
+  }, [userId, queryClient])
 }
 
 export function useSecurityEventsRealtime() {
   const queryClient = useQueryClient()
   
-  useQuery({
-    queryKey: ['securityEventsRealtime'],
-    queryFn: () => {
-      const subscription = RealtimeService.subscribeToSecurityEvents((payload) => {
-        queryClient.invalidateQueries({ queryKey: ['securityEvents'] })
-        
-        // Show toast for critical security events
-        if (payload.new && payload.new.severity === 'critical') {
-          toast.error(`Security Alert: ${payload.new.description}`)
-        }
-      })
+  React.useEffect(() => {
+    const subscription = RealtimeService.subscribeToSecurityEvents((payload) => {
+      queryClient.invalidateQueries({ queryKey: ['securityEvents'] })
       
-      return () => subscription.unsubscribe()
-    },
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  })
+      // Show toast for critical security events
+      if (payload.new && payload.new.severity === 'critical') {
+        toast.error(`Security Alert: ${payload.new.description}`)
+      }
+    })
+    
+    return () => {
+      subscription.unsubscribe().catch(console.error)
+    }
+  }, [queryClient])
 }
 
 export function useVPNConnectionsRealtime(userId: number) {
   const queryClient = useQueryClient()
   
-  useQuery({
-    queryKey: ['vpnConnectionsRealtime', userId],
-    queryFn: () => {
-      const subscription = RealtimeService.subscribeToVPNConnections(userId, (_payload) => {
-        queryClient.invalidateQueries({ queryKey: ['vpnConnections', userId] })
-      })
-      
-      return () => subscription.unsubscribe()
-    },
-    enabled: !!userId,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  })
+  React.useEffect(() => {
+    if (!userId) return
+    
+    const subscription = RealtimeService.subscribeToVPNConnections(userId, (_payload) => {
+      queryClient.invalidateQueries({ queryKey: ['vpnConnections', userId] })
+    })
+    
+    return () => {
+      subscription.unsubscribe().catch(console.error)
+    }
+  }, [userId, queryClient])
 }
 
 // Helper hooks for combining multiple queries
