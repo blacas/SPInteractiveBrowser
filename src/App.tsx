@@ -14,6 +14,7 @@ import clerkAuth from "@/services/clerkService";
 import ErrorDisplay, { ErrorInfo, VPNStatus, EnvironmentStatus } from "@/components/ui/error-display";
 import { EnvironmentValidator } from "@/config/environment";
 import BrowserWindow from "@/components/browser/BrowserWindow";
+import { DownloadManager } from "@/components/downloads/DownloadManager";
 import "./App.css";
 
 function App() {
@@ -633,6 +634,7 @@ function AppContent() {
       onAccessLevelChange={handleAccessLevelChange}
     >
       <BrowserWindow user={user} />
+      <DownloadManager />
     </Dashboard>
   );
 }

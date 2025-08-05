@@ -34,7 +34,41 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   shell: {
     openPath: (path) => electron.ipcRenderer.invoke("shell-open-path", path),
     showItemInFolder: (path) => electron.ipcRenderer.invoke("shell-show-item-in-folder", path)
-  }
+  },
+  // Download Management
+  downloads: {
+    chooseLocal: (downloadId) => electron.ipcRenderer.invoke("download-choose-local", downloadId),
+    chooseMeta: (downloadId) => electron.ipcRenderer.invoke("download-choose-meta", downloadId)
+  },
+  // Event listeners for download events
+  on: (channel, func) => {
+    const validChannels = [
+      "download-started",
+      "download-progress",
+      "download-completed",
+      "download-blocked",
+      "download-choice-required",
+      "download-choice-processed"
+    ];
+    if (validChannels.includes(channel)) {
+      electron.ipcRenderer.on(channel, func);
+    }
+  },
+  removeListener: (channel, func) => {
+    const validChannels = [
+      "download-started",
+      "download-progress",
+      "download-completed",
+      "download-blocked",
+      "download-choice-required",
+      "download-choice-processed"
+    ];
+    if (validChannels.includes(channel)) {
+      electron.ipcRenderer.removeListener(channel, func);
+    }
+  },
+  // External auth handling
+  openExternalAuth: (url) => electron.ipcRenderer.invoke("open-external-auth", url)
 });
 electron.contextBridge.exposeInMainWorld("secureBrowser", {
   // VPN Operations
@@ -89,15 +123,40 @@ electron.contextBridge.exposeInMainWorld("secureBrowser", {
     openPath: (path) => electron.ipcRenderer.invoke("shell-open-path", path),
     showItemInFolder: (path) => electron.ipcRenderer.invoke("shell-show-item-in-folder", path)
   },
+  // Download Management
+  downloads: {
+    chooseLocal: (downloadId) => electron.ipcRenderer.invoke("download-choose-local", downloadId),
+    chooseMeta: (downloadId) => electron.ipcRenderer.invoke("download-choose-meta", downloadId)
+  },
+  // Meta Storage Integration
+  metaStorage: {
+    getStatus: () => electron.ipcRenderer.invoke("meta-storage-get-status"),
+    connect: (accessToken) => electron.ipcRenderer.invoke("meta-storage-connect", accessToken),
+    disconnect: () => electron.ipcRenderer.invoke("meta-storage-disconnect")
+  },
   // Event listeners for download events
   on: (channel, func) => {
-    const validChannels = ["download-started", "download-progress", "download-completed", "download-blocked"];
+    const validChannels = [
+      "download-started",
+      "download-progress",
+      "download-completed",
+      "download-blocked",
+      "download-choice-required",
+      "download-choice-processed"
+    ];
     if (validChannels.includes(channel)) {
       electron.ipcRenderer.on(channel, func);
     }
   },
   removeListener: (channel, func) => {
-    const validChannels = ["download-started", "download-progress", "download-completed", "download-blocked"];
+    const validChannels = [
+      "download-started",
+      "download-progress",
+      "download-completed",
+      "download-blocked",
+      "download-choice-required",
+      "download-choice-processed"
+    ];
     if (validChannels.includes(channel)) {
       electron.ipcRenderer.removeListener(channel, func);
     }
@@ -118,6 +177,12 @@ electron.contextBridge.exposeInMainWorld("secureBrowser", {
       electron.ipcRenderer.removeAllListeners("context-menu-action");
     }
   }
+});
+console.log("🔧 Preload: electronAPI exposed to window with methods:", {
+  downloads: "object",
+  metaStorage: "object",
+  on: "function",
+  removeListener: "function"
 });
 delete window.module;
 delete window.exports;

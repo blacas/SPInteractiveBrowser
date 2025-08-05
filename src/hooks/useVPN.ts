@@ -28,6 +28,25 @@ interface ElectronAPI {
     openPath: (path: string) => Promise<string | null>;
     showItemInFolder: (path: string) => Promise<string | null>;
   };
+  downloads: {
+    chooseLocal: (downloadId: string) => Promise<{ success: boolean; error?: string }>;
+    chooseMeta: (downloadId: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  metaStorage: {
+    getStatus: () => Promise<{
+      connected: boolean;
+      accountName: string | null;
+      storageQuota: { used: number; total: number } | null;
+    }>;
+    connect: (accessToken: string) => Promise<{
+      success: boolean;
+      accountName?: string;
+      storageQuota?: { used: number; total: number };
+    }>;
+    disconnect: () => Promise<{ success: boolean }>;
+  };
+  on: (channel: string, func: (...args: any[]) => void) => void;
+  removeListener: (channel: string, func: (...args: any[]) => void) => void;
 }
 
 declare global {
@@ -53,9 +72,9 @@ const checkIPGeolocation = async (): Promise<{ country: string; ip: string; isAu
       } catch (error) {
         // console.warn('⚠️ Real IP check failed:', error);
         return { 
-          country: 'Error', 
+          country: 'Unknown', 
           ip: 'Failed to check', 
-          isAustralia: false 
+          isAustralia: false
         };
       }
     }

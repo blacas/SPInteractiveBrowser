@@ -37,7 +37,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
   shell: {
     openPath: (path: string) => ipcRenderer.invoke('shell-open-path', path),
     showItemInFolder: (path: string) => ipcRenderer.invoke('shell-show-item-in-folder', path),
-  }
+  },
+  
+  // Download Management
+  downloads: {
+    chooseLocal: (downloadId: string) => ipcRenderer.invoke('download-choose-local', downloadId),
+    chooseMeta: (downloadId: string) => ipcRenderer.invoke('download-choose-meta', downloadId),
+  },
+
+  // Event listeners for download events
+  on: (channel: string, func: (...args: any[]) => void) => {
+    const validChannels = [
+      'download-started', 'download-progress', 'download-completed', 'download-blocked',
+      'download-choice-required', 'download-choice-processed'
+    ];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.on(channel, func);
+    }
+  },
+  
+  removeListener: (channel: string, func: (...args: any[]) => void) => {
+    const validChannels = [
+      'download-started', 'download-progress', 'download-completed', 'download-blocked',
+      'download-choice-required', 'download-choice-processed'
+    ];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.removeListener(channel, func);
+    }
+  },
+
+  // External auth handling
+  openExternalAuth: (url: string) => ipcRenderer.invoke('open-external-auth', url)
 })
 
 // Secure API for VPN and Vault operations
@@ -106,16 +136,35 @@ contextBridge.exposeInMainWorld('secureBrowser', {
     showItemInFolder: (path: string) => ipcRenderer.invoke('shell-show-item-in-folder', path),
   },
 
+  // Download Management
+  downloads: {
+    chooseLocal: (downloadId: string) => ipcRenderer.invoke('download-choose-local', downloadId),
+    chooseMeta: (downloadId: string) => ipcRenderer.invoke('download-choose-meta', downloadId),
+  },
+
+  // Meta Storage Integration
+  metaStorage: {
+    getStatus: () => ipcRenderer.invoke('meta-storage-get-status'),
+    connect: (accessToken: string) => ipcRenderer.invoke('meta-storage-connect', accessToken),
+    disconnect: () => ipcRenderer.invoke('meta-storage-disconnect'),
+  },
+
   // Event listeners for download events
   on: (channel: string, func: (...args: any[]) => void) => {
-    const validChannels = ['download-started', 'download-progress', 'download-completed', 'download-blocked'];
+    const validChannels = [
+      'download-started', 'download-progress', 'download-completed', 'download-blocked',
+      'download-choice-required', 'download-choice-processed'
+    ];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, func);
     }
   },
   
   removeListener: (channel: string, func: (...args: any[]) => void) => {
-    const validChannels = ['download-started', 'download-progress', 'download-completed', 'download-blocked'];
+    const validChannels = [
+      'download-started', 'download-progress', 'download-completed', 'download-blocked',
+      'download-choice-required', 'download-choice-processed'
+    ];
     if (validChannels.includes(channel)) {
       ipcRenderer.removeListener(channel, func);
     }
@@ -139,6 +188,14 @@ contextBridge.exposeInMainWorld('secureBrowser', {
     }
   }
 })
+
+// Debug: Log electronAPI creation
+console.log('🔧 Preload: electronAPI exposed to window with methods:', {
+  downloads: 'object',
+  metaStorage: 'object', 
+  on: 'function',
+  removeListener: 'function'
+});
 
 // Remove node integration from window object for security
 delete (window as unknown as { module?: unknown }).module

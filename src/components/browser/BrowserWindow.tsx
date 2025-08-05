@@ -2329,6 +2329,9 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             VPN: {connection.location}
             {vpnStatus === "connected" &&
               connection.ipAddress &&
+              connection.ipAddress !== "Unknown" &&
+              connection.ipAddress !== "Failed" &&
+              connection.ipAddress !== "Failed to check" &&
               ` (${connection.ipAddress})`}
           </Badge>
 
