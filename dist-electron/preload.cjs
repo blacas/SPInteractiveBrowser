@@ -102,7 +102,11 @@ electron.contextBridge.exposeInMainWorld("secureBrowser", {
     getLibraryConfig: () => electron.ipcRenderer.invoke("sharepoint-get-config"),
     validateAccess: (url) => electron.ipcRenderer.invoke("sharepoint-validate-access", url),
     getOAuthToken: () => electron.ipcRenderer.invoke("sharepoint-get-oauth-token"),
-    graphRequest: (endpoint, accessToken) => electron.ipcRenderer.invoke("sharepoint-graph-request", { endpoint, accessToken })
+    graphRequest: (endpoint, accessToken) => electron.ipcRenderer.invoke("sharepoint-graph-request", { endpoint, accessToken }),
+    // Prepare temporary file for native drag
+    prepareTempFile: (options) => electron.ipcRenderer.invoke("sharepoint-prepare-temp-file", options),
+    // Start native drag (must be called synchronously from dragstart)
+    startDrag: (filePath) => electron.ipcRenderer.send("sharepoint-start-drag", { filePath })
   },
   // System Information
   system: {

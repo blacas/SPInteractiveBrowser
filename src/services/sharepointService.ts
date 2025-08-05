@@ -94,29 +94,40 @@ export class SharePointService {
     }
 
     try {
-      // console.log('🔄 Acquiring new access token via main process...');
+      console.log('🔄 Acquiring new access token via main process...');
+      console.log('🔍 Checking secureBrowser API availability:', {
+        hasWindow: typeof window !== 'undefined',
+        hasSecureBrowser: !!window?.secureBrowser,
+        hasSharepoint: !!window?.secureBrowser?.sharepoint,
+        hasGetOAuthToken: !!window?.secureBrowser?.sharepoint?.getOAuthToken
+      });
       
       // Use main process to handle OAuth (bypasses CORS)
       if (typeof window !== 'undefined' && window.secureBrowser?.sharepoint?.getOAuthToken) {
+        console.log('📞 Calling main process for OAuth token...');
         const result = await window.secureBrowser.sharepoint.getOAuthToken();
+        
+        console.log('📡 OAuth result:', { success: result.success, hasToken: !!result.accessToken, error: result.error });
         
         if (result.success && result.accessToken) {
           this.currentToken = result.accessToken;
           // Set expiry to 55 minutes from now (tokens usually last 1 hour)
           this.tokenExpiry = new Date(Date.now() + (55 * 60 * 1000));
           
-          // console.log('✅ Access token acquired successfully via main process');
-          // console.log(`📅 Token expires at: ${this.tokenExpiry.toISOString()}`);
+          console.log('✅ Access token acquired successfully via main process');
+          console.log(`📅 Token expires at: ${this.tokenExpiry.toISOString()}`);
           
           return this.currentToken;
         } else {
           throw new Error(result.error || 'Failed to get OAuth token from main process');
         }
       } else {
+        console.error('❌ Main process OAuth handler not available');
+        console.log('🔍 Available APIs:', Object.keys(window?.secureBrowser || {}));
         throw new Error('Main process OAuth handler not available');
       }
     } catch (error) {
-      // console.error('❌ Error acquiring access token:', error);
+      console.error('❌ Error acquiring access token:', error);
       throw new Error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, ipcMain, Menu, shell } from 'electron'
+import { app, BrowserWindow, session, ipcMain, Menu, shell, nativeImage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { spawn, ChildProcess } from 'child_process'
@@ -1750,7 +1750,7 @@ ipcMain.handle('vpn-disconnect', async () => {
 })
 
 // Real IP geolocation check
-ipcMain.handle('vpn-check-ip', async (): Promise<IPGeolocationResult> => {
+ipcMain.handle('vpn-check-ip', async (): Promise<boolean | IPGeolocationResult> => {
   // console.log('🔍 Real IP geolocation check requested...');
   try {
     // Use the same checkCurrentIP function used for VPN verification
@@ -2671,6 +2671,62 @@ ipcMain.handle('open-external-auth', async (_event, url: string) => {
   } catch (error) {
     console.error('❌ Failed to open external auth URL:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+});
+
+// Native drag-and-drop handler for SharePoint files  
+// NOTE: startDrag must be called synchronously from the dragstart event
+// We can't use it from an async IPC handler - this approach won't work
+ipcMain.handle('sharepoint-prepare-temp-file', async (event, { data, filename }) => {
+  try {
+    const tempDir = path.join(app.getPath('temp'), 'secure-browser-dnd');
+    await fs.mkdir(tempDir, { recursive: true });
+
+    // Sanitize filename to avoid path traversal and unsupported chars
+    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const tempPath = path.join(tempDir, `${Date.now()}_${safeName}`);
+
+    console.log(`📝 Writing file content to temp path: ${tempPath}`);
+    console.log(`📦 File size: ${data.byteLength} bytes`);
+
+    // Write the actual file content to temp path
+    const buffer = Buffer.from(data);
+    await fs.writeFile(tempPath, buffer);
+
+    // Verify the file was written correctly
+    const stats = await fs.stat(tempPath);
+    console.log(`✅ File written successfully: ${stats.size} bytes`);
+
+    // Clean up the temp file after a delay (to allow drag completion)
+    setTimeout(async () => {
+      try {
+        await fs.unlink(tempPath);
+        console.log(`🧹 Cleaned up temp file: ${tempPath}`);
+      } catch (cleanupError) {
+        console.warn(`⚠️ Failed to cleanup temp file: ${cleanupError}`);
+      }
+    }, 300000); // 5 minute delay
+
+    return { success: true, path: tempPath };
+  } catch (err) {
+    console.error('❌ Failed to prepare temp file:', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+});
+
+// Handle the actual drag start - this must be called from the renderer in response to dragstart
+ipcMain.on('sharepoint-start-drag', (event, { filePath }) => {
+  try {
+    console.log(`🚀 Starting native drag for file: ${filePath}`);
+    
+    event.sender.startDrag({
+      file: filePath,
+      icon: path.join(process.env.VITE_PUBLIC, 'assets/aussie-browser-logo-32.png')
+    });
+    
+    console.log(`✅ Native drag started successfully`);
+  } catch (err) {
+    console.error('❌ Failed to start native drag:', err);
   }
 });
 
