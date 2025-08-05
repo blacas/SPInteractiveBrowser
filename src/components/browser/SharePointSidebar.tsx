@@ -11,6 +11,7 @@ import {
   Loader2,
   RefreshCw,
   ArrowLeft,
+  GripVertical,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -72,8 +73,17 @@ export const SharePointSidebar: React.FC<SharePointSidebarProps> = ({
     new Set()
   );
 
+  // Resizable panel state
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    // Load saved width from localStorage or use default
+    const savedWidth = localStorage.getItem("sharepoint-sidebar-width");
+    return savedWidth ? parseInt(savedWidth, 10) : 500;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
   const sidebarRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const resizeHandleRef = useRef<HTMLDivElement>(null);
 
   // Initialize SharePoint service
   useEffect(() => {
@@ -111,6 +121,48 @@ export const SharePointSidebar: React.FC<SharePointSidebarProps> = ({
       }, 300);
     }
   }, [isOpen]);
+
+  // Handle resize functionality
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !sidebarRef.current) return;
+
+      const rect = sidebarRef.current.getBoundingClientRect();
+      const newWidth = rect.right - e.clientX;
+
+      // Min width: 300px, Max width: 80% of window width
+      const minWidth = 300;
+      const maxWidth = window.innerWidth * 0.8;
+      const clampedWidth = Math.min(Math.max(newWidth, minWidth), maxWidth);
+
+      setSidebarWidth(clampedWidth);
+      // Save to localStorage for persistence
+      localStorage.setItem("sharepoint-sidebar-width", clampedWidth.toString());
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    if (isResizing) {
+      document.body.style.cursor = "ew-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
 
   const loadSites = async () => {
     try {
@@ -230,7 +282,6 @@ export const SharePointSidebar: React.FC<SharePointSidebarProps> = ({
             )
         );
       } catch (error) {
-
         // Set error state
         setDragPreviews(
           (prev) =>
@@ -509,205 +560,241 @@ export const SharePointSidebar: React.FC<SharePointSidebarProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <>
+      {/* Global resize cursor overlay when resizing */}
+      {isResizing && (
+        <div
+          className="fixed inset-0 z-40 cursor-ew-resize"
+          style={{
+            userSelect: "none",
+            pointerEvents: "auto",
+          }}
+        />
+      )}
 
-      {/* Sidebar */}
-      <div
-        ref={sidebarRef}
-        className={cn(
-          "relative ml-auto w-[70%] h-full bg-white dark:bg-gray-900 shadow-2xl transform transition-transform duration-300 ease-out",
-          isOpen ? "translate-x-0" : "translate-x-full",
-          className
-        )}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-          <div className="flex items-center gap-3">
-            {showDiagnostics && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDiagnostics(false)}
-                className="text-white hover:bg-white/20 mr-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-            )}
-            <File className="w-6 h-6" />
-            <div>
-              <h2 className="text-lg font-semibold">
-                {showDiagnostics
-                  ? "SharePoint Diagnostics"
-                  : "SharePoint Files"}
-              </h2>
-              <p className="text-sm text-blue-100">
-                {showDiagnostics
-                  ? "Connection troubleshooting"
-                  : selectedSite?.name || "No site selected"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {!showDiagnostics && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={isRefreshing || !selectedSite || !selectedDrive}
-                className="text-white hover:bg-white/20"
-              >
-                <RefreshCw
-                  className={cn("w-4 h-4", isRefreshing && "animate-spin")}
-                />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="text-white hover:bg-white/20"
-            >
-              <X className="w-4 h-4" />
-            </Button>
+      <div className="fixed inset-y-0 right-0 z-50 flex">
+        {/* Resize Handle */}
+        <div
+          ref={resizeHandleRef}
+          className={cn(
+            "w-1 bg-gray-300 dark:bg-gray-600 hover:bg-blue-500 dark:hover:bg-blue-400 cursor-ew-resize transition-colors duration-200 flex items-center justify-center group",
+            isResizing && "bg-blue-500 dark:bg-blue-400"
+          )}
+          onMouseDown={handleResizeStart}
+          title="Drag to resize sidebar"
+        >
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <GripVertical className="w-3 h-3 text-white" />
           </div>
         </div>
 
-        {/* Search */}
-        {!showDiagnostics && (
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                ref={searchInputRef}
-                placeholder="Search files and folders..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-white dark:bg-gray-900 text-black"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Breadcrumb */}
-        {!showDiagnostics && breadcrumb.length > 1 && (
-          <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-            <div className="flex items-center gap-1 text-sm">
-              <Home
-                className="w-4 h-4 text-gray-500 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
-                onClick={() => handleBreadcrumbClick(0)}
-              />
-              {breadcrumb.slice(1).map((item, index) => (
-                <React.Fragment key={item.id || index}>
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
-                  <span
-                    className={cn(
-                      "cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
-                      index === breadcrumb.length - 2
-                        ? "text-blue-600 dark:text-blue-400 font-medium"
-                        : "text-gray-600 dark:text-gray-400"
-                    )}
-                    onClick={() => handleBreadcrumbClick(index + 1)}
-                  >
-                    {item.name}
-                  </span>
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="flex-1 overflow-auto">
-          {showDiagnostics ? (
-            <SharePointDiagnostics />
-          ) : isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">
-                  Loading SharePoint files...
+        {/* Sidebar */}
+        <div
+          ref={sidebarRef}
+          className={cn(
+            "h-full bg-white dark:bg-gray-900 shadow-2xl transform transition-all duration-300 ease-out border-l border-gray-200 dark:border-gray-700",
+            isOpen ? "translate-x-0" : "translate-x-full",
+            className
+          )}
+          style={{
+            width: `${sidebarWidth}px`,
+            minWidth: "300px",
+            maxWidth: "80vw",
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+            <div className="flex items-center gap-3">
+              {showDiagnostics && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDiagnostics(false)}
+                  className="text-white hover:bg-white/20 mr-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+              )}
+              <File className="w-6 h-6" />
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {showDiagnostics
+                    ? "SharePoint Diagnostics"
+                    : "SharePoint Files"}
+                </h2>
+                <p className="text-sm text-blue-100">
+                  {showDiagnostics
+                    ? "Connection troubleshooting"
+                    : selectedSite?.name || "No site selected"}
                 </p>
               </div>
             </div>
-          ) : error ? (
-            <div className="p-4">
-              <Card className="p-6 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+
+            <div className="flex items-center gap-2">
+              {!showDiagnostics && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing || !selectedSite || !selectedDrive}
+                  className="text-white hover:bg-white/20"
+                >
+                  <RefreshCw
+                    className={cn("w-4 h-4", isRefreshing && "animate-spin")}
+                  />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="text-white hover:bg-white/20"
+                title="Close sidebar"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Search */}
+          {!showDiagnostics && (
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  ref={searchInputRef}
+                  placeholder="Search files and folders..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white dark:bg-gray-900 text-black"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Breadcrumb */}
+          {!showDiagnostics && breadcrumb.length > 1 && (
+            <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+              <div className="flex items-center gap-1 text-sm">
+                <Home
+                  className="w-4 h-4 text-gray-500 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
+                  onClick={() => handleBreadcrumbClick(0)}
+                />
+                {breadcrumb.slice(1).map((item, index) => (
+                  <React.Fragment key={item.id || index}>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                    <span
+                      className={cn(
+                        "cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
+                        index === breadcrumb.length - 2
+                          ? "text-blue-600 dark:text-blue-400 font-medium"
+                          : "text-gray-600 dark:text-gray-400"
+                      )}
+                      onClick={() => handleBreadcrumbClick(index + 1)}
+                    >
+                      {item.name}
+                    </span>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="flex-1 overflow-auto">
+            {showDiagnostics ? (
+              <SharePointDiagnostics />
+            ) : isLoading ? (
+              <div className="flex items-center justify-center h-64">
                 <div className="text-center">
-                  <div className="text-red-600 dark:text-red-400 mb-2">❌</div>
-                  <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
-                    Connection Error
-                  </h3>
-                  <p className="text-sm text-red-700 dark:text-red-300 mb-4">
-                    {error}
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Loading SharePoint files...
                   </p>
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setError(null);
-                        loadSites();
-                      }}
-                      className="border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/40"
-                    >
-                      Try Again
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setShowDiagnostics(true)}
-                      className="bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
-                    >
-                      Run Diagnostics
-                    </Button>
-                  </div>
                 </div>
-              </Card>
-            </div>
-          ) : filteredFiles.length === 0 ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">
-                  {searchTerm
-                    ? "No files match your search"
-                    : "This folder is empty"}
-                </p>
               </div>
-            </div>
-          ) : (
-            <div className="p-4 space-y-2">
-              {filteredFiles.map(renderFileItem)}
+            ) : error ? (
+              <div className="p-4">
+                <Card className="p-6 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+                  <div className="text-center">
+                    <div className="text-red-600 dark:text-red-400 mb-2">
+                      ❌
+                    </div>
+                    <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+                      Connection Error
+                    </h3>
+                    <p className="text-sm text-red-700 dark:text-red-300 mb-4">
+                      {error}
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setError(null);
+                          loadSites();
+                        }}
+                        className="border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/40"
+                      >
+                        Try Again
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setShowDiagnostics(true)}
+                        className="bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
+                      >
+                        Run Diagnostics
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            ) : filteredFiles.length === 0 ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">
+                    {searchTerm
+                      ? "No files match your search"
+                      : "This folder is empty"}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 space-y-2">
+                {filteredFiles.map(renderFileItem)}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          {!showDiagnostics && (
+            <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+              <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex items-center gap-4">
+                  <span>{filteredFiles.length} items</span>
+                  <span className="text-xs opacity-50">
+                    {sidebarWidth}px wide
+                  </span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Badge
+                    variant="outline"
+                    className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                  >
+                    Drag & Drop Ready
+                  </Badge>
+                  <span className="text-xs">
+                    Drag handle to resize • Hover files to preload • Drag to
+                    browser
+                  </span>
+                </div>
+              </div>
             </div>
           )}
         </div>
-
-        {/* Footer */}
-        {!showDiagnostics && (
-          <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
-            <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-              <span>{filteredFiles.length} items</span>
-              <div className="flex items-center gap-4">
-                <Badge
-                  variant="outline"
-                  className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                >
-                  Drag & Drop Ready
-                </Badge>
-                <span className="text-xs">
-                  Hover files to preload • Drag to browser
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
-    </div>
+    </>
   );
 };
