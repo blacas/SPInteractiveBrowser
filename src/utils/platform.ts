@@ -98,24 +98,24 @@ export const getPlatformInfo = (platform?: SupportedPlatform): PlatformInfo => {
 
 export const logPlatformInfo = (): void => {
   const info = getPlatformInfo();
-  console.log(`${info.emoji} Detected platform: ${info.displayName}`);
-  console.log(`   Auto-connect: ${info.canAutoConnect ? '✅' : '❌'}`);
-  console.log(`   Manual setup required: ${info.requiresManualSetup ? '✅' : '❌'}`);
+  // console.log(`${info.emoji} Detected platform: ${info.displayName}`);
+  // console.log(`   Auto-connect: ${info.canAutoConnect ? '✅' : '❌'}`);
+  // console.log(`   Manual setup required: ${info.requiresManualSetup ? '✅' : '❌'}`);
 };
 
 export const printPlatformInstructions = (configPath: string): void => {
   const info = getPlatformInfo();
   
-  console.log(`${info.emoji} ${info.displayName} Instructions:`);
-  console.log(`   Config file: ${configPath}`);
-  console.log('');
+  // console.log(`${info.emoji} ${info.displayName} Instructions:`);
+  // console.log(`   Config file: ${configPath}`);
+  // console.log('');
   
   info.installInstructions.forEach((instruction, index) => {
-    console.log(`   ${index + 1}. ${instruction}`);
+    // console.log(`   ${index + 1}. ${instruction}`);
   });
   
   if (info.requiresManualSetup) {
-    console.log('');
-    console.log('🔄 After connecting, restart this application to verify the connection.');
+    // console.log('');
+    // console.log('🔄 After connecting, restart this application to verify the connection.');
   }
 }; 

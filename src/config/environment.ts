@@ -78,11 +78,11 @@ export class EnvironmentValidator {
     const warnings: string[] = [];
     const isDevelopment = env.NODE_ENV !== 'production';
 
-    console.log('🔍 Environment validation starting...', {
-      NODE_ENV: env.NODE_ENV,
-      VPN_PROVIDER: env.VPN_PROVIDER,
-      WIREGUARD_ENDPOINT: env.WIREGUARD_ENDPOINT ? '✅ Set' : '❌ Missing'
-    });
+    // console.log('🔍 Environment validation starting...', {
+    //   NODE_ENV: env.NODE_ENV,
+    //   VPN_PROVIDER: env.VPN_PROVIDER,
+    //   WIREGUARD_ENDPOINT: env.WIREGUARD_ENDPOINT ? '✅ Set' : '❌ Missing'
+    // });
 
     // Essential VPN validation - this is critical for app functionality
     if (env.VPN_PROVIDER === 'wireguard') {
@@ -94,14 +94,14 @@ export class EnvironmentValidator {
       } else if (env.WIREGUARD_ENDPOINT === 'your-server-ip:51820') {
         errors.push('WIREGUARD_ENDPOINT must be set to your actual server IP:port (currently using placeholder)');
       } else {
-        console.log('✅ WireGuard configuration looks valid');
+        // console.log('✅ WireGuard configuration looks valid');
       }
     }
 
     // Lenient validation for other services in development
     if (isDevelopment) {
       // In development, allow placeholder values for non-critical services
-      console.log('🔧 Development mode - allowing placeholder values for Vault/SharePoint');
+      // console.log('🔧 Development mode - allowing placeholder values for Vault/SharePoint');
       
       if (env.VAULT_ADDR?.includes('abc123')) {
         warnings.push('Using placeholder Vault URL in development mode');
@@ -131,11 +131,11 @@ export class EnvironmentValidator {
       }
     }
 
-    console.log('🔍 Validation result:', {
-      isValid: errors.length === 0,
-      errorCount: errors.length,
-      warningCount: warnings.length
-    });
+      // console.log('🔍 Validation result:', {
+      //   isValid: errors.length === 0,
+      //   errorCount: errors.length,
+      //   warningCount: warnings.length
+      // });
 
     return {
       isValid: errors.length === 0,
@@ -163,7 +163,7 @@ export class EnvironmentValidator {
   private static getDefaultEnvironment(): Record<string, string | undefined> {
     return {
       NODE_ENV: 'development',
-      APP_NAME: 'Secure Remote Browser',
+      APP_NAME: 'Aussie Vault Browser',
       APP_VERSION: '1.0.0',
       VPN_PROVIDER: 'wireguard',
       VPN_SERVER_REGION: 'australia',
@@ -196,25 +196,25 @@ export class EnvironmentValidator {
       if (typeof window !== 'undefined' && window.secureBrowser?.system) {
         // Use default environment for now - async loading handled elsewhere
         env = this.getDefaultEnvironment();
-        console.log('🚀 Loading environment configuration...');
-        console.log('📊 Using secure browser environment defaults');
+        // console.log('🚀 Loading environment configuration...');
+        // console.log('📊 Using secure browser environment defaults');
       } else {
         // Fallback to default environment when not in Electron
         env = this.getDefaultEnvironment();
-        console.log('🚀 Loading fallback environment configuration...');
-        console.log('📊 Using fallback defaults (not in Electron context)');
+        // console.log('🚀 Loading fallback environment configuration...');
+        // console.log('📊 Using fallback defaults (not in Electron context)');
       }
     } catch (error) {
-      console.warn('⚠️ Failed to load environment via IPC, using defaults:', error);
+      // console.warn('⚠️ Failed to load environment via IPC, using defaults:', error);
       env = this.getDefaultEnvironment();
     }
 
-    console.log('📊 Environment configuration:', {
-      NODE_ENV: env.NODE_ENV,
-      VPN_PROVIDER: env.VPN_PROVIDER,
-      WIREGUARD_ENDPOINT: env.WIREGUARD_ENDPOINT ? 'Set ✅' : 'Missing ❌',
-      WIREGUARD_CONFIG_PATH: env.WIREGUARD_CONFIG_PATH ? 'Set ✅' : 'Missing ❌'
-    });
+    // console.log('📊 Environment configuration:', {
+    //   NODE_ENV: env.NODE_ENV,
+    //   VPN_PROVIDER: env.VPN_PROVIDER,
+    //   WIREGUARD_ENDPOINT: env.WIREGUARD_ENDPOINT ? 'Set ✅' : 'Missing ❌',
+    //   WIREGUARD_CONFIG_PATH: env.WIREGUARD_CONFIG_PATH ? 'Set ✅' : 'Missing ❌'
+    // });
 
     const validation = this.validateEnvironment(env);
     
@@ -231,21 +231,21 @@ export class EnvironmentValidator {
         'See the setup documentation for required variables for your chosen providers.'
       ].join('\n');
       
-      console.error(errorMessage);
+      // console.error(errorMessage);
       throw new Error(errorMessage);
     }
 
     if (validation.warnings.length > 0) {
-      console.warn('⚠️ Environment configuration warnings:');
+      // console.warn('⚠️ Environment configuration warnings:');
       validation.warnings.forEach(warning => console.warn(`  • ${warning}`));
     }
 
-    console.log('✅ Environment configuration validated successfully');
+    // console.log('✅ Environment configuration validated successfully');
 
     return {
       // Application settings
       nodeEnv: this.isValidNodeEnv(env.NODE_ENV) ? env.NODE_ENV : 'development',
-      appName: env.APP_NAME || 'Secure Remote Browser',
+      appName: env.APP_NAME || 'Aussie Vault Browser',
       appVersion: env.APP_VERSION || '1.0.0',
 
       // Security settings
@@ -293,36 +293,36 @@ export class EnvironmentValidator {
 export const loadEnvironmentAsync = async (): Promise<EnvironmentConfig> => {
   try {
     if (typeof window !== 'undefined' && window.secureBrowser?.system?.getEnvironment) {
-      console.log('🔄 Loading environment from main process...');
+      // console.log('🔄 Loading environment from main process...');
       const envString = await window.secureBrowser.system.getEnvironment();
       const env = JSON.parse(envString);
       
-      console.log('✅ Environment loaded from main process');
-      console.log('📊 Real environment variables:', {
-        NODE_ENV: env.NODE_ENV,
-        VPN_PROVIDER: env.VPN_PROVIDER,
-        WIREGUARD_ENDPOINT: env.WIREGUARD_ENDPOINT ? 'Set ✅' : 'Missing ❌'
-      });
-      
+      // console.log('✅ Environment loaded from main process');
+      // console.log('📊 Real environment variables:', {
+      //   NODE_ENV: env.NODE_ENV,
+      //   VPN_PROVIDER: env.VPN_PROVIDER,
+      //   WIREGUARD_ENDPOINT: env.WIREGUARD_ENDPOINT ? 'Set ✅' : 'Missing ❌'
+      // });
+
       const validation = EnvironmentValidator.validateEnvironment(env);
       
       if (!validation.isValid) {
-        console.error('❌ Environment validation failed:', validation.errors);
+        // console.error('❌ Environment validation failed:', validation.errors);
         throw new Error('Environment validation failed: ' + validation.errors.join(', '));
       }
       
       if (validation.warnings.length > 0) {
-        console.warn('⚠️ Environment warnings:', validation.warnings);
+        // console.warn('⚠️ Environment warnings:', validation.warnings);
       }
       
       // Create config using the same logic as loadEnvironment but with the env from IPC
       return createConfigFromEnvironment(env);
     } else {
-      console.log('📊 Using default environment (no IPC available)');
+      // console.log('📊 Using default environment (no IPC available)');
       return EnvironmentValidator.loadEnvironment();
     }
   } catch (error) {
-    console.error('❌ Failed to load environment from main process:', error);
+    // console.error('❌ Failed to load environment from main process:', error);
     return EnvironmentValidator.loadEnvironment();
   }
 };
@@ -348,7 +348,7 @@ const createConfigFromEnvironment = (env: Record<string, string | undefined>): E
   return {
     // Application settings
     nodeEnv: isValidNodeEnv(env.NODE_ENV) ? env.NODE_ENV : 'development',
-    appName: env.APP_NAME || 'Secure Remote Browser',
+    appName: env.APP_NAME || 'Aussie Vault Browser',
     appVersion: env.APP_VERSION || '1.0.0',
 
     // Security settings

@@ -51,9 +51,9 @@ export class HistoryService {
         await this.updateDatabaseHistory(url, domain, pageTitle, faviconUrl);
       }
       
-      console.log('✅ History entry added:', { url, pageTitle, domain });
+      // console.log('✅ History entry added:', { url, pageTitle, domain });
     } catch (error) {
-      console.error('❌ Failed to add history entry:', error);
+      // console.error('❌ Failed to add history entry:', error);
     }
   }
 
@@ -103,7 +103,7 @@ export class HistoryService {
       
       localStorage.setItem(this.HISTORY_KEY, JSON.stringify(localHistory));
     } catch (error) {
-      console.error('❌ Failed to update local history:', error);
+      // console.error('❌ Failed to update local history:', error);
     }
   }
 
@@ -115,7 +115,7 @@ export class HistoryService {
     faviconUrl?: string
   ): Promise<void> {
     try {
-      if (!this.currentUser?.id) return;
+      if (!this.currentUser?.dbId) return;
 
       const deviceId = this.getDeviceId();
       const now = new Date().toISOString();
@@ -124,7 +124,7 @@ export class HistoryService {
       const { error } = await supabase
         .from('browsing_history')
         .upsert({
-          user_id: this.currentUser.id,
+          user_id: this.currentUser.dbId,
           device_id: deviceId,
           url,
           domain,
@@ -143,7 +143,7 @@ export class HistoryService {
         await this.handleDatabaseConflict(url, domain, pageTitle, faviconUrl);
       }
     } catch (error) {
-      console.error('❌ Failed to update database history:', error);
+      // console.error('❌ Failed to update database history:', error);
     }
   }
 
@@ -162,7 +162,7 @@ export class HistoryService {
       const { data: existing } = await supabase
         .from('browsing_history')
         .select('*')
-        .eq('user_id', this.currentUser.id)
+        .eq('user_id', this.currentUser.dbId)
         .eq('url', url)
         .single();
 
@@ -176,14 +176,14 @@ export class HistoryService {
             last_visit: now,
             favicon_url: faviconUrl || existing.favicon_url
           })
-          .eq('user_id', this.currentUser.id)
+          .eq('user_id', this.currentUser.dbId)
           .eq('url', url);
       } else {
         // Insert new entry
         await supabase
           .from('browsing_history')
           .insert({
-            user_id: this.currentUser.id,
+            user_id: this.currentUser.dbId,
             device_id: deviceId,
             url,
             domain,
@@ -196,7 +196,7 @@ export class HistoryService {
           });
       }
     } catch (error) {
-      console.error('❌ Failed to handle database conflict:', error);
+      // console.error('❌ Failed to handle database conflict:', error);
     }
   }
 
@@ -206,7 +206,7 @@ export class HistoryService {
       const stored = localStorage.getItem(this.HISTORY_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
-      console.error('❌ Failed to get local history:', error);
+      // console.error('❌ Failed to get local history:', error);
       return [];
     }
   }
@@ -214,12 +214,12 @@ export class HistoryService {
   // Get database history
   static async getDatabaseHistory(limit: number = 100): Promise<HistoryEntry[]> {
     try {
-      if (!this.currentUser?.id) return [];
+      if (!this.currentUser?.dbId) return [];
 
       const { data, error } = await supabase
         .from('browsing_history')
         .select('*')
-        .eq('user_id', this.currentUser.id)
+        .eq('user_id', this.currentUser.dbId)
         .order('last_visit', { ascending: false })
         .limit(limit);
 
@@ -238,7 +238,7 @@ export class HistoryService {
         accessLevel: row.access_level
       })) || [];
     } catch (error) {
-      console.error('❌ Failed to get database history:', error);
+      // console.error('❌ Failed to get database history:', error);
       return [];
     }
   }
@@ -313,7 +313,7 @@ export class HistoryService {
         )
         .slice(0, limit);
     } catch (error) {
-      console.error('❌ Failed to search history:', error);
+      // console.error('❌ Failed to search history:', error);
       return [];
     }
   }
@@ -335,11 +335,11 @@ export class HistoryService {
       }
       
       // Clear database history
-      if (this.currentUser?.id) {
+      if (this.currentUser?.dbId) {
         let query = supabase
           .from('browsing_history')
           .delete()
-          .eq('user_id', this.currentUser.id);
+          .eq('user_id', this.currentUser.dbId);
           
         if (timeRange !== 'all') {
           query = query.gte('last_visit', cutoffDate.toISOString());
@@ -348,9 +348,9 @@ export class HistoryService {
         await query;
       }
       
-      console.log('✅ History cleared for timeRange:', timeRange);
+      // console.log('✅ History cleared for timeRange:', timeRange);
     } catch (error) {
-      console.error('❌ Failed to clear history:', error);
+      // console.error('❌ Failed to clear history:', error);
     }
   }
 
@@ -394,7 +394,7 @@ export class HistoryService {
       if (!this.currentUser?.id) return;
       
       const localHistory = this.getLocalHistory();
-      console.log(`🔄 Syncing ${localHistory.length} local history entries to database...`);
+      // console.log(`🔄 Syncing ${localHistory.length} local history entries to database...`);
       
       for (const entry of localHistory) {
         await this.updateDatabaseHistory(
@@ -405,9 +405,9 @@ export class HistoryService {
         );
       }
       
-      console.log('✅ Local history synced to database');
+      // console.log('✅ Local history synced to database');
     } catch (error) {
-      console.error('❌ Failed to sync local history to database:', error);
+      // console.error('❌ Failed to sync local history to database:', error);
     }
   }
 } 

@@ -61,7 +61,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
             <AlertTriangle className="h-16 w-16 text-red-500" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Secure Remote Browser
+                          Aussie Vault Browser
           </h1>
           <p className="text-gray-600">
             Configuration issues detected. Please review the details below.

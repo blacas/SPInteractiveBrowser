@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getStatus: () => ipcRenderer.invoke('vpn-get-status'),
     connect: (provider: string) => ipcRenderer.invoke('vpn-connect', provider),
     disconnect: () => ipcRenderer.invoke('vpn-disconnect'),
+    checkIP: () => ipcRenderer.invoke('vpn-check-ip'),
     onStatusChange: (callback: (status: string) => void) => {
       ipcRenderer.on('vpn-status-changed', (_, status) => callback(status))
     },
@@ -36,7 +37,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
   shell: {
     openPath: (path: string) => ipcRenderer.invoke('shell-open-path', path),
     showItemInFolder: (path: string) => ipcRenderer.invoke('shell-show-item-in-folder', path),
-  }
+  },
+  
+  // Download Management
+  downloads: {
+    chooseLocal: (downloadId: string) => ipcRenderer.invoke('download-choose-local', downloadId),
+    chooseMeta: (downloadId: string) => ipcRenderer.invoke('download-choose-meta', downloadId),
+  },
+
+  // Event listeners for download events
+  on: (channel: string, func: (...args: any[]) => void) => {
+    const validChannels = [
+      'download-started', 'download-progress', 'download-completed', 'download-blocked',
+      'download-choice-required', 'download-choice-processed'
+    ];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.on(channel, func);
+    }
+  },
+  
+  removeListener: (channel: string, func: (...args: any[]) => void) => {
+    const validChannels = [
+      'download-started', 'download-progress', 'download-completed', 'download-blocked',
+      'download-choice-required', 'download-choice-processed'
+    ];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.removeListener(channel, func);
+    }
+  },
+
+  // External auth handling
+  openExternalAuth: (url: string) => ipcRenderer.invoke('open-external-auth', url)
 })
 
 // Secure API for VPN and Vault operations
@@ -46,6 +77,7 @@ contextBridge.exposeInMainWorld('secureBrowser', {
     getStatus: () => ipcRenderer.invoke('vpn-get-status'),
     connect: (provider: string) => ipcRenderer.invoke('vpn-connect', provider),
     disconnect: () => ipcRenderer.invoke('vpn-disconnect'),
+    checkIP: () => ipcRenderer.invoke('vpn-check-ip'),
     onStatusChange: (callback: (status: string) => void) => {
       ipcRenderer.on('vpn-status-changed', (_, status) => callback(status))
     },
@@ -76,7 +108,16 @@ contextBridge.exposeInMainWorld('secureBrowser', {
     injectCredentials: (webviewId: string) => 
       ipcRenderer.invoke('sharepoint-inject-credentials', webviewId),
     getLibraryConfig: () => ipcRenderer.invoke('sharepoint-get-config'),
-    validateAccess: (url: string) => ipcRenderer.invoke('sharepoint-validate-access', url)
+    validateAccess: (url: string) => ipcRenderer.invoke('sharepoint-validate-access', url),
+    getOAuthToken: () => ipcRenderer.invoke('sharepoint-get-oauth-token'),
+    graphRequest: (endpoint: string, accessToken: string) => 
+      ipcRenderer.invoke('sharepoint-graph-request', { endpoint, accessToken }),
+    // Prepare temporary file for native drag
+    prepareTempFile: (options: { data: ArrayBuffer, filename: string }) => 
+      ipcRenderer.invoke('sharepoint-prepare-temp-file', options),
+    // Start native drag (must be called synchronously from dragstart)
+    startDrag: (filePath: string) => 
+      ipcRenderer.send('sharepoint-start-drag', { filePath })
   },
 
   // System Information
@@ -101,16 +142,35 @@ contextBridge.exposeInMainWorld('secureBrowser', {
     showItemInFolder: (path: string) => ipcRenderer.invoke('shell-show-item-in-folder', path),
   },
 
+  // Download Management
+  downloads: {
+    chooseLocal: (downloadId: string) => ipcRenderer.invoke('download-choose-local', downloadId),
+    chooseMeta: (downloadId: string) => ipcRenderer.invoke('download-choose-meta', downloadId),
+  },
+
+  // Meta Storage Integration
+  metaStorage: {
+    getStatus: () => ipcRenderer.invoke('meta-storage-get-status'),
+    connect: (accessToken: string) => ipcRenderer.invoke('meta-storage-connect', accessToken),
+    disconnect: () => ipcRenderer.invoke('meta-storage-disconnect'),
+  },
+
   // Event listeners for download events
   on: (channel: string, func: (...args: any[]) => void) => {
-    const validChannels = ['download-started', 'download-progress', 'download-completed', 'download-blocked'];
+    const validChannels = [
+      'download-started', 'download-progress', 'download-completed', 'download-blocked',
+      'download-choice-required', 'download-choice-processed'
+    ];
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, func);
     }
   },
   
   removeListener: (channel: string, func: (...args: any[]) => void) => {
-    const validChannels = ['download-started', 'download-progress', 'download-completed', 'download-blocked'];
+    const validChannels = [
+      'download-started', 'download-progress', 'download-completed', 'download-blocked',
+      'download-choice-required', 'download-choice-processed'
+    ];
     if (validChannels.includes(channel)) {
       ipcRenderer.removeListener(channel, func);
     }
@@ -135,6 +195,14 @@ contextBridge.exposeInMainWorld('secureBrowser', {
   }
 })
 
+// Debug: Log electronAPI creation
+console.log('🔧 Preload: electronAPI exposed to window with methods:', {
+  downloads: 'object',
+  metaStorage: 'object', 
+  on: 'function',
+  removeListener: 'function'
+});
+
 // Remove node integration from window object for security
 delete (window as unknown as { module?: unknown }).module
 delete (window as unknown as { exports?: unknown }).exports
@@ -149,9 +217,9 @@ try {
 }
 
 // Log security initialization
-console.log('🔒 Secure Browser Preload: Context isolation enabled')
-console.log('🌐 VPN-routed traffic: Ready for Australian endpoint')
-console.log('🔑 Vault integration: SharePoint credentials secure')
+// console.log('🔒 Secure Browser Preload: Context isolation enabled')
+// console.log('🌐 VPN-routed traffic: Ready for Australian endpoint')
+// console.log('🔑 Vault integration: SharePoint credentials secure')
 
 // Type definitions for renderer process
 // Type definitions for renderer process
@@ -177,6 +245,10 @@ export interface SecureBrowserAPI {
     injectCredentials: (webviewId: string) => Promise<boolean>;
     getLibraryConfig: () => Promise<{tenantUrl: string, libraryPath: string}>;
     validateAccess: (url: string) => Promise<boolean>;
+    getOAuthToken: () => Promise<{success: boolean, accessToken?: string, error?: string}>;
+    graphRequest: (endpoint: string, accessToken: string) => Promise<{success: boolean, data?: any, error?: string}>;
+    prepareTempFile: (options: { data: ArrayBuffer, filename: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
+    startDrag: (filePath: string) => void; 
   };
   system: {
     getVersion: () => Promise<string>;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,21 +9,22 @@ import {
   DropdownMenuLabel,
   DropdownMenuShortcut,
 } from '@/components/ui/dropdown-menu';
-import {
-  MoreVertical,
-  History,
-  Download,
-  Bookmark,
-  Settings,
-  HelpCircle,
-  Info,
-  LogOut,
-  User,
-  Shield,
-  Zap,
-  Globe,
-  RefreshCw,
-  Archive
+import { 
+  MoreVertical, 
+  History, 
+  Download, 
+  Bookmark, 
+  Settings, 
+  HelpCircle, 
+  Info, 
+  LogOut, 
+  User, 
+  Shield, 
+  Zap, 
+  Globe, 
+  RefreshCw, 
+  Archive,
+  File
 } from 'lucide-react';
 
 interface BrowserMenuProps {
@@ -33,6 +34,11 @@ interface BrowserMenuProps {
   onBookmarksClick: () => void;
   onSettingsClick: () => void;
   onLogout: () => void;
+  onNewTabClick: () => void;
+  onNewWindowClick: () => void;
+  onTaskManagerClick: () => void;
+  onDebugAuthClick: () => void;
+  onSharePointClick?: () => void;
   zoomLevel: number;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -47,21 +53,31 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
   onBookmarksClick,
   onSettingsClick,
   onLogout,
+  onNewTabClick,
+  onNewWindowClick,
+  onTaskManagerClick,
+  onDebugAuthClick,
+  onSharePointClick,
   zoomLevel,
   onZoomIn,
   onZoomOut,
   onZoomReset,
   className = ""
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
   const handleMenuClick = (action: () => void) => {
     action();
-    setIsOpen(false);
+    // Let Radix UI handle closing the menu naturally
+  };
+
+  const handleZoomClick = (action: () => void, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    action();
+    // Keep the menu open by preventing the dropdown from closing
   };
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -75,8 +91,9 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
       
       <DropdownMenuContent 
         align="end" 
-        className="w-64 bg-white border border-slate-200 shadow-lg rounded-lg p-2"
+        className="w-72 bg-white border border-slate-200 shadow-lg rounded-lg p-2"
         sideOffset={8}
+
       >
         {/* User Info */}
         <DropdownMenuLabel className="flex items-center gap-3 px-3 py-2 text-slate-700 border-b border-slate-100 mb-2">
@@ -94,7 +111,7 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
 
         {/* New Tab / Window */}
         <DropdownMenuItem 
-          onClick={() => handleMenuClick(() => console.log('New tab - should be handled by browser window'))}
+          onClick={() => handleMenuClick(onNewTabClick)}
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
         >
           <RefreshCw className="w-4 h-4" />
@@ -103,7 +120,7 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
         </DropdownMenuItem>
 
         <DropdownMenuItem 
-          onClick={() => handleMenuClick(() => console.log('New window'))}
+          onClick={() => handleMenuClick(onNewWindowClick)}
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
         >
           <Globe className="w-4 h-4" />
@@ -143,6 +160,17 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
           <DropdownMenuShortcut>Ctrl+Shift+O</DropdownMenuShortcut>
         </DropdownMenuItem>
 
+        {/* SharePoint Files */}
+        {onSharePointClick && (
+          <DropdownMenuItem 
+            onClick={() => handleMenuClick(onSharePointClick)}
+            className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-blue-50 rounded-md cursor-pointer"
+          >
+            <File className="w-4 h-4 text-blue-600" />
+            <span className="text-blue-700 font-medium">SharePoint Files</span>
+          </DropdownMenuItem>
+        )}
+
         <DropdownMenuSeparator className="my-2 bg-slate-100" />
 
         {/* Zoom Controls */}
@@ -150,42 +178,51 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
           Zoom Controls
         </DropdownMenuLabel>
         
-        <div className="flex items-center justify-between px-3 py-2">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-slate-500" />
-            <span className="text-sm text-slate-700">Zoom</span>
+        <div className="px-3 py-2 space-y-3">
+          {/* Zoom Level Display and Controls */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-slate-500" />
+              <span className="text-sm text-slate-700 font-medium">Zoom</span>
+            </div>
+            <div className="flex items-center gap-1 bg-slate-50 rounded-lg px-2 py-1">
+              <button
+                onClick={(e) => {
+                  handleZoomClick(onZoomOut, e);
+                }}
+                disabled={zoomLevel <= 25}
+                className="w-8 h-8 rounded-md hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-lg font-medium"
+                title="Zoom out (5% steps)"
+              >
+                −
+              </button>
+              <span className="text-sm text-slate-700 w-16 text-center font-mono font-medium bg-white rounded px-2 py-1">
+                {zoomLevel}%
+              </span>
+              <button
+                onClick={(e) => {
+                  handleZoomClick(onZoomIn, e);
+                }}
+                disabled={zoomLevel >= 300}
+                className="w-8 h-8 rounded-md hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-lg font-medium"
+                title="Zoom in (5% steps)"
+              >
+                +
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-slate-500 hover:text-slate-700"
-              onClick={() => handleMenuClick(onZoomOut)}
-              disabled={zoomLevel <= 25}
+          
+          {/* Reset Button - Separate Row */}
+          <div className="flex justify-center">
+            <button
+              onClick={(e) => {
+                handleZoomClick(onZoomReset, e);
+              }}
+              className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors text-sm font-medium border border-blue-200"
+              title="Reset zoom to 100%"
             >
-              -
-            </Button>
-            <span className="text-xs text-slate-500 min-w-[3rem] text-center">
-              {zoomLevel}%
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-slate-500 hover:text-slate-700"
-              onClick={() => handleMenuClick(onZoomIn)}
-              disabled={zoomLevel >= 300}
-            >
-              +
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-slate-500 hover:text-slate-700"
-              onClick={() => handleMenuClick(onZoomReset)}
-              title="Reset zoom"
-            >
-              ⟲
-            </Button>
+              Reset to 100%
+            </button>
           </div>
         </div>
 
@@ -198,7 +235,7 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
 
         <DropdownMenuItem 
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => console.log('Task manager'))}
+          onClick={() => handleMenuClick(onTaskManagerClick)}
         >
           <Archive className="w-4 h-4" />
           <span>Task manager</span>
@@ -206,7 +243,17 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
 
         <DropdownMenuItem 
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => console.log('Developer tools'))}
+          onClick={() => handleMenuClick(onDebugAuthClick)}
+        >
+          <Settings className="w-4 h-4" />
+          <span>Debug Auth State</span>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem 
+          className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
+          onClick={() => handleMenuClick(() => {
+            // console.log('Developer tools')
+          })}
         >
           <Settings className="w-4 h-4" />
           <span>Developer tools</span>
@@ -225,9 +272,11 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
         </DropdownMenuItem>
 
         {/* Help */}
-        <DropdownMenuItem 
+        <DropdownMenuItem
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => console.log('Help'))}
+          onClick={() => handleMenuClick(() => {
+            // console.log('Help')             
+          })}
         >
           <HelpCircle className="w-4 h-4" />
           <span>Help</span>
@@ -238,7 +287,9 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
         {/* Security & Account */}
         <DropdownMenuItem 
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => console.log('Security'))}
+          onClick={() => handleMenuClick(() => {
+            // console.log('Security')
+          })}
         >
           <Shield className="w-4 h-4" />
           <span>Security & Privacy</span>
@@ -257,7 +308,9 @@ const BrowserMenu: React.FC<BrowserMenuProps> = ({
         {/* About */}
         <DropdownMenuItem 
           className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
-          onClick={() => handleMenuClick(() => console.log('About'))}
+          onClick={() => handleMenuClick(() => {
+            // console.log('About')
+          })}
         >
           <Info className="w-4 h-4" />
           <span>About Secure Browser</span>

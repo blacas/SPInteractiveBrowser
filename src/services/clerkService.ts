@@ -3,18 +3,110 @@ import type { ClerkUser, AuthState } from '../types/clerk';
 
 class ClerkAuthService {
   private clerk: Clerk | null = null;
-  private isInitialized = false;
+  private initializationPromise: Promise<void> | null = null;
   private authStateCallbacks: ((state: AuthState) => void)[] = [];
-
+  
+  // 🔐 SINGLETON AUTH STATE: Global authentication state shared between windows
+  private static globalAuthState: AuthState = {
+    user: null,
+    isLoaded: false,
+    isSignedIn: false
+  };
+  
+  // 🔐 STATIC INITIALIZATION FLAG: Prevent multiple initializations across windows
+  private static isGloballyInitialized = false;
+  private static globalInitPromise: Promise<void> | null = null;
+  
+  // 🔐 PERSISTENCE KEY: LocalStorage key for auth state persistence
+  private static readonly AUTH_STATE_KEY = 'aussie_vault_auth_state';
+  
+  // 🔐 LOAD PERSISTED STATE: Load authentication state from localStorage
+  private static loadPersistedAuthState(): void {
+    try {
+      const persistedState = localStorage.getItem(ClerkAuthService.AUTH_STATE_KEY);
+      if (persistedState) {
+        const parsed = JSON.parse(persistedState);
+        if (parsed && parsed.isSignedIn && parsed.user) {
+          // console.log('✅ Loaded persisted authentication state from localStorage');
+          ClerkAuthService.globalAuthState = parsed;
+        }
+      }
+    } catch (error) {
+      // console.warn('⚠️ Failed to load persisted auth state:', error);
+    }
+  }
+  
+  // 🔐 PERSIST STATE: Save authentication state to localStorage
+  private static persistAuthState(state: AuthState): void {
+    try {
+      if (state.isSignedIn && state.user) {
+        localStorage.setItem(ClerkAuthService.AUTH_STATE_KEY, JSON.stringify(state));
+        // console.log('💾 Authentication state persisted to localStorage');
+      } else {
+        localStorage.removeItem(ClerkAuthService.AUTH_STATE_KEY);
+        // console.log('🗑️ Authentication state cleared from localStorage');
+      }
+    } catch (error) {
+      // console.warn('⚠️ Failed to persist auth state:', error);
+    }
+  }
+  
   async initialize(): Promise<void> {
-    if (this.isInitialized) return;
+    // 🔐 LOAD PERSISTED STATE: Load any existing authentication from localStorage
+    ClerkAuthService.loadPersistedAuthState();
+    
+    // 🔐 CHECK GLOBAL INITIALIZATION: If already initialized globally, just set up local listeners
+         if (ClerkAuthService.isGloballyInitialized && this.clerk) {
+       // console.log('✅ Clerk already initialized globally - setting up window listeners');
+       
+       // Immediately notify with current state
+       this.notifyAuthStateChange(ClerkAuthService.globalAuthState);
+       return;
+     }
+    
+    // 🔐 SINGLETON PATTERN: Only allow one initialization across all windows
+         if (ClerkAuthService.globalInitPromise) {
+       // console.log('🔄 Waiting for global Clerk initialization to complete...');
+       await ClerkAuthService.globalInitPromise;
+       this.notifyAuthStateChange(ClerkAuthService.globalAuthState);
+       return;
+     }
+    
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+      return;
+    }
 
+    // 🔐 START GLOBAL INITIALIZATION: This window will handle the initialization
+    // console.log('🔄 Starting global Clerk initialization...');
+    ClerkAuthService.globalInitPromise = this.performInitialization();
+    this.initializationPromise = ClerkAuthService.globalInitPromise;
+    
+    await ClerkAuthService.globalInitPromise;
+  }
+  
+  private async performInitialization(): Promise<void> {
     try {
       // Get publishable key from environment (support multiple naming conventions)
       const publishableKey = import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
       
       if (!publishableKey) {
         throw new Error('Clerk publishable key is required. Set VITE_CLERK_PUBLISHABLE_KEY, CLERK_PUBLISHABLE_KEY, or NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env file');
+      }
+
+      // 🔐 CHECK FOR EXISTING AUTH: Look for existing Clerk session in localStorage
+      const existingSession = localStorage.getItem('__clerk_db_jwt') || 
+                            localStorage.getItem('__clerk_client_jwt') ||
+                            sessionStorage.getItem('__clerk_db_jwt');
+
+      // console.log('🔍 Checking for existing authentication state...');
+      // console.log('🔍 Local storage keys:', Object.keys(localStorage));
+      // console.log('🔍 Found existing session token:', !!existingSession);
+
+      if (existingSession) {
+        // console.log('🔍 Found existing Clerk session, initializing with existing state...');
+      } else {
+        // console.log('🔍 No existing session found, user will need to authenticate');
       }
 
       // Initialize Clerk using the constructor with OAuth popup configuration
@@ -24,22 +116,46 @@ class ClerkAuthService {
         allowedRedirectOrigins: [window.location.origin],
         // Enable popup mode for OAuth
         signInFallbackRedirectUrl: window.location.origin,
-        signUpFallbackRedirectUrl: window.location.origin
+        signUpFallbackRedirectUrl: window.location.origin,
+        // 🔐 FORCE SHARED SESSION: Ensure Clerk checks for existing sessions
+        // Force immediate session loading from storage
+        standardBrowser: true
       });
 
       // Set up auth state listener using proper Clerk listener pattern
       this.clerk.addListener((resources) => {
-        this.notifyAuthStateChange({
+        const newState = {
           user: resources.user as ClerkUser | null,
           isLoaded: true,
           isSignedIn: !!resources.session
-        });
+        };
+        
+        // 🔐 UPDATE GLOBAL STATE: Sync across all windows
+        ClerkAuthService.globalAuthState = newState;
+        ClerkAuthService.persistAuthState(newState);
+        this.notifyAuthStateChange(newState);
       });
 
-      this.isInitialized = true;
-      console.log('✅ Clerk authentication initialized');
+      // 🔐 FORCE SESSION SYNC: Immediately check if user is already signed in
+      if (this.clerk.user && this.clerk.session) {
+        // console.log('✅ Found existing authentication session for:', this.clerk.user.primaryEmailAddress?.emailAddress);
+        const initialState = {
+          user: this.clerk.user as unknown as ClerkUser | null,
+          isLoaded: true,
+          isSignedIn: true
+        };
+        
+        ClerkAuthService.globalAuthState = initialState;
+        ClerkAuthService.persistAuthState(initialState);
+        this.notifyAuthStateChange(initialState);
+      }
+
+             // 🔐 MARK AS GLOBALLY INITIALIZED
+       ClerkAuthService.isGloballyInitialized = true;
+       // console.log('✅ Clerk authentication initialized globally');
     } catch (error) {
-      console.error('❌ Failed to initialize Clerk:', error);
+      // console.error('❌ Failed to initialize Clerk:', error);
+      ClerkAuthService.globalInitPromise = null; // Reset on failure
       throw error;
     }
   }
@@ -64,7 +180,7 @@ class ClerkAuthService {
         routing: 'hash'
       });
     } catch (error) {
-      console.error('❌ Sign in failed:', error);
+      // console.error('❌ Sign in failed:', error);
       throw error;
     }
   }
@@ -87,14 +203,84 @@ class ClerkAuthService {
 
     try {
       await this.clerk.signOut();
-      console.log('✅ User signed out successfully');
+      
+      // 🔐 CLEAR GLOBAL STATE: Reset authentication across all windows
+      const clearedState = {
+        user: null,
+        isLoaded: true,
+        isSignedIn: false
+      };
+      ClerkAuthService.globalAuthState = clearedState;
+      ClerkAuthService.persistAuthState(clearedState);
+      
+             // 🔐 RESET GLOBAL INITIALIZATION: Allow re-initialization after sign out
+       ClerkAuthService.isGloballyInitialized = false;
+       ClerkAuthService.globalInitPromise = null;
+
+      // console.log('✅ User signed out successfully');
     } catch (error) {
-      console.error('❌ Sign out failed:', error);
+      // console.error('❌ Sign out failed:', error);
       throw error;
     }
   }
 
+  // 🔐 ENHANCED METHOD: Force authentication state refresh for new windows
+  async refreshAuthenticationState(): Promise<AuthState> {
+    if (!this.clerk) throw new Error('Clerk not initialized');
+
+    try {
+      // 🔐 RETURN GLOBAL STATE: If we have global auth state, return it immediately
+      if (ClerkAuthService.globalAuthState.isSignedIn) {
+        // console.log('🔄 Returning cached global authentication state');
+        this.notifyAuthStateChange(ClerkAuthService.globalAuthState);
+        return ClerkAuthService.globalAuthState;
+      }
+      
+      // Force Clerk to reload session from storage
+      await this.clerk.load();
+      
+      const currentState = {
+        user: this.clerk.user as unknown as ClerkUser | null,
+        isLoaded: true,
+        isSignedIn: !!this.clerk.session
+      };
+
+      // 🔐 UPDATE GLOBAL STATE
+      ClerkAuthService.globalAuthState = currentState;
+      ClerkAuthService.persistAuthState(currentState);
+      
+      // Notify listeners of current state
+      this.notifyAuthStateChange(currentState);
+
+      // console.log('🔄 Authentication state refreshed:', {
+      //   isSignedIn: currentState.isSignedIn,
+      //   userEmail: currentState.user?.emailAddresses?.[0]?.emailAddress
+      // });
+
+      return currentState;
+    } catch (error) {
+      // console.error('❌ Failed to refresh authentication state:', error);
+      throw error;
+    }
+  }
+  
+  // 🔐 NEW METHOD: Get current global auth state without initialization
+  getCurrentAuthState(): AuthState {
+    return ClerkAuthService.globalAuthState;
+  }
+  
+  // 🔐 NEW METHOD: Check if any window has authentication
+  isGloballyAuthenticated(): boolean {
+    return ClerkAuthService.globalAuthState.isSignedIn;
+  }
+
   getCurrentUser(): ClerkUser | null {
+    // 🔐 USE CACHED GLOBAL STATE: If we have cached user data, use it first
+    if (ClerkAuthService.globalAuthState.isSignedIn && ClerkAuthService.globalAuthState.user) {
+      return ClerkAuthService.globalAuthState.user;
+    }
+    
+    // Fallback to Clerk instance if available
     if (!this.clerk || !this.clerk.user) return null;
     
     // Convert Clerk's UserResource to our ClerkUser interface
@@ -112,10 +298,22 @@ class ClerkAuthService {
   }
 
   isSignedIn(): boolean {
+    // 🔐 USE GLOBAL STATE: Check global auth state first
+    if (ClerkAuthService.globalAuthState.isSignedIn) {
+      return true;
+    }
+    
+    // Fallback to Clerk instance
     return !!this.clerk?.session;
   }
 
   isLoaded(): boolean {
+    // 🔐 USE GLOBAL STATE: Check if globally loaded
+    if (ClerkAuthService.globalAuthState.isLoaded) {
+      return true;
+    }
+    
+    // Fallback to Clerk instance
     return !!this.clerk?.loaded;
   }
 

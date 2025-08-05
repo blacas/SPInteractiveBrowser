@@ -131,7 +131,7 @@ export const useAuth = () => {
         'low'
       );
       
-      console.log('✅ Login successful for:', credentials.email, 'with access level:', dbUser.access_level);
+      // console.log('✅ Login successful for:', credentials.email, 'with access level:', dbUser.access_level);
       
     } catch (error) {
       setAuthState(prev => ({ ...prev, isLoading: false }));
@@ -142,8 +142,8 @@ export const useAuth = () => {
         `Login failed for ${credentials.email}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         'medium'
       );
-      
-      console.error('❌ Login failed:', error);
+
+      // console.error('❌ Login failed:', error);
       throw error;
     }
   };
@@ -182,11 +182,11 @@ export const useAuth = () => {
         );
       }
       
-      console.log('✅ User logged out successfully');
+      // console.log('✅ User logged out successfully');
       
     } catch (error) {
-      console.error('❌ Error during logout:', error);
-      
+      // console.error('❌ Error during logout:', error);
+
       // Log logout error but still clear local state
       await SecureBrowserDatabaseService.logSecurityEvent(
         'unauthorized_access',
@@ -237,7 +237,7 @@ export const useAuth = () => {
           
           // Update localStorage with new name
           localStorage.setItem("auth", JSON.stringify(updatedUser));
-          console.log(`🔄 Updated cached user name from "${user.name}" to "${updatedUser.name}"`);
+          // console.log(`🔄 Updated cached user name from "${user.name}" to "${updatedUser.name}"`);
         }
         
         // Log session restoration
@@ -257,8 +257,8 @@ export const useAuth = () => {
         SecureBrowserDatabaseService.startSessionMonitoring();
         
       } catch (error) {
-        console.error('❌ Failed to restore auth session:', error);
-        
+        // console.error('❌ Failed to restore auth session:', error);
+
         // Log session restoration failure
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
@@ -296,7 +296,7 @@ export const useAuth = () => {
         }
         
         sessionTimeout = setTimeout(async () => {
-          console.warn('⚠️ Session timeout reached');
+          // console.warn('⚠️ Session timeout reached');
           
           // Log session timeout
           await SecureBrowserDatabaseService.logSecurityEvent(

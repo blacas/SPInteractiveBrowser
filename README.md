@@ -1,306 +1,278 @@
-# 🔒 Secure Remote Browser Platform
+# 🇦🇺 Aussie Vault Browser
 
-A secure, VPN-routed desktop application built with Electron and React for accessing SharePoint documents through a controlled browser environment.
+A secure, privacy-focused browser application with VPN capabilities and 1Password integration, specifically designed for Australian users.
 
-## 📋 Overview
+## ✨ Features
 
-This application provides secure remote access to SharePoint-hosted documents with the following key features:
+- **🔐 Enhanced Security**: Built-in VPN protection and secure browsing
+- **🔑 1Password Integration**: Seamless password management
+- **🇦🇺 Australian Focus**: Optimized for Australian users and services
+- **⚡ Fast Performance**: Electron-based with modern web technologies
+- **🎨 Modern UI**: Clean, intuitive interface built with React and Tailwind CSS
 
-- **🌐 Australian VPN Routing**: All browser traffic routed through Australian VPN endpoints
-- **🔑 Vault-Managed Credentials**: Shared SharePoint credentials securely managed via vault services
-- **📄 View-Only File Access**: Documents viewed in-browser only, never downloaded locally
-- **🛡️ Role-Based Access Control**: Three access levels with different browsing permissions
-- **⚡ Fail-Closed Security**: Browser access blocked if VPN connection fails
+## 🚀 Quick Installation
 
-## 🚀 Installation
+### macOS - One-Command Installation
 
-### macOS Installation
+**Homebrew (Recommended):**
+```bash
+brew install --cask bilalmohib/aussievault/aussie-vault-browser
+```
 
-Due to macOS security features (Gatekeeper), you may encounter a "damaged and can't be opened" error when first running the app.
+**Curl Installer:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/bilalmohib/AussieVaultBrowser/main/install-aussie-vault.sh | bash
+```
 
-**Quick Solution:**
-1. Download and extract the app
-2. Open Terminal and run:
-   ```bash
-   sudo xattr -rd com.apple.quarantine "/path/to/Secure Remote Browser.app"
-   ```
-3. Enter your password when prompted
-4. The app will now launch normally
+**Alternative (Two-step Homebrew):**
+```bash
+brew tap bilalmohib/aussievault
+brew install --cask aussie-vault-browser
+```
 
-For more detailed information about code signing and distribution options, see [docs/MACOS_CODE_SIGNING.md](docs/MACOS_CODE_SIGNING.md).
+### Manual Download
 
-## 🏗️ Architecture
+Download the latest release from [GitHub Releases](https://github.com/bilalmohib/AussieVaultBrowser/releases)
 
-### Core Components
+- **macOS**: Download `.dmg` file
+- **Windows**: Download `.exe` installer  
+- **Linux**: Download `.deb` or `.rpm` package
 
-- **Electron Main Process**: Security enforcement, VPN integration, vault communication
-- **React Frontend**: User interface, browser controls, authentication
-- **Webview Security**: Sandboxed browsing with credential injection
-- **Vault Integration**: Secure credential storage and rotation
-- **VPN Management**: Australian endpoint connection and monitoring
-
-### Access Levels
-
-| Level | Description | Allowed Domains | SharePoint Access |
-|-------|-------------|-----------------|-------------------|
-| **1** | Restricted | SharePoint, Office365 only | ✅ View-only |
-| **2** | Manager | SharePoint + Whitelisted domains | ✅ View-only |
-| **3** | Full Access | All domains (VPN-routed) | ✅ View-only |
-
-## 🚀 Getting Started
+## 🔧 Development
 
 ### Prerequisites
 
 - Node.js 18+ 
-- Australian VPN service account (NordLayer/ExpressVPN/WireGuard)
-- Vault service (HashiCorp Vault/AWS Secrets Manager/Azure KeyVault)
-- SharePoint tenant access
+- npm or yarn
+- Python 3.x (for native modules)
 
-### Installation
+### Setup
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd secure-remote-browser
+git clone https://github.com/bilalmohib/AussieVaultBrowser.git
+cd AussieVaultBrowser
 
 # Install dependencies
 npm install
 
-# Set up environment variables
-cp .env.example .env
-```
-
-### Environment Configuration
-
-Create a `.env` file with the following variables:
-
-```env
-# VPN Configuration
-VPN_PROVIDER=nordlayer              # nordlayer | expressvpn | wireguard
-VPN_ENDPOINT=au-sydney-01.vpn.com   # Australian VPN endpoint
-VPN_API_KEY=your-vpn-api-key       # VPN service API key
-
-# Vault Configuration  
-VAULT_PROVIDER=hashicorp            # hashicorp | aws-secrets | azure-keyvault
-VAULT_ADDR=https://vault.company.com # Vault service URL
-VAULT_ROLE_ID=your-role-id          # Vault authentication
-VAULT_SECRET_ID=your-secret-id      # Vault authentication
-
-# SharePoint Configuration
-SHAREPOINT_TENANT=company.sharepoint.com
-SHAREPOINT_LIBRARY=/sites/documents/Shared Documents
-
-# Application Settings
-NODE_ENV=development
-LOG_LEVEL=info
-```
-
-### Running the Application
-
-```bash
-# Development mode
+# Start development server
 npm run dev
 
 # Build for production
 npm run build
 
-# Run production build
-npm start
+# Package for current platform
+npm run make
+
+# Package for all platforms
+npm run make:all
 ```
 
-## 🔧 Configuration
+### Release Process
 
-### VPN Provider Setup
-
-#### Option 1: NordLayer (Recommended for Enterprise)
-```typescript
-// Provides enterprise-grade security with Australian endpoints
-vpn: {
-  provider: 'nordlayer',
-  australianEndpoints: [
-    'au-sydney-01.nordlayer.com',
-    'au-melbourne-01.nordlayer.com'
-  ],
-  features: ['enterprise-grade', 'api-integration', 'fail-safe']
-}
-```
-
-#### Option 2: ExpressVPN (Reliable Alternative)
-```typescript
-vpn: {
-  provider: 'expressvpn', 
-  australianEndpoints: [
-    'australia-sydney.expressvpn.com',
-    'australia-melbourne.expressvpn.com'
-  ],
-  features: ['high-speed', 'reliable', 'automation-friendly']
-}
-```
-
-#### Option 3: WireGuard + Australian VPS (Cost-Effective)
-```typescript
-vpn: {
-  provider: 'wireguard',
-  australianEndpoints: ['au-syd-wg.yourdomain.com'],
-  features: ['full-control', 'cost-effective', 'high-performance']
-}
-```
-
-### Vault Provider Setup
-
-#### HashiCorp Vault (Recommended)
 ```bash
-# Enable AppRole authentication
-vault auth enable approle
+# Complete release with Homebrew publishing
+npm run release:homebrew
 
-# Create policy for SharePoint secrets
-vault policy write sharepoint-policy - <<EOF
-path "secret/data/sharepoint" {
-  capabilities = ["read"]
-}
-path "secret/data/sharepoint-config" {
-  capabilities = ["read"]  
-}
-EOF
-
-# Create role
-vault write auth/approle/role/secure-browser \
-    token_policies="sharepoint-policy" \
-    token_ttl=1h \
-    token_max_ttl=4h
+# Or update just the Homebrew formula
+npm run update:homebrew
 ```
 
-#### Store SharePoint Credentials
+## 🚀 Release Management
+
+### Automated Release Process
+
+This project includes automated scripts to build and publish releases to the public repository while keeping the source code private.
+
+#### Quick Release Commands
+
 ```bash
-# Store shared SharePoint credentials
-vault kv put secret/sharepoint \
-    username="sharepoint-service@company.com" \
-    password="secure-password-from-vault"
+# Build and release with version bump
+npm run release:version [version]
 
-# Store SharePoint configuration
-vault kv put secret/sharepoint-config \
-    tenantUrl="https://company.sharepoint.com" \
-    libraryPath="/sites/documents/Shared Documents" \
-    allowedFileTypes="pdf,docx,xlsx,pptx"
+# Build and release current version
+npm run release
+
+# Quick build and release (no prompts)
+npm run release:quick
 ```
 
-## 🛡️ Security Features
+#### Manual Release Process
 
-### Browser Security
-- ✅ **Context Isolation**: Webview runs in isolated context
-- ✅ **No Local Downloads**: Files cannot be saved to local machine
-- ✅ **HTTPS Enforcement**: HTTP requests blocked (except localhost)
-- ✅ **Header Security**: Security headers injected automatically
-- ✅ **DevTools Disabled**: Production builds disable developer tools
+1. **Update Version** (if needed):
+   ```bash
+   npm version 1.0.2 --no-git-tag-version
+   ```
 
-### VPN Security
-- ✅ **Fail-Closed**: Browser blocked if VPN disconnects
-- ✅ **Australian Exit Points**: All traffic originates from Australia
-- ✅ **Connection Monitoring**: Real-time VPN status tracking
-- ✅ **Auto-Reconnection**: Automatic retry on connection failure
+2. **Run Release Script**:
+   ```bash
+   ./scripts/publish-release.sh
+   ```
 
-### Credential Security  
-- ✅ **Vault Management**: Credentials stored securely in vault
-- ✅ **Auto-Injection**: SharePoint login automated via vault
-- ✅ **Rotation Support**: Credential rotation without app restart
-- ✅ **No Local Storage**: Credentials never stored locally
+3. **Complete GitHub Release**:
+   - Go to: https://github.com/bilalmohib/aussie-vault-browser-releases/releases
+   - Edit the created release
+   - Upload the DMG file
+   - Publish the release
 
-## 🔄 Usage Workflow
+#### Installation for Users
 
-1. **App Launch**: User opens Secure Remote Browser
-2. **Authentication**: User logs in with personal credentials  
-3. **VPN Connection**: Australian VPN automatically established
-4. **Vault Access**: SharePoint credentials retrieved from vault
-5. **Browser Access**: Controlled browsing based on access level
-6. **SharePoint Auto-Login**: Vault credentials auto-injected
-7. **Document Viewing**: PDFs and documents viewed in-browser only
+Once released, users can install via Homebrew:
 
-## 📊 Monitoring & Logging
-
-### VPN Status Monitoring
-```typescript
-// Real-time VPN status in UI
-vpnStatus: "connected" | "connecting" | "disconnected" | "failed"
-
-// Australian IP verification
-connection: {
-  endpoint: "au-sydney-01.vpn.com",
-  location: "Sydney, Australia", 
-  ipAddress: "203.219.252.100",
-  latency: 45
-}
-```
-
-### Security Logging
-```typescript
-// Navigation attempts logged
-navigationAttempt: {
-  url: "https://example.com",
-  timestamp: new Date(),
-  allowed: false,
-  accessLevel: 1,
-  vpnActive: true
-}
-```
-
-## 🎯 Development Roadmap
-
-### Phase 1: MVP (Current)
-- [x] Basic browser with access controls
-- [x] VPN integration framework  
-- [x] Vault service architecture
-- [x] SharePoint credential injection
-- [ ] Real VPN provider integration
-- [ ] Production vault deployment
-
-### Phase 2: Admin Panel
-- [ ] Next.js + Supabase admin application
-- [ ] User management interface
-- [ ] Role assignment controls  
-- [ ] System monitoring dashboard
-
-### Phase 3: Enhanced Security
-- [ ] Certificate pinning
-- [ ] Advanced audit logging
-- [ ] Real-time threat detection
-- [ ] Compliance reporting
-
-## 🔍 Troubleshooting
-
-### VPN Connection Issues
 ```bash
-# Check VPN status
-curl -X GET "${VPN_API_ENDPOINT}/status" \
-  -H "Authorization: Bearer ${VPN_API_KEY}"
-
-# Test Australian IP
-curl https://ipapi.co/json
+brew install --cask bilalmohib/aussievault/aussie-vault-browser
 ```
 
-### Vault Access Issues  
+### Repository Structure
+
+- **Private Repo** (`AussieVaultBrowser/`): Contains source code (this repository)
+- **Public Releases** (`aussie-vault-browser-releases/`): Contains releases only
+- **Homebrew Tap** (`homebrew-aussievault/`): Contains Homebrew cask formula
+
+## 📋 Admin Dashboard
+
+Access the admin dashboard to manage users and monitor activity:
+
 ```bash
-# Test vault connectivity
-vault status
-
-# Verify credentials
-vault kv get secret/sharepoint
+cd admin-aussie-vault-browser
+npm install
+npm run dev
 ```
 
-### SharePoint Access Issues
-- Verify tenant URL in configuration
-- Check shared credentials in vault
-- Confirm library permissions
-- Test SharePoint URL manually
+Features:
+- User management with access levels
+- Session monitoring  
+- Security event tracking
+- VPN connection analytics
+- Real-time activity monitoring
 
-## 📞 Support & Configuration
+## 🛠️ Configuration
 
-For VPN and Vault provider recommendations based on your infrastructure:
+### Environment Variables
 
-- **Enterprise Setup**: HashiCorp Vault + NordLayer
-- **AWS Native**: AWS Secrets Manager + ExpressVPN  
-- **Cost-Effective**: Custom Vault + WireGuard
-- **Azure Native**: Azure KeyVault + ExpressVPN
+Create a `.env` file in the project root:
+
+```bash
+# VPN Configuration
+VPN_PROVIDER=wireguard
+VPN_SERVER_REGION=australia
+VPN_AUTO_CONNECT=true
+
+# Security Settings  
+SECURITY_HTTPS_ONLY=true
+SECURITY_BLOCK_DOWNLOADS=false
+SECURITY_FAIL_CLOSED_VPN=true
+
+# Database (for admin dashboard)
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_supabase_key
+
+# Authentication
+CLERK_PUBLISHABLE_KEY=your_clerk_key
+CLERK_SECRET_KEY=your_clerk_secret
+```
+
+### Access Levels
+
+- **Level 1**: Restricted access to approved sites only
+- **Level 2**: Manager access with additional permissions  
+- **Level 3**: Full access to all features
+
+## 🔐 Security Features
+
+- **Sandboxed Browsing**: Isolated browser environment
+- **VPN Enforcement**: Automatic VPN connection for secure browsing
+- **Content Filtering**: Block malicious sites and downloads
+- **Session Management**: Secure session handling and monitoring
+- **Audit Logging**: Complete activity logging for compliance
+
+## 🌐 VPN Setup
+
+The browser includes built-in VPN support for Australian servers:
+
+1. **WireGuard Configuration**: Automatic setup for Australian endpoints
+2. **Connection Monitoring**: Real-time VPN status and failover
+3. **Geo-Blocking**: Ensure Australian IP addresses
+4. **Speed Optimization**: Optimized for Australian network infrastructure
+
+## 📱 Browser Features
+
+- **Secure Downloads**: Controlled download management with scanning
+- **Password Integration**: Native 1Password extension support  
+- **Context Menus**: Right-click to save pages as PDF
+- **Session Persistence**: Secure session storage and recovery
+- **Multi-Window**: Support for multiple browser windows
+
+## 🏢 Enterprise Deployment
+
+### System Requirements
+
+- **macOS**: 10.15+ (Catalina or later)
+- **Windows**: Windows 10/11
+- **Linux**: Ubuntu 18.04+, CentOS 7+
+- **RAM**: 4GB minimum, 8GB recommended
+- **Storage**: 500MB for application + data
+
+### Deployment Options
+
+1. **Homebrew** (macOS): Centralized package management
+2. **MSI Installer** (Windows): Group Policy deployment
+3. **DEB/RPM Packages** (Linux): Repository-based distribution
+4. **Docker**: Containerized deployment option
+
+## 📊 Analytics & Monitoring
+
+The admin dashboard provides comprehensive analytics:
+
+- User session tracking
+- VPN connection statistics  
+- Security event monitoring
+- Download and navigation logs
+- Real-time system health
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable  
+5. Submit a pull request
+
+## 📚 Documentation
+
+- [Admin Panel Setup](admin-aussie-vault-browser/README.md)
+- [VPN Configuration](docs/vpn-setup.md)
+- [1Password Integration](docs/1password-setup.md)
+- [Homebrew Publishing](HOMEBREW_SETUP.md)
+
+## 🐛 Bug Reports
+
+Found a bug? Please [open an issue](https://github.com/bilalmohib/AussieVaultBrowser/issues) with:
+
+- Operating system and version
+- Browser version
+- Steps to reproduce
+- Expected vs actual behavior
+- Screenshots if applicable
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Electron](https://www.electronjs.org/)
+- VPN powered by [WireGuard](https://www.wireguard.com/) 
+- Password management via [1Password](https://1password.com/)
+- UI components from [Tailwind CSS](https://tailwindcss.com/)
 
 ---
 
-**🔒 Security Notice**: This application is designed for secure document access. All traffic is routed through Australian VPN endpoints, and documents are never downloaded to local machines. Ensure proper vault and VPN configuration before production deployment.
+Made with ❤️ in Australia 🇦🇺
+
+For support, please contact [support@aussievault.com](mailto:support@aussievault.com)

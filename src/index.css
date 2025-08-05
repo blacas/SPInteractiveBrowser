@@ -177,4 +177,132 @@ html {
   webview {
     pointer-events: auto;
   }
+
+  /* ================================= */
+  /* DRAG AND DROP STYLES */
+  /* ================================= */
+
+  /* Dragging state */
+  .file-row.dragging {
+    opacity: 0.5;
+    background-color: #bbdefb;
+    border: 2px dashed #2196f3;
+    transform: rotate(2deg);
+    cursor: grabbing;
+  }
+
+  /* Drag preview element */
+  .drag-preview {
+    position: absolute;
+    top: -1000px;
+    left: -1000px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 1000;
+    pointer-events: none;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .drag-preview.folder {
+    background: linear-gradient(135deg, #ffa726 0%, #ff7043 100%);
+  }
+
+  .drag-preview::before {
+    content: "📄";
+    margin-right: 8px;
+  }
+
+  .drag-preview.folder::before {
+    content: "📁";
+  }
+
+  /* Drag overlay for visual feedback */
+  .drag-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(33, 150, 243, 0.1);
+    z-index: 999;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .drag-overlay.active {
+    opacity: 1;
+  }
+
+  /* Drag hint */
+  .drag-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 1001;
+    max-width: 400px;
+    text-align: center;
+  }
+
+  .drag-hint.show {
+    opacity: 1;
+  }
+
+  /* Ready to drag indicator */
+  .drag-indicator {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    color: #2196f3;
+    font-size: 12px;
+    margin-left: 8px;
+    font-weight: 500;
+  }
+
+  .sharepoint-file-item:hover .drag-indicator {
+    opacity: 1;
+  }
+
+  /* Animation for successful drop */
+  @keyframes dropSuccess {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  .drop-success {
+    animation: dropSuccess 0.4s ease;
+    background-color: #e8f5e8 !important;
+    border-color: #4caf50 !important;
+  }
+
+  /* File preparation states */
+  .drag-indicator.preparing {
+    color: #ff9800;
+  }
+
+  .drag-indicator.ready {
+    color: #4caf50;
+  }
+
+  .drag-indicator.error {
+    color: #f44336;
+  }
 }

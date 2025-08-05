@@ -113,7 +113,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
               </div>
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">
-              Secure Remote Browser
+              Aussie Vault Browser
             </h1>
             <p className="text-slate-300 text-sm">
               Initializing secure environment...

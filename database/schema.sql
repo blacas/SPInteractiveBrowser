@@ -18,6 +18,7 @@ CREATE TABLE users (
     status user_status_enum NOT NULL DEFAULT 'active',
     device_id TEXT,
     vpn_required BOOLEAN NOT NULL DEFAULT true,
+    can_edit_access_level BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     last_login TIMESTAMP WITH TIME ZONE,
@@ -184,6 +185,36 @@ CREATE TABLE system_settings (
 CREATE INDEX idx_system_settings_category ON system_settings(category);
 CREATE INDEX idx_system_settings_key ON system_settings(key);
 
+-- Bookmarks table for user bookmark management
+CREATE TABLE bookmarks (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    favicon_url TEXT,
+    folder_name TEXT DEFAULT 'General',
+    tags TEXT[] DEFAULT '{}',
+    is_public BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    access_level INTEGER NOT NULL DEFAULT 1 CHECK (access_level IN (1, 2, 3)),
+    device_id TEXT,
+    
+    -- Prevent duplicate URLs per user
+    UNIQUE(user_id, url)
+);
+
+-- Create indexes for bookmarks table
+CREATE INDEX idx_bookmarks_user_id ON bookmarks(user_id);
+CREATE INDEX idx_bookmarks_folder_name ON bookmarks(folder_name);
+CREATE INDEX idx_bookmarks_tags ON bookmarks USING gin(tags);
+CREATE INDEX idx_bookmarks_created_at ON bookmarks(created_at DESC);
+CREATE INDEX idx_bookmarks_access_level ON bookmarks(access_level);
+CREATE INDEX idx_bookmarks_is_public ON bookmarks(is_public);
+CREATE INDEX idx_bookmarks_title ON bookmarks USING gin(to_tsvector('english', title));
+CREATE INDEX idx_bookmarks_url ON bookmarks USING gin(to_tsvector('english', url));
+
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -204,6 +235,11 @@ CREATE TRIGGER update_access_levels_updated_at
 
 CREATE TRIGGER update_system_settings_updated_at 
     BEFORE UPDATE ON system_settings 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Add updated_at trigger for bookmarks
+CREATE TRIGGER update_bookmarks_updated_at 
+    BEFORE UPDATE ON bookmarks 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert default access levels
@@ -285,6 +321,12 @@ ALTER TABLE browsing_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow authenticated access to browsing_history" ON browsing_history
     FOR ALL USING (true);
 
+-- Bookmarks policies
+ALTER TABLE bookmarks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow authenticated access to bookmarks" ON bookmarks
+    FOR ALL USING (true);
+
 -- System Settings policies
 ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
 
@@ -327,6 +369,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE security_events;
 ALTER PUBLICATION supabase_realtime ADD TABLE vpn_connections;
 ALTER PUBLICATION supabase_realtime ADD TABLE navigation_logs;
 ALTER PUBLICATION supabase_realtime ADD TABLE browsing_history;
+ALTER PUBLICATION supabase_realtime ADD TABLE bookmarks;
 
 -- Grant permissions for authenticated users
 GRANT SELECT, INSERT, UPDATE ON users TO authenticated;
@@ -335,6 +378,7 @@ GRANT SELECT, INSERT ON security_events TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON vpn_connections TO authenticated;
 GRANT SELECT, INSERT ON navigation_logs TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON browsing_history TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON bookmarks TO authenticated;
 GRANT SELECT ON access_levels TO authenticated;
 GRANT SELECT ON system_settings TO authenticated;
 
@@ -353,4 +397,5 @@ COMMENT ON TABLE security_events IS 'Security incident logging and monitoring';
 COMMENT ON TABLE vpn_connections IS 'VPN connection monitoring and analytics';
 COMMENT ON TABLE navigation_logs IS 'User browsing activity and access control logs';
 COMMENT ON TABLE browsing_history IS 'Chrome-like browsing history with local and cloud sync';
+COMMENT ON TABLE bookmarks IS 'User bookmarks with categorization and access control';
 COMMENT ON TABLE system_settings IS 'Application configuration and system settings'; 

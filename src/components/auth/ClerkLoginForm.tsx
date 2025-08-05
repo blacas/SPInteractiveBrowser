@@ -6,6 +6,7 @@ import { Separator } from '../ui/separator';
 import { LoadingScreen } from '../ui/loading-screen';
 import { ErrorDisplay } from '../ui/error-display';
 import clerkAuth from '../../services/clerkService';
+import { SecureBrowserDatabaseService } from '../../services/databaseService';
 import type { AuthState } from '../../types/clerk';
 import { Shield, Users, Lock, Chrome, Globe } from 'lucide-react';
 
@@ -34,22 +35,135 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
         setIsInitializing(true);
         setInitError(null);
 
-        // Initialize Clerk
+        // 🔐 CHECK GLOBAL AUTH STATE FIRST: If user is already authenticated globally, use that
+        // console.log('🔍 Checking for existing global authentication state...');
+        const globalAuthState = clerkAuth.getCurrentAuthState();
+        
+        if (globalAuthState.isSignedIn && globalAuthState.user) {
+          // console.log('✅ Found existing global authentication - user already signed in!');
+          setAuthState(globalAuthState);
+          
+          // Notify parent immediately with existing auth
+          try {
+            // 🔐 GET EMAIL FROM CACHED STATE: Use cached user data directly
+            const userEmail = globalAuthState.user.emailAddresses?.[0]?.emailAddress;
+            if (!userEmail) {
+              onAuthError('No email address found for this user');
+              return;
+            }
+            // console.log('🔍 Using cached user data for:', userEmail);
+            
+            // Fetch user data from database with permissions
+            const dbUserData = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail);
+            
+            if (dbUserData) {
+              // console.log('✅ Database user data loaded from cache:', dbUserData);
+              onAuthSuccess({
+                id: globalAuthState.user.id,
+                dbId: dbUserData.id,
+                name: dbUserData.name,
+                email: dbUserData.email,
+                accessLevel: dbUserData.accessLevel,
+                canEditAccessLevel: dbUserData.canEditAccessLevel,
+              });
+            } else {
+              // console.warn('⚠️ User not found in database, using Clerk defaults from cache');
+              // 🔐 USE CACHED DATA: Get user info from cached state directly
+              const firstName = globalAuthState.user.firstName || '';
+              const lastName = globalAuthState.user.lastName || '';
+              const displayName = `${firstName} ${lastName}`.trim() || userEmail.split('@')[0];
+              const accessLevel = (globalAuthState.user.publicMetadata as { accessLevel?: number })?.accessLevel || 1;
+              
+              onAuthSuccess({
+                id: globalAuthState.user.id,
+                name: displayName,
+                email: userEmail,
+                accessLevel: accessLevel,
+                canEditAccessLevel: false,
+                avatar: globalAuthState.user.imageUrl
+              });
+            }
+          } catch (error) {
+            // console.error('❌ Error processing cached user data:', error);
+            // 🔐 FALLBACK WITH CACHED DATA: Use cached user data directly as fallback
+            const userEmail = globalAuthState.user.emailAddresses?.[0]?.emailAddress || 'unknown@example.com';
+            const firstName = globalAuthState.user.firstName || '';
+            const lastName = globalAuthState.user.lastName || '';
+            const displayName = `${firstName} ${lastName}`.trim() || userEmail.split('@')[0];
+            const accessLevel = (globalAuthState.user.publicMetadata as { accessLevel?: number })?.accessLevel || 1;
+            
+            onAuthSuccess({
+              id: globalAuthState.user.id,
+              name: displayName,
+              email: userEmail,
+              accessLevel: accessLevel,
+              canEditAccessLevel: false,
+              avatar: globalAuthState.user.imageUrl
+            });
+          }
+          
+          setIsInitializing(false);
+          return; // Exit early - no need to initialize
+        }
+
+        // 🔐 NO EXISTING AUTH: Initialize Clerk for first time
+        // console.log('🔄 No existing authentication found - initializing Clerk...');
         await clerkAuth.initialize();
 
-        // Set up auth state listener
-        clerkAuth.onAuthStateChange((state) => {
+        // 🔐 REFRESH AUTH STATE: Check for session after initialization
+        // console.log('🔄 Refreshing authentication state after initialization...');
+        await clerkAuth.refreshAuthenticationState();
+
+        // Set up auth state listener for future changes
+        clerkAuth.onAuthStateChange(async (state) => {
           setAuthState(state);
           
           // If user is signed in, notify parent
           if (state.isSignedIn && state.user) {
-            onAuthSuccess({
-              id: state.user.id,
-              name: clerkAuth.getUserDisplayName(),
-              email: clerkAuth.getUserEmail(),
-              accessLevel: clerkAuth.getUserAccessLevel(),
-              avatar: state.user.imageUrl
-            });
+            try {
+              const userEmail = clerkAuth.getUserEmail();
+              if (!userEmail) {
+                onAuthError('No email address found for this user');
+                return;
+              }
+              // console.log('🔍 Fetching user data from database for:', userEmail);
+              
+              // Fetch user data from database with permissions
+              const dbUserData = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail);
+              
+              if (dbUserData) {
+                // console.log('✅ Database user data loaded:', dbUserData);
+                onAuthSuccess({
+                  id: state.user.id,
+                  dbId: dbUserData.id,
+                  name: dbUserData.name,
+                  email: dbUserData.email,
+                  accessLevel: dbUserData.accessLevel,
+                  canEditAccessLevel: dbUserData.canEditAccessLevel,
+                });
+              } else {
+                console.warn('⚠️ User not found in database, using Clerk defaults');
+                onAuthSuccess({
+                  id: state.user.id,
+                  name: clerkAuth.getUserDisplayName(),
+                  email: clerkAuth.getUserEmail(),
+                  accessLevel: clerkAuth.getUserAccessLevel(),
+                  canEditAccessLevel: false,
+                  avatar: state.user.imageUrl
+                });
+              }
+            } catch (error) {
+              console.error('❌ Error fetching user data from database:', error);
+              // Fallback to Clerk data if database fetch fails
+              onAuthSuccess({
+                id: state.user.id,
+                name: clerkAuth.getUserDisplayName(),
+                email: clerkAuth.getUserEmail(),
+                accessLevel: clerkAuth.getUserAccessLevel(),
+                canEditAccessLevel: false,
+                avatar: state.user.imageUrl
+              });
+            }
           }
         });
 
@@ -73,11 +187,11 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
   const handleSignIn = async () => {
     try {
       setIsSigningIn(true);
-      console.log('🔐 Opening Clerk sign-in modal...');
+      // console.log('🔐 Opening Clerk sign-in modal...');
       await clerkAuth.signIn();
-      console.log('✅ Clerk sign-in modal opened successfully');
+      // console.log('✅ Clerk sign-in modal opened successfully');
     } catch (error) {
-      console.error('❌ Sign in failed:', error);
+      // console.error('❌ Sign in failed:', error);
       onAuthError(error instanceof Error ? error.message : 'Unable to open sign-in. Please refresh and try again.');
     } finally {
       setIsSigningIn(false);
@@ -87,11 +201,11 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
   const handleSignUp = async () => {
     try {
       setIsSigningUp(true);
-      console.log('🔐 Opening Clerk sign-up modal...');
+      // console.log('🔐 Opening Clerk sign-up modal...');
       await clerkAuth.signUp();
-      console.log('✅ Clerk sign-up modal opened successfully');
+      // console.log('✅ Clerk sign-up modal opened successfully');
     } catch (error) {
-      console.error('❌ Sign up failed:', error);
+      // console.error('❌ Sign up failed:', error);
       onAuthError(error instanceof Error ? error.message : 'Unable to open sign-up. Please refresh and try again.');
     } finally {
       setIsSigningUp(false);
@@ -174,7 +288,7 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
           </div>
           
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Secure Remote Browser</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Aussie Vault Browser</h1>
             <p className="text-gray-600 mt-1">
               Enterprise-grade browsing with VPN protection
             </p>

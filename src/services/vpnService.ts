@@ -57,7 +57,7 @@ export class VPNService {
 
     try {
       const platformInfo = getPlatformInfo();
-      console.log(`🌐 Attempting VPN connection with ${this.config.provider} on ${platformInfo.displayName} ${platformInfo.emoji}...`);
+      // console.log(`🌐 Attempting VPN connection with ${this.config.provider} on ${platformInfo.displayName} ${platformInfo.emoji}...`);
       
       let connected = false;
       switch (this.config.provider) {
@@ -93,7 +93,7 @@ export class VPNService {
           vpnIP
         );
 
-        console.log('✅ VPN connection logged to database');
+        // console.log('✅ VPN connection logged to database');
       } else {
         // Log failed connection as security event
         await SecureBrowserDatabaseService.logSecurityEvent(
@@ -105,8 +105,8 @@ export class VPNService {
 
       return connected;
     } catch (error) {
-      console.error('❌ VPN connection failed:', error);
-      
+      // console.error('❌ VPN connection failed:', error);
+
       // Log VPN connection failure as critical security event
       await SecureBrowserDatabaseService.logSecurityEvent(
         'vpn_disconnected',
@@ -140,14 +140,14 @@ export class VPNService {
           'VPN disconnected by user request',
           'medium'
         );
-        
-        console.log('🔌 VPN disconnected and logged to database');
+
+        // console.log('🔌 VPN disconnected and logged to database');
         this.notifyStatusChange({ connected: false });
       }
       
       return disconnected;
     } catch (error) {
-      console.error('❌ VPN disconnect failed:', error);
+      // console.error('❌ VPN disconnect failed:', error);
       
       // Log disconnect failure
       await SecureBrowserDatabaseService.logSecurityEvent(
@@ -173,7 +173,7 @@ export class VPNService {
           return { connected: false };
       }
     } catch (error) {
-      console.error('❌ Failed to get VPN status:', error);
+      // console.error('❌ Failed to get VPN status:', error);
       return { connected: false };
     }
   }
@@ -199,7 +199,7 @@ export class VPNService {
       try {
         callback(status);
       } catch (error) {
-        console.error('❌ Error in VPN status callback:', error);
+        // console.error('❌ Error in VPN status callback:', error);
       }
     });
 
@@ -215,7 +215,7 @@ export class VPNService {
         status.connected ? 'Australia' : undefined
       );
     } catch (error) {
-      console.warn('⚠️ Failed to update VPN status in database:', error);
+      // console.warn('⚠️ Failed to update VPN status in database:', error);
     }
   }
 
@@ -228,11 +228,11 @@ export class VPNService {
     try {
       // Use IPC to request VPN connection from main process (for security)
       if (typeof window !== 'undefined' && window.secureBrowser) {
-        console.log('🔌 Requesting WireGuard connection from main process...');
+        // console.log('🔌 Requesting WireGuard connection from main process...');
         const success = await window.secureBrowser.vpn.connect('wireguard');
         
         if (success) {
-          console.log('✅ WireGuard VPN connected successfully');
+          // console.log('✅ WireGuard VPN connected successfully');
           this.startStatusMonitoring();
           this.notifyStatusChange({ 
             connected: true, 
@@ -240,7 +240,7 @@ export class VPNService {
           });
           return true;
         } else {
-          console.warn('⚠️ WireGuard connection failed - check main process logs for platform-specific instructions');
+          // console.warn('⚠️ WireGuard connection failed - check main process logs for platform-specific instructions');
           this.notifyStatusChange({ connected: false });
           return false;
         }
@@ -249,7 +249,7 @@ export class VPNService {
       throw new Error('Secure browser IPC not available');
     } catch (error) {
       const errorMessage = `WireGuard connection failed: ${error instanceof Error ? error.message : String(error)}`;
-      console.error('❌', errorMessage);
+      // console.error('❌', errorMessage);
       this.notifyStatusChange({ connected: false });
       throw new Error(errorMessage);
     }
@@ -262,14 +262,14 @@ export class VPNService {
         
         if (success) {
           this.stopStatusMonitoring();
-          console.log('🔌 WireGuard VPN disconnected');
+          // console.log('🔌 WireGuard VPN disconnected');
           return true;
         }
       }
       
       return false;
     } catch (error) {
-      console.error('❌ WireGuard disconnect error:', error);
+      // console.error('❌ WireGuard disconnect error:', error);
       return false;
     }
   }
@@ -291,7 +291,7 @@ export class VPNService {
       
       return { connected: false };
     } catch (error) {
-      console.error('❌ Failed to get WireGuard status:', error);
+      // console.error('❌ Failed to get WireGuard status:', error);
       return { connected: false };
     }
   }
@@ -350,7 +350,7 @@ export class VPNService {
       // For now, return a placeholder - you could implement actual IP detection
       return '192.168.1.100'; // Placeholder for actual client IP
     } catch (error) {
-      console.warn('⚠️ Failed to get current IP:', error);
+      // console.warn('⚠️ Failed to get current IP:', error);
       return '127.0.0.1';
     }
   }
@@ -361,7 +361,7 @@ export class VPNService {
       // For Australian VPN, return the actual server IP
       return '134.199.169.102'; // Your actual Australian VPN IP
     } catch (error) {
-      console.warn('⚠️ Failed to get VPN IP:', error);
+      // console.warn('⚠️ Failed to get VPN IP:', error);
       return '134.199.169.102';
     }
   }
