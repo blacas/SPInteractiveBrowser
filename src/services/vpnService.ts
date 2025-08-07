@@ -50,6 +50,17 @@ export class VPNService {
     }
   }
 
+  // Allow configuration to be set after login when environment is loaded from Supabase
+  setConfiguration(env: Record<string, string | undefined>) {
+    this.config = {
+      provider: env.VPN_PROVIDER || 'wireguard',
+      endpoint: env.WIREGUARD_ENDPOINT || '',
+      configPath: env.WIREGUARD_CONFIG_PATH || './config/wireguard-australia.conf',
+      autoConnect: env.VPN_AUTO_CONNECT === 'true',
+      failClosed: env.VPN_FAIL_CLOSED === 'true'
+    };
+  }
+
   async connect(): Promise<boolean> {
     if (!this.config) {
       throw new Error('VPN service not configured');
