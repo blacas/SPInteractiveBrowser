@@ -6,6 +6,7 @@ import {
   Search,
   MoreVertical,
   Download,
+  Upload,
   FolderOpen,
   File,
   Loader2,
@@ -323,68 +324,6 @@ export const SharePointSidebar: React.FC<SharePointSidebarProps> = ({
     return dragPreview;
   }, []);
 
-  // Pre-load file for drag operations with visual feedback
-  const preloadFileForDrag = useCallback(
-    async (file: SharePointFile) => {
-      if (file.isFolder || !file.downloadUrl) {
-        return;
-      }
-
-      // Check if already cached and ready
-      const existing = dragPreviews.get(file.id);
-      if (existing?.isReady && existing.blob) {
-        return;
-      }
-
-      // Check if we're already preparing this file
-      if (existing && !existing.isReady && existing.blob === null) {
-        return; // Already in progress
-      }
-
-      console.log(`🔄 Pre-loading ${file.name} for drag...`);
-
-      try {
-        // Set loading state
-        setDragPreviews(prev => new Map(prev.set(file.id, {
-                file,
-                blob: null,
-                isReady: false,
-        })));
-
-        // Download file EXACTLY like working interactive-browser
-        console.log(`⏳ Pre-loading ${file.name} for drag...`);
-        const response = await fetch(file.downloadUrl);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const arrayBuffer = await response.arrayBuffer();
-        const contentType = response.headers.get('content-type') || getMimeTypeFromExtension(file.name);
-        
-        const blob = new Blob([arrayBuffer], { type: contentType });
-        
-        console.log(`✅ File ${file.name} pre-loaded (${(arrayBuffer.byteLength / 1024).toFixed(1)}KB)`);
-
-        // Update with ready state
-        setDragPreviews(prev => new Map(prev.set(file.id, {
-                file,
-                blob,
-                isReady: true,
-        })));
-        
-      } catch (error) {
-        console.log(`Failed to pre-load ${file.name}:`, error);
-        
-        // Set error state
-        setDragPreviews(prev => new Map(prev.set(file.id, {
-                file,
-                blob: null,
-                isReady: false,
-        })));
-      }
-    },
-    [dragPreviews, getMimeTypeFromExtension]
-  );
 
   const handleDragStart = useCallback(
     (e: React.DragEvent, file: SharePointFile) => {
@@ -437,44 +376,11 @@ export const SharePointSidebar: React.FC<SharePointSidebarProps> = ({
             sizesMatch: fileObject.size === cachedData.blob.size
           });
           
-          // CRITICAL: For same-window drag (sidebar->webview), use native drag
-          console.log(`🔧 SAME-WINDOW DRAG: Setting up native drag for ${file.name}`);
-          
-          // Prevent default web drag (doesn't work cross-context)
+          // Use in-memory drag with DataTransfer only
+          console.log(`📎 Using in-memory drag for ${file.name}`);
           e.preventDefault();
-          
-          // Create temp file and use native OS drag
-          if (window.secureBrowser?.sharepoint?.prepareTempFile) {
-            console.log(`📁 Converting to temp file for native drag...`);
-            
-            cachedData.blob.arrayBuffer().then(arrayBuffer => {
-              return window.secureBrowser.sharepoint.prepareTempFile({
-                data: arrayBuffer,
-                filename: file.name
-              });
-            }).then(result => {
-              if (result.success && result.path) {
-                console.log(`✅ Temp file created: ${result.path}`);
-                
-                // Start native OS drag that works cross-context
-                if (window.secureBrowser?.sharepoint?.startDrag) {
-                  window.secureBrowser.sharepoint.startDrag(result.path);
-                  console.log(`🚀 Native OS drag started for ${file.name}`);
-                } else {
-                  console.error(`❌ startDrag not available`);
-                }
-              } else {
-                console.error(`❌ Failed to create temp file:`, result.error);
-              }
-            }).catch(error => {
-              console.error(`❌ Native drag setup failed:`, error);
-            });
-          } else {
-            console.error(`❌ prepareTempFile not available`);
-            console.log(`📎 Fallback: trying web drag anyway...`);
-            e.dataTransfer.items.add(fileObject);
-            e.dataTransfer.effectAllowed = "copy";
-          }
+          e.dataTransfer.items.add(fileObject);
+          e.dataTransfer.effectAllowed = "copy";
         } catch (error) {
           console.error(`❌ Error adding file to drag:`, error);
           // Fallback to URL
@@ -562,11 +468,73 @@ export const SharePointSidebar: React.FC<SharePointSidebarProps> = ({
       }
     },
     []
-  );
+    );
 
-  const filteredFiles = files.filter((file) =>
-    file.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    const uploadToActiveWebview = useCallback(async (file: SharePointFile) => {
+      try {
+        if (!file.downloadUrl) {
+          alert('Missing download URL');
+          return;
+        }
+
+        const response = await fetch(file.downloadUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        const contentType = response.headers.get('content-type') || 'application/octet-stream';
+        const uint8Array = new Uint8Array(arrayBuffer);
+        let binary = '';
+        uint8Array.forEach(b => (binary += String.fromCharCode(b)));
+        const base64Data = btoa(binary);
+
+        const webview = document.querySelector('[data-state="active"] webview') as any;
+        if (!webview) {
+          alert('No active page available');
+          return;
+        }
+
+        const result = await webview.executeJavaScript(`
+          (function() {
+            try {
+              const base64 = '${base64Data}';
+              const filename = '${file.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}';
+              const contentType = '${contentType}';
+              const byteCharacters = atob(base64);
+              const byteArrays = [];
+              for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+                const slice = byteCharacters.slice(offset, offset + 512);
+                const byteNumbers = new Array(slice.length);
+                for (let i = 0; i < slice.length; i++) {
+                  byteNumbers[i] = slice.charCodeAt(i);
+                }
+                byteArrays.push(new Uint8Array(byteNumbers));
+              }
+              const blob = new Blob(byteArrays, { type: contentType });
+              const file = new File([blob], filename, { type: contentType });
+              const dataTransfer = new DataTransfer();
+              dataTransfer.items.add(file);
+              const dropZone = document.querySelector('[data-dropzone], .dropzone, input[type="file"]');
+              if (!dropZone) { return { success: false, error: 'No drop zone found on page' }; }
+              const rect = dropZone.getBoundingClientRect();
+              const event = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer, clientX: rect.left + 10, clientY: rect.top + 10 });
+              dropZone.dispatchEvent(event);
+              return { success: true };
+            } catch (e) {
+              return { success: false, error: e.message };
+            }
+          })();
+        `);
+
+        if (!result?.success) {
+          alert('Drop failed: ' + (result?.error || 'Unknown error'));
+        }
+      } catch (err) {
+        console.error('Error uploading file:', err);
+        alert('Error sending file: ' + (err as Error).message);
+      }
+    }, []);
+
+    const filteredFiles = files.filter((file) =>
+      file.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   const renderFileItem = (file: SharePointFile) => {
     const dragData = dragPreviews.get(file.id);
@@ -588,7 +556,7 @@ export const SharePointSidebar: React.FC<SharePointSidebarProps> = ({
         )}
         style={{ cursor: file.isFolder ? "pointer" : "grab" }}
         draggable={!file.isFolder}
-        onMouseEnter={() => !file.isFolder && preloadFileForDrag(file)}
+        // Drag-and-drop preloading removed
         onDragStart={(e) => handleDragStart(e, file)}
         onDragEnd={(e) => handleDragEnd(e, file)}
         onClick={() => {
@@ -745,9 +713,22 @@ export const SharePointSidebar: React.FC<SharePointSidebarProps> = ({
               ) : (
                 <Download className="w-4 h-4" />
               )}
-            </Button>
+              </Button>
 
-            <DropdownMenu>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  uploadToActiveWebview(file);
+                }}
+                className="h-8 w-8 p-0 transition-all hover:bg-green-100 dark:hover:bg-green-900 text-green-600 dark:text-green-400 hover:scale-110"
+                title="Send to page"
+              >
+                <Upload className="w-4 h-4" />
+              </Button>
+
+              <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
