@@ -1,31 +1,32 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 // Environment variable support for Vite (Electron environment)
 const supabaseUrl = import.meta.env?.NEXT_PUBLIC_SUPABASE_URL as string
-const supabaseKey = import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
-
-// Debug: Check if environment variables are loaded
-// console.log('🔍 Secure Browser Supabase Config:')
-// console.log('Supabase URL:', supabaseUrl)
-// console.log('Anon Key (first 20 chars):', supabaseKey?.substring(0, 20) + '...')
-// console.log('URL is valid:', supabaseUrl?.startsWith('https://'))
-// console.log('Key is valid:', supabaseKey?.startsWith('eyJ'))
 
 // Validate environment variables
-if (!supabaseUrl || !supabaseKey) {
+if (!supabaseUrl) {
   console.error('❌ Missing Supabase environment variables!')
   console.error('URL:', supabaseUrl)
-  console.error('Key:', supabaseKey ? 'Present' : 'Missing')
   throw new Error('Supabase configuration is incomplete')
 }
 
-// Create Supabase client with better error handling
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-})
+// Supabase client is created after Clerk provides a JWT
+export let supabase: SupabaseClient
+
+export const initSupabaseClient = (token: string): SupabaseClient => {
+  supabase = createClient(supabaseUrl, '', {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  })
+  return supabase
+}
 
 // TypeScript interfaces for database entities (using integer IDs)
 export interface User {
