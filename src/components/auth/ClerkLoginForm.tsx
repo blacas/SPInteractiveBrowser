@@ -33,62 +33,39 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
   useEffect(() => {
     const handleAuthState = async (state: AuthState) => {
       setAuthState(state);
-  
-      // If user is signed in, initialize Supabase with Clerk token
+    
+      if (!state.isLoaded) {
+        console.warn("Clerk not fully loaded yet. Skipping auth handling.");
+        return;
+      }
+    
       if (state.isSignedIn && state.user) {
-        try {
-          const token = await clerkAuth.getSupabaseToken();
-          if (!token) throw new Error('Supabase token missing from Clerk');
-  
-          const supabaseClient = await initSupabaseClient();
-  
-          // Enforce fresh auth on every app restart (skip any session reuse)
-          await clerkAuth.signOut();
-  
-          const userEmail = clerkAuth.getUserEmail();
-          if (!userEmail) {
-            onAuthError('No email address found');
-            return;
-          }
-  
-          const dbUser = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail, supabaseClient);
-          if (dbUser) {
-            onAuthSuccess({
-              id: state.user.id,
-              dbId: dbUser.id,
-              name: dbUser.name,
-              email: dbUser.email,
-              accessLevel: dbUser.accessLevel,
-              canEditAccessLevel: dbUser.canEditAccessLevel,
-            });
-          } else {
-            console.warn('User not found in database, falling back to Clerk defaults');
-            onAuthSuccess({
-              id: state.user.id,
-              name: clerkAuth.getUserDisplayName(),
-              email: clerkAuth.getUserEmail(),
-              accessLevel: clerkAuth.getUserAccessLevel(),
-              canEditAccessLevel: false,
-              avatar: state.user.imageUrl,
-            });
-          }
-        } catch (err) {
-          console.error('Auth state error:', err);
-          onAuthError('Failed to initialize secure session');
+        // Delay Supabase init to onAuthSuccess
+        const userEmail = clerkAuth.getUserEmail();
+        if (!userEmail) {
+          onAuthError('No email address found');
+          return;
         }
+    
+        // Just pass minimal user data here — defer DB + Supabase logic
+        onAuthSuccess({
+          id: state.user.id,
+          name: clerkAuth.getUserDisplayName(),
+          email: userEmail,
+          accessLevel: clerkAuth.getUserAccessLevel(),
+          canEditAccessLevel: false,
+          avatar: state.user.imageUrl,
+        });
       }
     };
-  
+    
+
     const initializeClerk = async () => {
       try {
         setIsInitializing(true);
         setInitError(null);
-  
+
         await clerkAuth.initialize();
-  
-        // Force sign out any remembered sessions to always re-login
-        await clerkAuth.signOut();
-  
         clerkAuth.onAuthStateChange(handleAuthState);
         await clerkAuth.refreshAuthenticationState();
       } catch (err) {
@@ -99,23 +76,19 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
         setIsInitializing(false);
       }
     };
-  
+
     initializeClerk();
-  
+
     return () => {
       clerkAuth.removeAuthStateListener(handleAuthState);
     };
   }, [onAuthSuccess, onAuthError]);
-  
 
   const handleSignIn = async () => {
     try {
       setIsSigningIn(true);
-      // console.log('🔐 Opening Clerk sign-in modal...');
       await clerkAuth.signIn();
-      // console.log('✅ Clerk sign-in modal opened successfully');
     } catch (error) {
-      // console.error('❌ Sign in failed:', error);
       onAuthError(error instanceof Error ? error.message : 'Unable to open sign-in. Please refresh and try again.');
     } finally {
       setIsSigningIn(false);
@@ -125,29 +98,18 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
   const handleSignUp = async () => {
     try {
       setIsSigningUp(true);
-      // console.log('🔐 Opening Clerk sign-up modal...');
       await clerkAuth.signUp();
-      // console.log('✅ Clerk sign-up modal opened successfully');
     } catch (error) {
-      // console.error('❌ Sign up failed:', error);
       onAuthError(error instanceof Error ? error.message : 'Unable to open sign-up. Please refresh and try again.');
     } finally {
       setIsSigningUp(false);
     }
   };
 
-  // Show loading screen while initializing
   if (isInitializing) {
-    return (
-      <LoadingScreen 
-        stage="auth" 
-        message="Initializing secure authentication..."
-        progress={50}
-      />
-    );
+    return <LoadingScreen stage="auth" message="Initializing secure authentication..." progress={50} />;
   }
 
-  // Show error if initialization failed
   if (initError) {
     return (
       <ErrorDisplay
@@ -167,15 +129,8 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
     );
   }
 
-  // Show loading if user is already authenticated
   if (authState.isSignedIn && authState.user) {
-    return (
-      <LoadingScreen 
-        stage="ready" 
-        message="Welcome back! Setting up your secure browser..."
-        progress={90}
-      />
-    );
+    return <LoadingScreen stage="ready" message="Welcome back! Setting up your secure browser..." progress={90} />;
   }
 
   return (

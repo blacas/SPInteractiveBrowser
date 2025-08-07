@@ -1,38 +1,56 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { Clerk } from '@clerk/clerk-js';
 
-// Supabase URL — this is public and safe to embed
-const supabaseUrl = import.meta.env.NEXT_PUBLIC_SUPABASE_URL as string
-const supabaseAnonKey = import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+const supabaseUrl = import.meta.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('❌ Missing Supabase environment variables')
-}
-
-export let supabase: SupabaseClient
+export let supabase: SupabaseClient;
 
 export const initSupabaseClient = async (): Promise<SupabaseClient> => {
-  const clerk = window.Clerk
+  const clerk = window.Clerk as Clerk;
 
-  if (!clerk?.user || !clerk?.session) {
-    throw new Error('❌ Clerk is not loaded or user is not signed in')
-  }
-
-  const token = await clerk.session.getToken({ template: 'supabase' })
-
-  if (!token) {
-    throw new Error('❌ Failed to get Supabase token from Clerk session')
+  // ✅ Wait for Clerk to fully load if not already
+  if (!clerk?.loaded) {
+    await clerk?.load();
   }
 
   supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
     },
-  })
+    global: {
+      fetch,
+    },
+    accessToken: async () => {
+      const clerk = window.Clerk as Clerk;
+    
+      if (!clerk?.loaded) {
+        console.warn("🛑 Clerk is not ready yet. No session available.");
+        return null;
+      }
+    
+      const session = clerk.session;
+      if (!session) {
+        console.warn("🛑 Clerk session is undefined.");
+        return null;
+      }
+    
+      try {
+        const token = await session.getToken({ template: 'supabase' });
+        console.log("✅ JWT token:", token);
+        return token ?? null;
+      } catch (err) {
+        console.error("❌ Failed to get Clerk token:", err);
+        return null;
+      }
+    } 
+  });
 
-  return supabase
-}
+  return supabase;
+};
+
 
 // TypeScript interfaces for database entities (using integer IDs)
 export interface User {
