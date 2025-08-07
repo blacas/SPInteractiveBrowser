@@ -6,8 +6,6 @@ import { Separator } from '../ui/separator';
 import { LoadingScreen } from '../ui/loading-screen';
 import { ErrorDisplay } from '../ui/error-display';
 import clerkAuth from '../../services/clerkService';
-import { SecureBrowserDatabaseService } from '../../services/databaseService';
-import { initSupabaseClient } from '@/lib/supabase';
 import type { AuthState } from '../../types/clerk';
 import { Shield, Users, Lock, Chrome, Globe } from 'lucide-react';
 
@@ -106,10 +104,6 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
     }
   };
 
-  if (isInitializing) {
-    return <LoadingScreen stage="auth" message="Initializing secure authentication..." progress={50} />;
-  }
-
   if (initError) {
     return (
       <ErrorDisplay
@@ -205,10 +199,15 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
             {/* Sign In Button */}
             <Button
               onClick={handleSignIn}
-              disabled={isSigningIn || isSigningUp}
+              disabled={isSigningIn || isSigningUp || isInitializing}
               className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
             >
-              {isSigningIn ? (
+              {isInitializing ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Loading...
+                </div>
+              ) : isSigningIn ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   Signing in...
@@ -226,11 +225,16 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
             {/* Sign Up Button */}
             <Button
               onClick={handleSignUp}
-              disabled={isSigningIn || isSigningUp}
+              disabled={isSigningIn || isSigningUp || isInitializing}
               variant="outline"
               className="w-full h-12 border-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50"
             >
-              {isSigningUp ? (
+              {isInitializing ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  Loading...
+                </div>
+              ) : isSigningUp ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                   Creating account...
