@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { SecureBrowserDatabaseService } from '@/services/databaseService';
+import { supabase } from '@/lib/supabase';
 
 interface User {
   id: number; // Changed from string to number
@@ -35,7 +36,8 @@ export const useAuth = () => {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
           `Login attempt failed: Missing email or password`,
-          'medium'
+          'medium',
+          supabase
         );
         
         throw new Error("Email and password are required");
@@ -47,7 +49,8 @@ export const useAuth = () => {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
           `Login attempt failed: Invalid email format for ${credentials.email}`,
-          'medium'
+          'medium',
+          supabase
         );
         
         throw new Error("Invalid email format");
@@ -58,7 +61,8 @@ export const useAuth = () => {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
           `Login attempt failed: Password too short for ${credentials.email}`,
-          'medium'
+          'medium',
+          supabase
         );
         
         throw new Error("Password is too short");
@@ -71,7 +75,8 @@ export const useAuth = () => {
       await SecureBrowserDatabaseService.logSecurityEvent(
         'unauthorized_access',
         `Login attempt for user: ${credentials.email}`,
-        'low'
+        'low',
+        supabase
       );
       
       // Initialize database session
@@ -81,7 +86,8 @@ export const useAuth = () => {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
           `Login failed: Database session initialization failed for ${credentials.email}`,
-          'high'
+          'high',
+          supabase
         );
         
         throw new Error("Failed to initialize user session");
@@ -94,7 +100,8 @@ export const useAuth = () => {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
           `Login failed: Could not retrieve user data for ${credentials.email}`,
-          'high'
+          'high',
+          supabase
         );
         
         throw new Error("Failed to retrieve user data");
@@ -122,13 +129,14 @@ export const useAuth = () => {
       localStorage.setItem("auth", JSON.stringify(user));
       
       // Start session monitoring
-      SecureBrowserDatabaseService.startSessionMonitoring();
+      SecureBrowserDatabaseService.startSessionMonitoring(supabase);
       
       // Log successful login
       await SecureBrowserDatabaseService.logSecurityEvent(
         'unauthorized_access',
         `User successfully logged in: ${credentials.email} with access level ${dbUser.access_level}`,
-        'low'
+        'low',
+        supabase
       );
       
       // console.log('✅ Login successful for:', credentials.email, 'with access level:', dbUser.access_level);
@@ -140,7 +148,8 @@ export const useAuth = () => {
       await SecureBrowserDatabaseService.logSecurityEvent(
         'unauthorized_access',
         `Login failed for ${credentials.email}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'medium'
+        'medium',
+        supabase
       );
 
       // console.error('❌ Login failed:', error);
@@ -157,7 +166,8 @@ export const useAuth = () => {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
           `User initiated logout: ${currentUser.email}`,
-          'low'
+          'low',
+          supabase
         );
       }
       
@@ -178,7 +188,8 @@ export const useAuth = () => {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
           `User successfully logged out: ${currentUser.email}`,
-          'low'
+          'low',
+          supabase
         );
       }
       
@@ -191,7 +202,8 @@ export const useAuth = () => {
       await SecureBrowserDatabaseService.logSecurityEvent(
         'unauthorized_access',
         `Logout error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'medium'
+        'medium',
+        supabase
       );
       
       // Still clear the state even if database cleanup fails
@@ -244,7 +256,8 @@ export const useAuth = () => {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
           `Session restored for user: ${updatedUser.email}`,
-          'low'
+          'low',
+          supabase
         );
         
         setAuthState({
@@ -254,7 +267,7 @@ export const useAuth = () => {
         });
         
         // Restart session monitoring if user was restored from localStorage
-        SecureBrowserDatabaseService.startSessionMonitoring();
+        SecureBrowserDatabaseService.startSessionMonitoring(supabase);
         
       } catch (error) {
         // console.error('❌ Failed to restore auth session:', error);
@@ -263,7 +276,8 @@ export const useAuth = () => {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
           `Failed to restore user session from localStorage: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          'medium'
+          'medium',
+          supabase
         );
         
         localStorage.removeItem("auth");
@@ -302,7 +316,8 @@ export const useAuth = () => {
           await SecureBrowserDatabaseService.logSecurityEvent(
             'session_timeout',
             `User session timed out due to inactivity: ${authState.user?.email}`,
-            'medium'
+            'medium',
+            supabase
           );
           
           // Auto-logout due to timeout

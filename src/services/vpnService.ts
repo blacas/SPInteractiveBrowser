@@ -1,5 +1,6 @@
 import { getPlatformInfo } from '../utils/platform';
 import { SecureBrowserDatabaseService } from './databaseService';
+import { supabase } from '@/lib/supabase';
 
 export interface VPNStatus {
   connected: boolean;
@@ -86,7 +87,8 @@ export class VPNService {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'vpn_disconnected',
           `Failed to establish VPN connection to ${this.config.endpoint}`,
-          'high'
+          'high',
+          supabase
         );
       }
 
@@ -98,7 +100,8 @@ export class VPNService {
       await SecureBrowserDatabaseService.logSecurityEvent(
         'vpn_disconnected',
         `VPN connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'critical'
+        'critical',
+        supabase
       );
       
       this.notifyStatusChange({ connected: false });
@@ -125,7 +128,8 @@ export class VPNService {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'vpn_disconnected',
           'VPN disconnected by user request',
-          'medium'
+          'medium',
+          supabase
         );
 
         // console.log('🔌 VPN disconnected and logged to database');
@@ -140,7 +144,8 @@ export class VPNService {
       await SecureBrowserDatabaseService.logSecurityEvent(
         'vpn_disconnected',
         `VPN disconnect failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'high'
+        'high',
+        supabase
       );
       
       return false;
@@ -297,7 +302,8 @@ export class VPNService {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'vpn_disconnected',
           'Unexpected VPN disconnection detected during monitoring',
-          'high'
+          'high',
+          supabase
         );
         
         await SecureBrowserDatabaseService.updateVPNStatus(false);
