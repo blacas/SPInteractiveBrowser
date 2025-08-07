@@ -2479,44 +2479,6 @@ ipcMain.handle("open-external-auth", async (_event, url) => {
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
   }
 });
-ipcMain.handle("sharepoint-prepare-temp-file", async (event, { data, filename }) => {
-  try {
-    const tempDir = path.join(app.getPath("temp"), "secure-browser-dnd");
-    await promises.mkdir(tempDir, { recursive: true });
-    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const tempPath = path.join(tempDir, `${Date.now()}_${safeName}`);
-    console.log(`📝 Writing file content to temp path: ${tempPath}`);
-    console.log(`📦 File size: ${data.byteLength} bytes`);
-    const buffer = Buffer.from(data);
-    await promises.writeFile(tempPath, buffer);
-    const stats = await promises.stat(tempPath);
-    console.log(`✅ File written successfully: ${stats.size} bytes`);
-    setTimeout(async () => {
-      try {
-        await promises.unlink(tempPath);
-        console.log(`🧹 Cleaned up temp file: ${tempPath}`);
-      } catch (cleanupError) {
-        console.warn(`⚠️ Failed to cleanup temp file: ${cleanupError}`);
-      }
-    }, 3e5);
-    return { success: true, path: tempPath };
-  } catch (err) {
-    console.error("❌ Failed to prepare temp file:", err);
-    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
-  }
-});
-ipcMain.on("sharepoint-start-drag", (event, { filePath }) => {
-  try {
-    console.log(`🚀 Starting native drag for file: ${filePath}`);
-    event.sender.startDrag({
-      file: filePath,
-      icon: path.join(process.env.VITE_PUBLIC, "assets/aussie-browser-logo-32.png")
-    });
-    console.log(`✅ Native drag started successfully`);
-  } catch (err) {
-    console.error("❌ Failed to start native drag:", err);
-  }
-});
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
     app.setAsDefaultProtocolClient("secure-browser", process.execPath, [path.resolve(process.argv[1])]);

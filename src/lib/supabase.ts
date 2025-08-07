@@ -1,30 +1,36 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-// Environment variable support for Vite (Electron environment)
-const supabaseUrl = import.meta.env?.NEXT_PUBLIC_SUPABASE_URL as string
+// Supabase URL — this is public and safe to embed
+const supabaseUrl = import.meta.env.NEXT_PUBLIC_SUPABASE_URL as string
+const supabaseAnonKey = import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
 
-// Validate environment variables
-if (!supabaseUrl) {
-  console.error('❌ Missing Supabase environment variables!')
-  console.error('URL:', supabaseUrl)
-  throw new Error('Supabase configuration is incomplete')
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('❌ Missing Supabase environment variables')
 }
 
-// Supabase client is created after Clerk provides a JWT
 export let supabase: SupabaseClient
 
-export const initSupabaseClient = (token: string): SupabaseClient => {
-  supabase = createClient(supabaseUrl, '', {
+export const initSupabaseClient = async (): Promise<SupabaseClient> => {
+  const clerk = window.Clerk
+
+  if (!clerk?.user || !clerk?.session) {
+    throw new Error('❌ Clerk is not loaded or user is not signed in')
+  }
+
+  const token = await clerk.session.getToken({ template: 'supabase' })
+
+  if (!token) {
+    throw new Error('❌ Failed to get Supabase token from Clerk session')
+  }
+
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     },
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-    },
   })
+
   return supabase
 }
 
@@ -210,27 +216,31 @@ export class DatabaseService {
   }
 
   // Security events
-  static async logSecurityEvent(eventData: Omit<SecurityEvent, 'id' | 'timestamp' | 'resolved'>): Promise<boolean> {
+  static async logSecurityEvent(
+    eventData: Omit<SecurityEvent, 'id' | 'timestamp' | 'resolved'>,
+    supabaseClient: SupabaseClient
+  ): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('security_events')
         .insert({
           ...eventData,
           timestamp: new Date().toISOString(),
           resolved: false
-        })
-      
+        });
+  
       if (error) {
-        console.error('Error logging security event:', error)
-        return false
+        console.error('Error logging security event:', error);
+        return false;
       }
-      
-      return true
+  
+      return true;
     } catch (error) {
-      console.error('Exception in logSecurityEvent:', error)
-      return false
+      console.error('Exception in logSecurityEvent:', error);
+      return false;
     }
   }
+  
 
   // VPN connections
   static async logVPNConnection(connectionData: Omit<VPNConnection, 'id' | 'connection_start'>): Promise<VPNConnection | null> {

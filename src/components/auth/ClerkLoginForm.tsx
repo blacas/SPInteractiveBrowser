@@ -33,30 +33,36 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
   useEffect(() => {
     const handleAuthState = async (state: AuthState) => {
       setAuthState(state);
-
+  
+      // If user is signed in, initialize Supabase with Clerk token
       if (state.isSignedIn && state.user) {
-        const token = await clerkAuth.getSupabaseToken();
-        if (token) initSupabaseClient(token);
         try {
+          const token = await clerkAuth.getSupabaseToken();
+          if (!token) throw new Error('Supabase token missing from Clerk');
+  
+          const supabaseClient = await initSupabaseClient();
+  
+          // Enforce fresh auth on every app restart (skip any session reuse)
+          await clerkAuth.signOut();
+  
           const userEmail = clerkAuth.getUserEmail();
           if (!userEmail) {
-            onAuthError('No email address found for this user');
+            onAuthError('No email address found');
             return;
           }
-
-          const dbUserData = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail);
-
-          if (dbUserData) {
+  
+          const dbUser = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail, supabaseClient);
+          if (dbUser) {
             onAuthSuccess({
               id: state.user.id,
-              dbId: dbUserData.id,
-              name: dbUserData.name,
-              email: dbUserData.email,
-              accessLevel: dbUserData.accessLevel,
-              canEditAccessLevel: dbUserData.canEditAccessLevel,
+              dbId: dbUser.id,
+              name: dbUser.name,
+              email: dbUser.email,
+              accessLevel: dbUser.accessLevel,
+              canEditAccessLevel: dbUser.canEditAccessLevel,
             });
           } else {
-            console.warn('⚠️ User not found in database, using Clerk defaults');
+            console.warn('User not found in database, falling back to Clerk defaults');
             onAuthSuccess({
               id: state.user.id,
               name: clerkAuth.getUserDisplayName(),
@@ -66,43 +72,41 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
               avatar: state.user.imageUrl,
             });
           }
-        } catch (error) {
-          console.error('❌ Error fetching user data from database:', error);
-          onAuthSuccess({
-            id: state.user.id,
-            name: clerkAuth.getUserDisplayName(),
-            email: clerkAuth.getUserEmail(),
-            accessLevel: clerkAuth.getUserAccessLevel(),
-            canEditAccessLevel: false,
-            avatar: state.user.imageUrl,
-          });
+        } catch (err) {
+          console.error('Auth state error:', err);
+          onAuthError('Failed to initialize secure session');
         }
       }
     };
-
+  
     const initializeClerk = async () => {
       try {
         setIsInitializing(true);
         setInitError(null);
-
+  
         await clerkAuth.initialize();
+  
+        // Force sign out any remembered sessions to always re-login
+        await clerkAuth.signOut();
+  
         clerkAuth.onAuthStateChange(handleAuthState);
         await clerkAuth.refreshAuthenticationState();
-      } catch (error) {
-        console.error('Failed to initialize Clerk auth:', error);
-        setInitError(error instanceof Error ? error.message : 'Authentication initialization failed');
-        onAuthError('Authentication service unavailable');
+      } catch (err) {
+        console.error('Failed to initialize Clerk:', err);
+        setInitError(err instanceof Error ? err.message : 'Initialization failed');
+        onAuthError('Authentication system unavailable');
       } finally {
         setIsInitializing(false);
       }
     };
-
+  
     initializeClerk();
-
+  
     return () => {
       clerkAuth.removeAuthStateListener(handleAuthState);
     };
   }, [onAuthSuccess, onAuthError]);
+  
 
   const handleSignIn = async () => {
     try {

@@ -1,4 +1,5 @@
 import { DatabaseService, User, UserSession, VPNConnection, supabase } from '@/lib/supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Generate unique device ID for this Electron instance
 const DEVICE_ID = `electron-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -199,8 +200,9 @@ export class SecureBrowserDatabaseService {
     eventType: 'download_blocked' | 'domain_blocked' | 'vpn_disconnected' | 'unauthorized_access' | 'session_timeout',
     description: string,
     severity: 'low' | 'medium' | 'high' | 'critical' = 'medium',
+    supabaseClient: SupabaseClient,
     url?: string
-  ) {
+  ): Promise<boolean> {
     try {
       const eventData = {
         user_id: this.currentUser?.id,
@@ -211,19 +213,16 @@ export class SecureBrowserDatabaseService {
         url,
         ip_address: await this.getCurrentIP(),
         user_agent: navigator.userAgent
-      }
-
-      const success = await DatabaseService.logSecurityEvent(eventData)
-      if (success) {
-        // console.log('🔒 Security event logged:', { eventType, severity, description })
-      }
-      
-      return success
+      };
+  
+      const success = await DatabaseService.logSecurityEvent(eventData, supabaseClient);
+      return success;
     } catch (error) {
-      // console.error('❌ Failed to log security event:', error)
-      return false
+      console.error('❌ Failed to log security event:', error);
+      return false;
     }
   }
+  
 
   // Log navigation attempts
   static async logNavigation(url: string, allowed: boolean, blockedReason?: string) {
@@ -336,96 +335,99 @@ export class SecureBrowserDatabaseService {
   }
 
   // Monitor session health and VPN status
-  static startSessionMonitoring() {
-    // Monitor session and VPN status every 2 minutes
-    setInterval(async () => {
-      if (this.currentUser && this.currentSession) {
-        try {
-          // Check current VPN status
-          const vpnStatus = await window.secureBrowser?.vpn.getStatus();
-          const isVpnConnected = vpnStatus === 'connected';
-          
-          // Update session heartbeat and VPN status
-          const updates: any = {
-            // Add a heartbeat timestamp or extend session
-          };
-          
-          // Only update VPN status if it has changed
-          if (this.currentSession.vpn_status !== (isVpnConnected ? 'connected' : 'disconnected')) {
-            updates.vpn_status = isVpnConnected ? 'connected' : 'disconnected';
+// Monitor session health and VPN status
+static startSessionMonitoring(supabaseClient: SupabaseClient) {
+  // Monitor session and VPN status every 2 minutes
+  setInterval(async () => {
+    if (this.currentUser && this.currentSession) {
+      try {
+        // Check current VPN status
+        const vpnStatus = await window.secureBrowser?.vpn.getStatus();
+        const isVpnConnected = vpnStatus === 'connected';
 
-            // console.log(`🔄 VPN status changed: ${this.currentSession.vpn_status} → ${updates.vpn_status}`);
+        // Update session heartbeat and VPN status
+        const updates: any = {
+          // Add a heartbeat timestamp or extend session
+        };
 
-            // Log the status change as a security event
-            await this.logSecurityEvent(
-              'vpn_disconnected',
-              `VPN status changed to ${updates.vpn_status} during session monitoring`,
-              isVpnConnected ? 'low' : 'high'
+        // Only update VPN status if it has changed
+        const currentStatus = this.currentSession.vpn_status;
+        const newStatus = isVpnConnected ? 'connected' : 'disconnected';
+
+        if (currentStatus !== newStatus) {
+          updates.vpn_status = newStatus;
+
+          // Log the status change as a security event
+          await this.logSecurityEvent(
+            'vpn_disconnected',
+            `VPN status changed to ${newStatus} during session monitoring`,
+            isVpnConnected ? 'low' : 'high',
+            supabaseClient
+          );
+
+          // If VPN disconnected, end current VPN connection record
+          if (!isVpnConnected && this.currentVPNConnection) {
+            await this.endVPNConnection();
+          }
+          // If VPN reconnected, create new VPN connection record
+          else if (isVpnConnected && !this.currentVPNConnection) {
+            const envConfigStr = await window.secureBrowser?.system.getEnvironment();
+            const envConfig = envConfigStr ? JSON.parse(envConfigStr) : {};
+            const endpoint = envConfig?.WIREGUARD_ENDPOINT || '134.199.169.102:59926';
+
+            await this.logVPNConnection(
+              endpoint,
+              'Sydney, Australia',
+              '127.0.0.1', // Will be resolved to actual IP
+              '134.199.169.102'
             );
-            
-            // If VPN disconnected, end current VPN connection record
-            if (!isVpnConnected && this.currentVPNConnection) {
-              await this.endVPNConnection();
-            }
-            // If VPN reconnected, create new VPN connection record
-            else if (isVpnConnected && !this.currentVPNConnection) {
-              const envConfigStr = await window.secureBrowser?.system.getEnvironment();
-              const envConfig = envConfigStr ? JSON.parse(envConfigStr) : {};
-              const endpoint = envConfig?.WIREGUARD_ENDPOINT || '134.199.169.102:59926';
-              
-              await this.logVPNConnection(
-                endpoint,
-                'Sydney, Australia',
-                '127.0.0.1', // Will be resolved to actual IP
-                '134.199.169.102'
-              );
-            }
           }
-          
-          if (Object.keys(updates).length > 0) {
-            await DatabaseService.updateUserSession(this.currentSession.id, updates);
-            // Update local session data
-            this.currentSession = { ...this.currentSession, ...updates };
-          }
-        } catch (error) {
-          // console.warn('⚠️ Session monitoring error:', error)
         }
+
+        if (Object.keys(updates).length > 0) {
+          await DatabaseService.updateUserSession(this.currentSession.id, updates);
+          this.currentSession = { ...this.currentSession, ...updates };
+        }
+      } catch (error) {
+        // console.warn('⚠️ Session monitoring error:', error)
       }
-    }, 2 * 60 * 1000) // 2 minutes
+    }
+  }, 2 * 60 * 1000); // 2 minutes
+}
+
+// Get device ID for this session
+static getDeviceId(): string {
+  return DEVICE_ID;
+}
+
+// Debug function to manually test VPN connection logging
+static async debugVPNConnectionLogging(): Promise<void> {
+  // console.log('🔧 DEBUG: Manual VPN connection logging test')
+  // console.log('🔧 Current user:', this.currentUser)
+  // console.log('🔧 Current session:', this.currentSession)
+
+  if (!this.currentUser) {
+    // console.error('❌ DEBUG: No current user for VPN logging test')
+    return;
   }
 
-  // Get device ID for this session
-  static getDeviceId(): string {
-    return DEVICE_ID
-  }
+  try {
+    const result = await this.logVPNConnection(
+      '134.199.169.102:59926',
+      'Sydney, Australia (DEBUG TEST)',
+      '127.0.0.1',
+      '134.199.169.102'
+    );
 
-  // Debug function to manually test VPN connection logging
-  static async debugVPNConnectionLogging(): Promise<void> {
-    // console.log('🔧 DEBUG: Manual VPN connection logging test')
-    // console.log('🔧 Current user:', this.currentUser)
-    // console.log('🔧 Current session:', this.currentSession)
-    
-    if (!this.currentUser) {
-      // console.error('❌ DEBUG: No current user for VPN logging test')
-      return
-    }
-    
-    try {
-      const result = await this.logVPNConnection(
-        '134.199.169.102:59926',
-        'Sydney, Australia (DEBUG TEST)',
-        '127.0.0.1',
-        '134.199.169.102'
-      )
-      
-      // console.log('🔧 DEBUG: VPN connection logging test result:', result)
-    } catch (error) {
-      // console.error('❌ DEBUG: VPN connection logging test failed:', error)
-    }
+    // console.log('🔧 DEBUG: VPN connection logging test result:', result)
+  } catch (error) {
+    // console.error('❌ DEBUG: VPN connection logging test failed:', error)
   }
+}
+
 
   // Get user data with access level permissions
-  static async getUserWithPermissions(email: string): Promise<{
+  static async getUserWithPermissions(email: string, supabaseClient: SupabaseClient): Promise<{
     id: number;
     name: string;
     email: string;
@@ -437,7 +439,7 @@ export class SecureBrowserDatabaseService {
     try {
       // console.log('🔍 Fetching user data with permissions for:', email)
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClient
         .from('users')
         .select('*')
         .eq('email', email)
@@ -479,12 +481,12 @@ export class SecureBrowserDatabaseService {
   }
 
   // Update user access level if user has permission
-  static async updateUserAccessLevel(email: string, newAccessLevel: 1 | 2 | 3): Promise<boolean> {
+  static async updateUserAccessLevel(email: string, newAccessLevel: 1 | 2 | 3, supabaseClient: SupabaseClient): Promise<boolean> {
     try {
       // console.log('🔄 Attempting to update access level for:', email, 'to level:', newAccessLevel)
       
       // First check if user can edit their access level
-      const userData = await this.getUserWithPermissions(email)
+      const userData = await this.getUserWithPermissions(email, supabaseClient)
       if (!userData) {
         // console.error('❌ User not found for access level update')
         return false
@@ -495,7 +497,7 @@ export class SecureBrowserDatabaseService {
         return false
       }
 
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('users')
         .update({ 
           access_level: newAccessLevel,

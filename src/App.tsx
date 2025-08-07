@@ -11,6 +11,7 @@ import ErrorBoundary from "@/components/ui/error-boundary";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/providers/QueryProvider";
 import clerkAuth from "@/services/clerkService";
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import ErrorDisplay, { ErrorInfo, VPNStatus, EnvironmentStatus } from "@/components/ui/error-display";
 import { EnvironmentValidator } from "@/config/environment";
@@ -136,10 +137,33 @@ function AppContent() {
 
       // Override global environment provider so other services use Supabase config
       if (typeof window !== 'undefined') {
-        (window as any).secureBrowser = window.secureBrowser || {};
-        (window as any).secureBrowser.system = window.secureBrowser.system || {};
-        (window as any).secureBrowser.system.getEnvironment = async () => JSON.stringify(envConfig);
+        const root = window as any;
+      
+        if (!root.secureBrowser) {
+          Object.defineProperty(root, 'secureBrowser', {
+            value: {},
+            writable: true,
+            configurable: true
+          });
+        }
+      
+        if (!root.secureBrowser.system) {
+          root.secureBrowser.system = {};
+        }
+      
+        const descriptor = Object.getOwnPropertyDescriptor(root.secureBrowser.system, 'getEnvironment');
+      
+        if (!descriptor || descriptor.writable || descriptor.configurable) {
+          Object.defineProperty(root.secureBrowser.system, 'getEnvironment', {
+            value: async () => JSON.stringify(envConfig),
+            writable: true,
+            configurable: true
+          });
+        } else {
+          console.warn('⚠️ secureBrowser.system.getEnvironment is already defined and not writable – skipping override');
+        }
       }
+      
       vpnService.setConfiguration(envConfig);
 
       setInitProgress(25);
@@ -322,73 +346,64 @@ function AppContent() {
     handleVPNStatusChange();
   }, [vpnStatus]);
 
-  const handleAccessLevelChange = async (newLevel: 1 | 2 | 3) => {
-    if (user) {
-      try {
-        // Check if user has permission to edit access level
-        if (user.canEditAccessLevel === false) {
-          // console.error('❌ User does not have permission to edit access level');
-          alert('You do not have permission to change your access level. Please contact your administrator.');
-          return;
-        }
-
-        // Show loading state while changing access level
-        setInitStage('vpn');
-        setInitProgress(50);
-        
-        // console.log(`🔄 Changing access level from ${user.accessLevel} to ${newLevel}...`);
-        
-        // Update access level in database
-        const updateSuccess = await SecureBrowserDatabaseService.updateUserAccessLevel(user.email, newLevel);
-        
-        if (!updateSuccess) {
-          throw new Error('Failed to update access level in database');
-        }
-        
-        // Log access level change as security event
-        await SecureBrowserDatabaseService.logSecurityEvent(
-          'unauthorized_access',
-          `User access level changed from ${user.accessLevel} to ${newLevel}`,
-          'medium'
-        );
-        
-        // Update user object with new access level
-        const updatedUser = { ...user, accessLevel: newLevel };
-        
-        // Update localStorage with new access level
-        localStorage.setItem("auth", JSON.stringify(updatedUser));
-        
-        // Small delay to show loading state
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Update state directly instead of forcing reload
-        setUser(updatedUser);
-        setInitStage('ready');
-        setInitProgress(100);
-        
-        // Clear any existing errors
-        setErrors([]);
-
-        // console.log(`✅ Access level changed to ${newLevel} successfully`);
-
-      } catch (error) {
-        // console.error('❌ Failed to change access level:', error);
-
-        // Log access level change failure
-        await SecureBrowserDatabaseService.logSecurityEvent(
-          'unauthorized_access',
-          `Failed to change access level: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          'medium'
-        );
-        
-        // Show error to user
-        alert(`Failed to change access level: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        
-        setInitStage('ready');
-        setInitProgress(100);
+  const handleAccessLevelChange = async (newLevel: 1 | 2 | 3, supabaseClient: SupabaseClient) => {
+    if (!user) return;
+  
+    try {
+      // Check if user has permission to edit access level
+      if (!user.canEditAccessLevel) {
+        alert('You do not have permission to change your access level. Please contact your administrator.');
+        return;
       }
+  
+      // Show loading state while changing access level
+      setInitStage('vpn');
+      setInitProgress(50);
+  
+      // Update access level in database
+      const updateSuccess = await SecureBrowserDatabaseService.updateUserAccessLevel(
+        user.email,
+        newLevel,
+        supabaseClient
+      );
+  
+      if (!updateSuccess) {
+        throw new Error('Failed to update access level in database');
+      }
+  
+      // Log access level change as security event
+      await SecureBrowserDatabaseService.logSecurityEvent(
+        'unauthorized_access',
+        `User access level changed from ${user.accessLevel} to ${newLevel}`,
+        'medium',
+        supabaseClient
+      );
+  
+      // Update user object with new access level
+      const updatedUser = { ...user, accessLevel: newLevel };
+      localStorage.setItem("auth", JSON.stringify(updatedUser));
+      await new Promise(resolve => setTimeout(resolve, 1000));
+  
+      // Update state directly instead of forcing reload
+      setUser(updatedUser);
+      setInitStage('ready');
+      setInitProgress(100);
+      setErrors([]);
+  
+    } catch (error) {
+      await SecureBrowserDatabaseService.logSecurityEvent(
+        'unauthorized_access',
+        `Failed to change access level: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'medium',
+        supabaseClient
+      );
+  
+      alert(`Failed to change access level: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setInitStage('ready');
+      setInitProgress(100);
     }
   };
+  
 
   // Show error screen if initialization failed
   if (errors.length > 0) {

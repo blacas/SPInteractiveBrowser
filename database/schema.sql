@@ -399,3 +399,57 @@ COMMENT ON TABLE navigation_logs IS 'User browsing activity and access control l
 COMMENT ON TABLE browsing_history IS 'Chrome-like browsing history with local and cloud sync';
 COMMENT ON TABLE bookmarks IS 'User bookmarks with categorization and access control';
 COMMENT ON TABLE system_settings IS 'Application configuration and system settings'; 
+
+-- USERS TABLE POLICY
+DROP POLICY IF EXISTS "Allow authenticated access to users" ON users;
+CREATE POLICY "Users can manage their own row" ON users
+  FOR ALL
+  USING (email = auth.jwt() ->> 'email');
+
+-- USER_SESSIONS TABLE POLICY
+DROP POLICY IF EXISTS "Allow authenticated access to user_sessions" ON user_sessions;
+CREATE POLICY "User can access their own data" ON user_sessions
+  FOR ALL
+  USING (user_id = (SELECT id FROM users WHERE email = auth.jwt() ->> 'email'));
+
+-- BOOKMARKS TABLE POLICY
+DROP POLICY IF EXISTS "Allow authenticated access to bookmarks" ON bookmarks;
+CREATE POLICY "User can access their own data" ON bookmarks
+  FOR ALL
+  USING (user_id = (SELECT id FROM users WHERE email = auth.jwt() ->> 'email'));
+
+-- VPN_CONNECTIONS TABLE POLICY
+DROP POLICY IF EXISTS "Allow authenticated access to vpn_connections" ON vpn_connections;
+CREATE POLICY "User can access their own data" ON vpn_connections
+  FOR ALL
+  USING (user_id = (SELECT id FROM users WHERE email = auth.jwt() ->> 'email'));
+
+-- BROWSING_HISTORY TABLE POLICY
+DROP POLICY IF EXISTS "Allow authenticated access to browsing_history" ON browsing_history;
+CREATE POLICY "User can access their own data" ON browsing_history
+  FOR ALL
+  USING (user_id = (SELECT id FROM users WHERE email = auth.jwt() ->> 'email'));
+
+-- NAVIGATION_LOGS TABLE POLICY
+DROP POLICY IF EXISTS "Allow authenticated access to navigation_logs" ON navigation_logs;
+CREATE POLICY "User can access their own data" ON navigation_logs
+  FOR ALL
+  USING (user_id = (SELECT id FROM users WHERE email = auth.jwt() ->> 'email'));
+
+-- SECURITY_EVENTS TABLE POLICY
+DROP POLICY IF EXISTS "Allow authenticated access to security_events" ON security_events;
+CREATE POLICY "User can access their own data" ON security_events
+  FOR ALL
+  USING (user_id = (SELECT id FROM users WHERE email = auth.jwt() ->> 'email'));
+
+-- SYSTEM_SETTINGS TABLE READ-ONLY POLICY
+DROP POLICY IF EXISTS "Allow read access to system_settings" ON system_settings;
+CREATE POLICY "Allow authenticated read access" ON system_settings
+  FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+-- ACCESS_LEVELS TABLE READ-ONLY POLICY
+DROP POLICY IF EXISTS "Allow read access to access_levels" ON access_levels;
+CREATE POLICY "Allow authenticated read access" ON access_levels
+  FOR SELECT
+  USING (auth.role() = 'authenticated');
