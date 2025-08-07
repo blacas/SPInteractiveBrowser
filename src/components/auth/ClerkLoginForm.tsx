@@ -7,6 +7,7 @@ import { LoadingScreen } from '../ui/loading-screen';
 import { ErrorDisplay } from '../ui/error-display';
 import clerkAuth from '../../services/clerkService';
 import { SecureBrowserDatabaseService } from '../../services/databaseService';
+import { initSupabaseClient } from '@/lib/supabase';
 import type { AuthState } from '../../types/clerk';
 import { Shield, Users, Lock, Chrome, Globe } from 'lucide-react';
 
@@ -35,25 +36,22 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
         setIsInitializing(true);
         setInitError(null);
 
-        // 🔐 CHECK GLOBAL AUTH STATE FIRST: If user is already authenticated globally, use that
-        // console.log('🔍 Checking for existing global authentication state...');
+        await clerkAuth.initialize();
         const globalAuthState = clerkAuth.getCurrentAuthState();
-        
+
         if (globalAuthState.isSignedIn && globalAuthState.user) {
-          // console.log('✅ Found existing global authentication - user already signed in!');
           setAuthState(globalAuthState);
-          
-          // Notify parent immediately with existing auth
+
+          const token = await clerkAuth.getSupabaseToken();
+          if (token) initSupabaseClient(token);
+
           try {
-            // 🔐 GET EMAIL FROM CACHED STATE: Use cached user data directly
             const userEmail = globalAuthState.user.emailAddresses?.[0]?.emailAddress;
             if (!userEmail) {
               onAuthError('No email address found for this user');
               return;
             }
-            // console.log('🔍 Using cached user data for:', userEmail);
-            
-            // Fetch user data from database with permissions
+
             const dbUserData = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail);
             
             if (dbUserData) {
@@ -106,33 +104,23 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
           return; // Exit early - no need to initialize
         }
 
-        // 🔐 NO EXISTING AUTH: Initialize Clerk for first time
-        // console.log('🔄 No existing authentication found - initializing Clerk...');
-        await clerkAuth.initialize();
-
-        // 🔐 REFRESH AUTH STATE: Check for session after initialization
-        // console.log('🔄 Refreshing authentication state after initialization...');
-        await clerkAuth.refreshAuthenticationState();
-
-        // Set up auth state listener for future changes
+        // No existing auth - set up listener and refresh state
         clerkAuth.onAuthStateChange(async (state) => {
           setAuthState(state);
-          
-          // If user is signed in, notify parent
+
           if (state.isSignedIn && state.user) {
+            const token = await clerkAuth.getSupabaseToken();
+            if (token) initSupabaseClient(token);
             try {
               const userEmail = clerkAuth.getUserEmail();
               if (!userEmail) {
                 onAuthError('No email address found for this user');
                 return;
               }
-              // console.log('🔍 Fetching user data from database for:', userEmail);
-              
-              // Fetch user data from database with permissions
+
               const dbUserData = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail);
-              
+
               if (dbUserData) {
-                // console.log('✅ Database user data loaded:', dbUserData);
                 onAuthSuccess({
                   id: state.user.id,
                   dbId: dbUserData.id,
@@ -154,7 +142,6 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
               }
             } catch (error) {
               console.error('❌ Error fetching user data from database:', error);
-              // Fallback to Clerk data if database fetch fails
               onAuthSuccess({
                 id: state.user.id,
                 name: clerkAuth.getUserDisplayName(),
@@ -167,6 +154,7 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
           }
         });
 
+        await clerkAuth.refreshAuthenticationState();
         setIsInitializing(false);
       } catch (error) {
         console.error('Failed to initialize Clerk auth:', error);
