@@ -96,7 +96,7 @@ const checkIPGeolocation = async (): Promise<{ country: string; ip: string; isAu
   }
 };
 
-export const useVPN = (userAccessLevel?: number) => {
+export const useVPN = (enabled = true, userAccessLevel?: number) => {
   const [vpnStatus, setVpnStatus] = useState<VPNStatus>("disconnected");
   const [connection, setConnection] = useState<VPNConnection>({
     endpoint: "au-sydney-01.vpn.provider.com",
@@ -267,6 +267,8 @@ export const useVPN = (userAccessLevel?: number) => {
 
   // Fast initial VPN check on mount
   useEffect(() => {
+    if (!enabled) return;
+
     let mounted = true;
 
     const checkInitialStatus = async () => {
@@ -350,19 +352,21 @@ export const useVPN = (userAccessLevel?: number) => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [enabled]);
 
   // Periodic VPN status check - reduced frequency to minimize system load
   useEffect(() => {
+    if (!enabled) return;
     const interval = setInterval(() => {
       checkVPNStatus();
     }, 60000); // Check every 60 seconds (reduced from 15s to prevent API spam)
 
     return () => clearInterval(interval);
-  }, [checkVPNStatus]);
+  }, [enabled, checkVPNStatus]);
 
   // Auto-reconnect logic - triggered when status changes to disconnected
   useEffect(() => {
+    if (!enabled) return;
     if (vpnStatus === "disconnected") {
       const autoReconnectTimeout = setTimeout(() => {
         // Check current state and attempt reconnect if conditions are met
@@ -379,7 +383,7 @@ export const useVPN = (userAccessLevel?: number) => {
 
       return () => clearTimeout(autoReconnectTimeout);
     }
-  }, [vpnStatus]); // Only depend on vpnStatus
+  }, [enabled, vpnStatus]); // Only depend on vpnStatus
 
   return {
     vpnStatus,

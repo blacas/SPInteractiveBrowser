@@ -32,9 +32,9 @@ function App() {
 }
 
 function AppContent() {
-  const { vpnStatus } = useVPN();
   const [user, setUser] = useState<any>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { vpnStatus } = useVPN(isAuthenticated, user?.accessLevel);
   
   // Make debug functions available globally for testing
   useEffect(() => {
