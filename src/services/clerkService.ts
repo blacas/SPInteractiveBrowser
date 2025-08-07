@@ -297,6 +297,17 @@ class ClerkAuthService {
     };
   }
 
+  // Retrieve a JWT for Supabase authentication
+  async getSupabaseToken(): Promise<string | null> {
+    if (!this.clerk || !this.clerk.session) return null;
+    try {
+      const jwt = await this.clerk.session.getToken({ template: 'supabase' });
+      return jwt || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   isSignedIn(): boolean {
     // 🔐 USE GLOBAL STATE: Check global auth state first
     if (ClerkAuthService.globalAuthState.isSignedIn) {
