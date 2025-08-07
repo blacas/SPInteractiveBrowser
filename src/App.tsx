@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/providers/QueryProvider";
 import clerkAuth from "@/services/clerkService";
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { initSupabaseClient } from '@/lib/supabase'
 
 import ErrorDisplay, { ErrorInfo, VPNStatus, EnvironmentStatus } from "@/components/ui/error-display";
 import { EnvironmentValidator } from "@/config/environment";
@@ -50,9 +51,10 @@ function AppContent() {
   const [envStatusInfo, setEnvStatusInfo] = useState<EnvironmentStatus | null>(null);
   const [vaultError, setVaultError] = useState<string | null>(null);
   const [initProgress, setInitProgress] = useState(0);
+  const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(null);
 
   // Initialize services after user authentication
-  const initializeServices = async (accessLevel: number) => {
+  const initializeServices = async (accessLevel: number, client: SupabaseClient) => {
     try {
       setInitStage('auth');
       setInitProgress(10);
@@ -80,7 +82,8 @@ function AppContent() {
           await SecureBrowserDatabaseService.logSecurityEvent(
             'unauthorized_access',
             'Invalid environment configuration detected',
-            'critical'
+            'critical',
+            client
           );
           setErrors([
             {
@@ -99,14 +102,16 @@ function AppContent() {
           await SecureBrowserDatabaseService.logSecurityEvent(
             'unauthorized_access',
             `Environment configuration warnings: ${validation.warnings.join(', ')}`,
-            'low'
+            'low',
+            client
           );
         }
       } catch (error) {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
           'Failed to load environment configuration',
-          'critical'
+          'critical',
+          client
         );
 
         setEnvStatusInfo({
@@ -179,7 +184,8 @@ function AppContent() {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'unauthorized_access',
           `Vault initialization failed: ${errorMessage}`,
-          'medium'
+          'medium',
+          client
         );
       }
 
@@ -199,7 +205,8 @@ function AppContent() {
               await SecureBrowserDatabaseService.logSecurityEvent(
                 'vpn_disconnected',
                 `VPN connection attempt ${retryCount + 1} failed, retrying...`,
-                'medium'
+                'medium',
+                client
               );
               await new Promise(resolve => setTimeout(resolve, 2000));
             }
@@ -219,7 +226,8 @@ function AppContent() {
           await SecureBrowserDatabaseService.logSecurityEvent(
             'vpn_disconnected',
             `VPN connection failed after ${maxRetries} attempts`,
-            'critical'
+            'critical',
+            client
           );
           setErrors([
             {
@@ -242,14 +250,16 @@ function AppContent() {
         await SecureBrowserDatabaseService.logSecurityEvent(
           'vpn_disconnected',
           'VPN successfully connected and initialized',
-          'low'
+          'low',
+          client
         );
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'VPN connection failed';
         await SecureBrowserDatabaseService.logSecurityEvent(
           'vpn_disconnected',
           `VPN connection error during startup: ${errorMessage}`,
-          'critical'
+          'critical',
+          client
         );
         setVpnStatusInfo({
           connected: false,
@@ -283,13 +293,15 @@ function AppContent() {
       await SecureBrowserDatabaseService.logSecurityEvent(
         'unauthorized_access',
         'Secure browser application successfully initialized',
-        'low'
+        'low',
+        client
       );
     } catch (error) {
       await SecureBrowserDatabaseService.logSecurityEvent(
         'unauthorized_access',
         `Application initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'critical'
+        'critical',
+        client
       );
       setErrors([
         {
@@ -322,17 +334,20 @@ function AppContent() {
           if (isCurrentlyConnected !== wasConnected) {
             // Log async without blocking
             (async () => {
+              if (!supabaseClient) return;
               if (isCurrentlyConnected) {
                 await SecureBrowserDatabaseService.logSecurityEvent(
                   'vpn_disconnected', // Using this type but with positive message
                   'VPN connection restored',
-                  'low'
+                  'low',
+                  supabaseClient
                 );
               } else {
                 await SecureBrowserDatabaseService.logSecurityEvent(
                   'vpn_disconnected',
                   'VPN connection lost during session',
-                  'high'
+                  'high',
+                  supabaseClient
                 );
               }
             })();
@@ -346,8 +361,8 @@ function AppContent() {
     handleVPNStatusChange();
   }, [vpnStatus]);
 
-  const handleAccessLevelChange = async (newLevel: 1 | 2 | 3, supabaseClient: SupabaseClient) => {
-    if (!user) return;
+  const handleAccessLevelChange = async (newLevel: 1 | 2 | 3) => {
+    if (!user || !supabaseClient) return;
   
     try {
       // Check if user has permission to edit access level
@@ -445,6 +460,9 @@ function AppContent() {
       <ClerkLoginForm
         onAuthSuccess={async (userData) => {
           try {
+            const client = await initSupabaseClient();
+            setSupabaseClient(client);
+
             const sessionSuccess = await SecureBrowserDatabaseService.initializeUserSession(
               userData.email,
               userData.name
@@ -454,21 +472,26 @@ function AppContent() {
             setIsAuthenticated(true);
 
             if (sessionSuccess) {
-              await initializeServices(userData.accessLevel);
-              SecureBrowserDatabaseService.startSessionMonitoring();
+              await initializeServices(userData.accessLevel, client);
+              SecureBrowserDatabaseService.startSessionMonitoring(client);
             } else {
               await SecureBrowserDatabaseService.logSecurityEvent(
                 'unauthorized_access',
                 `Database session init failed for ${userData.email} - continuing without DB tracking`,
-                'medium'
+                'medium',
+                client
               );
             }
           } catch (error) {
-            await SecureBrowserDatabaseService.logSecurityEvent(
-              'unauthorized_access',
-              `Database session init error for ${userData.email}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              'high'
-            );
+            const fallbackClient = await initSupabaseClient().catch(() => null);
+            if (fallbackClient) {
+              await SecureBrowserDatabaseService.logSecurityEvent(
+                'unauthorized_access',
+                `Database session init error for ${userData.email}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                'high',
+                fallbackClient
+              );
+            }
             setUser(userData);
             setIsAuthenticated(true);
           }
@@ -519,11 +542,14 @@ function AppContent() {
       await SecureBrowserDatabaseService.endSession();
       
       // Log logout event
-      await SecureBrowserDatabaseService.logSecurityEvent(
-        'unauthorized_access',
-        'User logged out',
-        'low'
-      );
+      if (supabaseClient) {
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          'User logged out',
+          'low',
+          supabaseClient
+        );
+      }
       
       // Sign out from Clerk
       await clerkAuth.signOut();

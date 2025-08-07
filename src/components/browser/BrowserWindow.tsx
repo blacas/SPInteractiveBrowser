@@ -41,6 +41,7 @@ import SettingsModal from "./SettingsModal";
 import BookmarkButton from "./BookmarkButton";
 import VPNConnectionError from "@/components/ui/vpn-connection-error";
 import { SharePointSidebar } from "./SharePointSidebar";
+import { supabase } from '@/lib/supabase';
 
 interface Tab {
   id: string;
@@ -815,6 +816,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         "domain_blocked",
         `Navigation blocked due to VPN disconnection: ${urlInput}`,
         "high",
+        supabase,
         urlInput
       );
 
@@ -830,6 +832,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         "unauthorized_access",
         `User performed search query: "${urlInput}" (Level ${user?.accessLevel})`,
         "low",
+        supabase,
         finalUrl
       );
     }
@@ -863,6 +866,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           isSearchQuery ? ` (search: "${urlInput}")` : ""
         }`,
         "medium",
+        supabase,
         finalUrl
       );
 
@@ -891,6 +895,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         isSearchQuery ? "search results" : "URL"
       }: ${finalUrl}${isSearchQuery ? ` (query: "${urlInput}")` : ""}`,
       "low",
+      supabase,
       finalUrl
     );
 
@@ -1487,6 +1492,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       "unauthorized_access",
       "User navigated to home page",
       "low",
+      supabase,
       homeUrl
     );
 
@@ -1521,6 +1527,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       "unauthorized_access",
       "User created new browser tab",
       "low",
+      supabase,
       homeUrl
     );
 
@@ -1554,7 +1561,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       SecureBrowserDatabaseService.logSecurityEvent(
         "domain_blocked",
         "New window creation blocked due to VPN disconnection",
-        "medium"
+        "medium",
+        supabase
       );
 
       alert(
@@ -1568,7 +1576,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
       SecureBrowserDatabaseService.logSecurityEvent(
         "unauthorized_access",
         "User created new browser window",
-        "low"
+        "low",
+        supabase
       );
 
       const result = await window.secureBrowser.window.createNew();
@@ -1584,7 +1593,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         SecureBrowserDatabaseService.logSecurityEvent(
           "unauthorized_access",
           `Failed to create new window: ${result.error}`,
-          "medium"
+          "medium",
+          supabase
         );
 
         alert(`Failed to create new window: ${result.error}`);
@@ -1598,7 +1608,8 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
         `Error creating new window: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
-        "medium"
+        "medium",
+        supabase
       );
 
       alert("Failed to create new window. Please try again.");
@@ -1690,6 +1701,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           "unauthorized_access",
           `Page failed to load: ${failEvent.url} - ${failEvent.errorDescription}`,
           "low",
+          supabase,
           failEvent.url
         );
       });
@@ -1742,6 +1754,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
             "unauthorized_access",
             "User accessed SharePoint/Office365 site",
             "low",
+            supabase,
             webviewEvent.url
           );
 
@@ -1755,6 +1768,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                 "unauthorized_access",
                 "SharePoint credentials automatically injected",
                 "low",
+                supabase,
                 webviewEvent.url
               );
             } catch (error) {
@@ -1765,6 +1779,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
                   error instanceof Error ? error.message : "Unknown error"
                 }`,
                 "medium",
+                supabase,
                 webviewEvent.url
               );
             }
@@ -1811,6 +1826,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
           "unauthorized_access",
           `Popup window blocked for security: ${newWindowEvent.url}`,
           "low",
+          supabase,
           newWindowEvent.url
         );
       });
@@ -1833,6 +1849,7 @@ const BrowserWindow: React.FC<BrowserWindowProps> = ({ user, onLogout }) => {
               consoleEvent.message
             }`,
             consoleEvent.level >= 3 ? "low" : "low",
+            supabase,
             consoleEvent.sourceId
           );
         }

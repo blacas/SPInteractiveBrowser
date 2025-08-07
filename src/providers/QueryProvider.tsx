@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { toast } from 'sonner'
 
-import { DatabaseService, RealtimeService, type UserSession } from '@/lib/supabase'
+import { DatabaseService, RealtimeService, type UserSession, type SecurityEvent, supabase } from '@/lib/supabase'
 
 interface QueryProviderProps {
   children: React.ReactNode
@@ -87,9 +87,10 @@ export function useUpdateUserSession() {
 
 export function useLogSecurityEvent() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
-    mutationFn: DatabaseService.logSecurityEvent,
+    mutationFn: (eventData: Omit<SecurityEvent, 'id' | 'timestamp' | 'resolved'>) =>
+      DatabaseService.logSecurityEvent(eventData, supabase),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['securityEvents'] })
     },
