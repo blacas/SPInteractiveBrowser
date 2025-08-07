@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { vaultService } from "@/services/vaultService";
 import { vpnService } from "@/services/vpnService";
 import { SecureBrowserDatabaseService } from "@/services/databaseService";
+import { fetchEnvironmentConfig } from "@/services/environmentService";
 import { ClerkLoginForm } from "@/components/auth/ClerkLoginForm";
 import { Dashboard } from "@/components/layout/Dashboard";
 import LoadingScreen from "@/components/ui/loading-screen";
@@ -49,90 +50,74 @@ function AppContent() {
   const [vaultError, setVaultError] = useState<string | null>(null);
   const [initProgress, setInitProgress] = useState(0);
 
-  // Initialize services in sequence
-  useEffect(() => {
-    const initializeServices = async () => {
+  // Initialize services after user authentication
+  const initializeServices = async (accessLevel: number) => {
+    try {
+      setInitStage('auth');
+      setInitProgress(10);
+
+      // Load environment configuration from Supabase
+      let envConfig: Record<string, string | undefined> = {};
       try {
-        // Stage 1: Environment validation
-        setInitStage('auth');
-        setInitProgress(10);
-        
-        // Validate environment configuration first
-        let envConfig: Record<string, string | undefined> = {};
-        
-        try {
-          const envConfigStr = await window.secureBrowser?.system.getEnvironment();
-          if (envConfigStr) {
-            envConfig = JSON.parse(envConfigStr);
-            // console.log('🔍 Environment config loaded:', {
-            //   NODE_ENV: envConfig.NODE_ENV,
-            //   VPN_PROVIDER: envConfig.VPN_PROVIDER,
-            //   WIREGUARD_ENDPOINT: envConfig.WIREGUARD_ENDPOINT ? 'Set ✅' : 'Missing ❌'
-            // });
-            
-            const validation = EnvironmentValidator.validateEnvironment(envConfig);
-            
-            setEnvStatusInfo({
-              loaded: true,
-              valid: validation.isValid,
-              errors: validation.errors,
-              warnings: validation.warnings,
-              config: {
-                nodeEnv: envConfig.NODE_ENV,
-                vpnProvider: envConfig.VPN_PROVIDER,
-                wireguardEndpoint: envConfig.WIREGUARD_ENDPOINT,
-                wireguardConfigPath: envConfig.WIREGUARD_CONFIG_PATH
-              }
-            });
-            
-            if (!validation.isValid) {
-              // Log configuration error as security event
-              await SecureBrowserDatabaseService.logSecurityEvent(
-                'unauthorized_access',
-                'Invalid environment configuration detected',
-                'critical'
-              );
-              
-              setErrors([{
-                type: 'environment',
-                title: 'Environment Configuration Invalid',
-                message: 'Configuration contains placeholder values or missing required settings',
-                details: validation.errors,
-                critical: true,
-                action: 'Update your .env file with correct values'
-              }]);
-              return;
-            }
-            
-            if (validation.warnings.length > 0) {
-              // console.warn('⚠️ Environment warnings:', validation.warnings);
-              // Log warnings as low-severity security events
-              await SecureBrowserDatabaseService.logSecurityEvent(
-                'unauthorized_access',
-                `Environment configuration warnings: ${validation.warnings.join(', ')}`,
-                'low'
-              );
-            }
-          } else {
-            throw new Error('No environment configuration received');
+        envConfig = await fetchEnvironmentConfig(accessLevel);
+        const validation = EnvironmentValidator.validateEnvironment(envConfig);
+
+        setEnvStatusInfo({
+          loaded: true,
+          valid: validation.isValid,
+          errors: validation.errors,
+          warnings: validation.warnings,
+          config: {
+            nodeEnv: envConfig.NODE_ENV,
+            vpnProvider: envConfig.VPN_PROVIDER,
+            wireguardEndpoint: envConfig.WIREGUARD_ENDPOINT,
+            wireguardConfigPath: envConfig.WIREGUARD_CONFIG_PATH
           }
-        } catch (error) {
-          // Log configuration loading failure
+        });
+
+        if (!validation.isValid) {
           await SecureBrowserDatabaseService.logSecurityEvent(
             'unauthorized_access',
-            'Failed to load environment configuration',
+            'Invalid environment configuration detected',
             'critical'
           );
-          
-          setEnvStatusInfo({
-            loaded: false,
-            valid: false,
-            errors: ['Unable to load environment configuration'],
-            warnings: [],
-            config: undefined
-          });
-          
-          setErrors([{
+          setErrors([
+            {
+              type: 'environment',
+              title: 'Environment Configuration Invalid',
+              message: 'Configuration contains placeholder values or missing required settings',
+              details: validation.errors,
+              critical: true,
+              action: 'Update your .env file with correct values'
+            }
+          ]);
+          return;
+        }
+
+        if (validation.warnings.length > 0) {
+          await SecureBrowserDatabaseService.logSecurityEvent(
+            'unauthorized_access',
+            `Environment configuration warnings: ${validation.warnings.join(', ')}`,
+            'low'
+          );
+        }
+      } catch (error) {
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          'Failed to load environment configuration',
+          'critical'
+        );
+
+        setEnvStatusInfo({
+          loaded: false,
+          valid: false,
+          errors: ['Unable to load environment configuration'],
+          warnings: [],
+          config: undefined
+        });
+
+        setErrors([
+          {
             type: 'config',
             title: 'Configuration Loading Failed',
             message: 'Unable to load environment configuration',
@@ -144,104 +129,76 @@ function AppContent() {
             ],
             critical: true,
             action: 'Check .env file and restart application'
-          }]);
-          return;
-        }
-        
-        // Auth is handled by Clerk service, no need to wait
-        
-        setInitProgress(25);
-        
-        // Stage 2: Vault initialization  
-        setInitStage('vault');
-        setInitProgress(50);
-        
-        try {
-          await vaultService.initialize();
-          // console.log('✅ Vault service initialized successfully');
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Vault initialization failed';
-          setVaultError(errorMessage);
-          // console.error('❌ Vault initialization failed:', error);
-          
-          // Log vault initialization failure
-          await SecureBrowserDatabaseService.logSecurityEvent(
-            'unauthorized_access',
-            `Vault initialization failed: ${errorMessage}`,
-            'medium'
-          );
-          
-          // Only set as critical error if vault is required
-          // For now, allow continuation without vault
-        }
-        
-        // Stage 3: VPN initialization
-        setInitStage('vpn');
-        setInitProgress(75);
-        
-        // Real VPN connection with retry logic and proper error handling
-        try {
-          // First check if VPN is already connected (to avoid unnecessary reconnection attempts)
-          // console.log('🔍 Checking existing VPN connection status...');
-          let vpnConnected = await vpnService.isConnected();
-          
-          const maxRetries = 3;
-          
-          if (vpnConnected) {
-            // console.log('✅ VPN is already connected, skipping connection attempt');
-            
-            // Update database with existing connection status
-            await SecureBrowserDatabaseService.updateVPNStatus(
-              true, 
-              envConfig?.WIREGUARD_ENDPOINT, 
-              'Australia'
-            );
-          } else {
-            let retryCount = 0;
-            
-            // Try connecting with retries - don't show error immediately
-            while (!vpnConnected && retryCount < maxRetries) {
-              // console.log(`🔄 VPN connection attempt ${retryCount + 1}/${maxRetries}...`);
-              
-              // Use the enhanced VPN service that integrates with database
-              vpnConnected = await vpnService.connect();
-              
-              if (!vpnConnected && retryCount < maxRetries - 1) {
-                // console.log(`⏳ VPN connection attempt ${retryCount + 1} failed, retrying in 2 seconds...`);
-                
-                // Log retry attempt
-                await SecureBrowserDatabaseService.logSecurityEvent(
-                  'vpn_disconnected',
-                  `VPN connection attempt ${retryCount + 1} failed, retrying...`,
-                  'medium'
-                );
-                
-                await new Promise(resolve => setTimeout(resolve, 2000));
-              }
-              retryCount++;
-            }
           }
-          
-          setVpnStatusInfo({
-            connected: vpnConnected,
-            provider: envConfig?.VPN_PROVIDER || 'wireguard',
-            endpoint: envConfig?.WIREGUARD_ENDPOINT,
-            location: 'Australia',
-            lastCheck: new Date()
-          });
-          
-          if (!vpnConnected) {
-            // Log final VPN connection failure
-            await SecureBrowserDatabaseService.logSecurityEvent(
-              'vpn_disconnected',
-              `VPN connection failed after ${maxRetries} attempts`,
-              'critical'
-            );
-            
-            // Only show error after all retries failed
-            // console.log(`❌ VPN connection failed after ${maxRetries} attempts`);
+        ]);
+        return;
+      }
 
-            setErrors([{
+      // Override global environment provider so other services use Supabase config
+      if (typeof window !== 'undefined') {
+        (window as any).secureBrowser = window.secureBrowser || {};
+        (window as any).secureBrowser.system = window.secureBrowser.system || {};
+        (window as any).secureBrowser.system.getEnvironment = async () => JSON.stringify(envConfig);
+      }
+      vpnService.setConfiguration(envConfig);
+
+      setInitProgress(25);
+
+      // Stage 2: Vault initialization
+      setInitStage('vault');
+      setInitProgress(50);
+      try {
+        await vaultService.initialize();
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Vault initialization failed';
+        setVaultError(errorMessage);
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'unauthorized_access',
+          `Vault initialization failed: ${errorMessage}`,
+          'medium'
+        );
+      }
+
+      // Stage 3: VPN initialization
+      setInitStage('vpn');
+      setInitProgress(75);
+      try {
+        let vpnConnected = await vpnService.isConnected();
+        const maxRetries = 3;
+        if (vpnConnected) {
+          await SecureBrowserDatabaseService.updateVPNStatus(true, envConfig?.WIREGUARD_ENDPOINT, 'Australia');
+        } else {
+          let retryCount = 0;
+          while (!vpnConnected && retryCount < maxRetries) {
+            vpnConnected = await vpnService.connect();
+            if (!vpnConnected && retryCount < maxRetries - 1) {
+              await SecureBrowserDatabaseService.logSecurityEvent(
+                'vpn_disconnected',
+                `VPN connection attempt ${retryCount + 1} failed, retrying...`,
+                'medium'
+              );
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            retryCount++;
+          }
+        }
+
+        setVpnStatusInfo({
+          connected: vpnConnected,
+          provider: envConfig?.VPN_PROVIDER || 'wireguard',
+          endpoint: envConfig?.WIREGUARD_ENDPOINT,
+          location: 'Australia',
+          lastCheck: new Date()
+        });
+
+        if (!vpnConnected) {
+          await SecureBrowserDatabaseService.logSecurityEvent(
+            'vpn_disconnected',
+            `VPN connection failed after ${maxRetries} attempts`,
+            'critical'
+          );
+          setErrors([
+            {
               type: 'vpn',
               title: 'VPN Connection Failed',
               message: 'Failed to establish VPN connection to Australian servers after multiple attempts',
@@ -253,38 +210,32 @@ function AppContent() {
               ],
               critical: true,
               action: 'Connect WireGuard and retry'
-            }]);
-            return;
-          }
+            }
+          ]);
+          return;
+        }
 
-          // console.log('✅ VPN connected successfully');
-
-          // Log successful VPN initialization
-          await SecureBrowserDatabaseService.logSecurityEvent(
-            'vpn_disconnected', // Note: We use vpn_disconnected type but with positive message
-            'VPN successfully connected and initialized',
-            'low'
-          );
-          
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'VPN connection failed';
-          
-          // Log VPN connection error
-          await SecureBrowserDatabaseService.logSecurityEvent(
-            'vpn_disconnected',
-            `VPN connection error during startup: ${errorMessage}`,
-            'critical'
-          );
-          
-          setVpnStatusInfo({
-            connected: false,
-            provider: envConfig?.VPN_PROVIDER || 'wireguard',
-            endpoint: envConfig?.WIREGUARD_ENDPOINT,
-            location: 'Australia',
-            lastCheck: new Date()
-          });
-          
-          setErrors([{
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'vpn_disconnected',
+          'VPN successfully connected and initialized',
+          'low'
+        );
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'VPN connection failed';
+        await SecureBrowserDatabaseService.logSecurityEvent(
+          'vpn_disconnected',
+          `VPN connection error during startup: ${errorMessage}`,
+          'critical'
+        );
+        setVpnStatusInfo({
+          connected: false,
+          provider: envConfig?.VPN_PROVIDER || 'wireguard',
+          endpoint: envConfig?.WIREGUARD_ENDPOINT,
+          location: 'Australia',
+          lastCheck: new Date()
+        });
+        setErrors([
+          {
             type: 'vpn',
             title: 'VPN Connection Error',
             message: errorMessage,
@@ -297,44 +248,37 @@ function AppContent() {
             ],
             critical: true,
             action: 'Fix VPN configuration and retry'
-          }]);
-          return;
-        }
-        
-        // Stage 4: Ready
-        setInitStage('ready');
-        setInitProgress(100);
-        
-        // Log successful app initialization
-        await SecureBrowserDatabaseService.logSecurityEvent(
-          'unauthorized_access', // Using this type for positive security events
-          'Secure browser application successfully initialized',
-          'low'
-        );
-        
-      } catch (error) {
-        // console.error('❌ Service initialization failed:', error);
-        
-        // Log general initialization failure
-        await SecureBrowserDatabaseService.logSecurityEvent(
-          'unauthorized_access',
-          `Application initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          'critical'
-        );
-        
-        setErrors([{
+          }
+        ]);
+        return;
+      }
+
+      // Stage 4: Ready
+      setInitStage('ready');
+      setInitProgress(100);
+      await SecureBrowserDatabaseService.logSecurityEvent(
+        'unauthorized_access',
+        'Secure browser application successfully initialized',
+        'low'
+      );
+    } catch (error) {
+      await SecureBrowserDatabaseService.logSecurityEvent(
+        'unauthorized_access',
+        `Application initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'critical'
+      );
+      setErrors([
+        {
           type: 'config',
           title: 'Application Initialization Failed',
           message: 'Application initialization failed',
           details: [error instanceof Error ? error.message : 'Unknown error occurred'],
           critical: true,
           action: 'Check configuration and restart application'
-        }]);
-      }
-    };
-
-    initializeServices();
-  }, []);
+        }
+      ]);
+    }
+  };
 
   // Monitor VPN status changes and log to database
   useEffect(() => {
@@ -480,6 +424,54 @@ function AppContent() {
     );
   }
 
+  // Show login form if not authenticated
+  if (!isAuthenticated || !user) {
+    return (
+      <ClerkLoginForm
+        onAuthSuccess={async (userData) => {
+          try {
+            const sessionSuccess = await SecureBrowserDatabaseService.initializeUserSession(
+              userData.email,
+              userData.name
+            );
+
+            setUser(userData);
+            setIsAuthenticated(true);
+
+            if (sessionSuccess) {
+              await initializeServices(userData.accessLevel);
+              SecureBrowserDatabaseService.startSessionMonitoring();
+            } else {
+              await SecureBrowserDatabaseService.logSecurityEvent(
+                'unauthorized_access',
+                `Database session init failed for ${userData.email} - continuing without DB tracking`,
+                'medium'
+              );
+            }
+          } catch (error) {
+            await SecureBrowserDatabaseService.logSecurityEvent(
+              'unauthorized_access',
+              `Database session init error for ${userData.email}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              'high'
+            );
+            setUser(userData);
+            setIsAuthenticated(true);
+          }
+        }}
+        onAuthError={(error) => {
+          // console.error('❌ Clerk authentication failed:', error);
+          setErrors([{
+            type: 'config',
+            title: 'Authentication Failed',
+            message: error,
+            details: ['Check your internet connection', 'Verify Clerk configuration'],
+            critical: false
+          }]);
+        }}
+      />
+    );
+  }
+
   // Show loading screen during initialization
   if (initStage !== 'ready') {
     const currentMessage = (() => {
@@ -501,97 +493,6 @@ function AppContent() {
         message={currentMessage}
         error={vaultError}
         progress={initProgress}
-      />
-    );
-  }
-
-  // Show login form if not authenticated
-  if (!isAuthenticated || !user) {
-    return (
-      <ClerkLoginForm 
-        onAuthSuccess={async (userData) => {
-          // console.log('✅ User authenticated via Clerk:', userData);
-
-          // Initialize database session for the authenticated user
-          try {
-            // console.log('🔑 Initializing database session for Clerk user...');
-            const sessionSuccess = await SecureBrowserDatabaseService.initializeUserSession(
-              userData.email, 
-              userData.name
-            );
-            
-            if (sessionSuccess) {
-              // console.log('✅ Database session initialized successfully');
-              
-              // Now that we have a session, update VPN status if connected
-              try {
-                const vpnConnected = await vpnService.isConnected();
-                // console.log('🔍 Checking VPN status after session creation:', vpnConnected);
-
-                if (vpnConnected) {
-                  // Get current environment config
-                  const envConfigStr = await window.secureBrowser?.system.getEnvironment();
-                  const currentEnvConfig = envConfigStr ? JSON.parse(envConfigStr) : {};
-                  const endpoint = currentEnvConfig?.WIREGUARD_ENDPOINT || '134.199.169.102:59926';
-                  
-                  // Update session with VPN status
-                  await SecureBrowserDatabaseService.updateVPNStatus(
-                    true,
-                    endpoint,
-                    'Australia'
-                  );
-                  
-                  // Create VPN connection record for admin panel monitoring
-                  await SecureBrowserDatabaseService.logVPNConnection(
-                    endpoint,
-                    'Sydney, Australia',
-                    '127.0.0.1', // Will be updated with actual client IP
-                    '134.199.169.102' // VPN IP
-                  );
-                  
-                  // console.log('✅ VPN status synchronized to database');
-                } else {
-                  // console.log('⚠️ VPN not connected during session initialization');
-                }
-              } catch (error) {
-                // console.error('❌ Failed to sync VPN status after session creation:', error);
-              }
-              
-              // Start session monitoring
-              SecureBrowserDatabaseService.startSessionMonitoring();
-            } else {
-              // console.warn('⚠️ Database session initialization failed, but continuing with authentication');
-              // Log the failure but don't block authentication
-              await SecureBrowserDatabaseService.logSecurityEvent(
-                'unauthorized_access',
-                `Database session init failed for ${userData.email} - continuing without DB tracking`,
-                'medium'
-              );
-            }
-          } catch (error) {
-            // console.error('❌ Failed to initialize database session:', error);
-            // Log the error but don't block authentication
-            await SecureBrowserDatabaseService.logSecurityEvent(
-              'unauthorized_access',
-              `Database session init error for ${userData.email}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              'high'
-            );
-          }
-          
-          // Set authentication state
-          setUser(userData);
-          setIsAuthenticated(true);
-        }}
-        onAuthError={(error) => {
-          // console.error('❌ Clerk authentication failed:', error);
-          setErrors([{
-            type: 'config',
-            title: 'Authentication Failed',
-            message: error,
-            details: ['Check your internet connection', 'Verify Clerk configuration'],
-            critical: false
-          }]);
-        }}
       />
     );
   }
