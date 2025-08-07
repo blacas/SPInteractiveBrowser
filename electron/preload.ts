@@ -110,14 +110,8 @@ contextBridge.exposeInMainWorld('secureBrowser', {
     getLibraryConfig: () => ipcRenderer.invoke('sharepoint-get-config'),
     validateAccess: (url: string) => ipcRenderer.invoke('sharepoint-validate-access', url),
     getOAuthToken: () => ipcRenderer.invoke('sharepoint-get-oauth-token'),
-    graphRequest: (endpoint: string, accessToken: string) => 
-      ipcRenderer.invoke('sharepoint-graph-request', { endpoint, accessToken }),
-    // Prepare temporary file for native drag
-    prepareTempFile: (options: { data: ArrayBuffer, filename: string }) => 
-      ipcRenderer.invoke('sharepoint-prepare-temp-file', options),
-    // Start native drag (must be called synchronously from dragstart)
-    startDrag: (filePath: string) => 
-      ipcRenderer.send('sharepoint-start-drag', { filePath })
+    graphRequest: (endpoint: string, accessToken: string) =>
+      ipcRenderer.invoke('sharepoint-graph-request', { endpoint, accessToken })
   },
 
   // System Information
@@ -247,8 +241,6 @@ export interface SecureBrowserAPI {
     validateAccess: (url: string) => Promise<boolean>;
     getOAuthToken: () => Promise<{success: boolean, accessToken?: string, error?: string}>;
     graphRequest: (endpoint: string, accessToken: string) => Promise<{success: boolean, data?: any, error?: string}>;
-    prepareTempFile: (options: { data: ArrayBuffer, filename: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
-    startDrag: (filePath: string) => void; 
   };
   system: {
     getVersion: () => Promise<string>;
