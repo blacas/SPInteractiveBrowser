@@ -31,144 +31,76 @@ export const ClerkLoginForm: React.FC<ClerkLoginFormProps> = ({
   const [isSigningUp, setIsSigningUp] = useState(false);
 
   useEffect(() => {
+    const handleAuthState = async (state: AuthState) => {
+      setAuthState(state);
+
+      if (state.isSignedIn && state.user) {
+        const token = await clerkAuth.getSupabaseToken();
+        if (token) initSupabaseClient(token);
+        try {
+          const userEmail = clerkAuth.getUserEmail();
+          if (!userEmail) {
+            onAuthError('No email address found for this user');
+            return;
+          }
+
+          const dbUserData = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail);
+
+          if (dbUserData) {
+            onAuthSuccess({
+              id: state.user.id,
+              dbId: dbUserData.id,
+              name: dbUserData.name,
+              email: dbUserData.email,
+              accessLevel: dbUserData.accessLevel,
+              canEditAccessLevel: dbUserData.canEditAccessLevel,
+            });
+          } else {
+            console.warn('⚠️ User not found in database, using Clerk defaults');
+            onAuthSuccess({
+              id: state.user.id,
+              name: clerkAuth.getUserDisplayName(),
+              email: clerkAuth.getUserEmail(),
+              accessLevel: clerkAuth.getUserAccessLevel(),
+              canEditAccessLevel: false,
+              avatar: state.user.imageUrl,
+            });
+          }
+        } catch (error) {
+          console.error('❌ Error fetching user data from database:', error);
+          onAuthSuccess({
+            id: state.user.id,
+            name: clerkAuth.getUserDisplayName(),
+            email: clerkAuth.getUserEmail(),
+            accessLevel: clerkAuth.getUserAccessLevel(),
+            canEditAccessLevel: false,
+            avatar: state.user.imageUrl,
+          });
+        }
+      }
+    };
+
     const initializeClerk = async () => {
       try {
         setIsInitializing(true);
         setInitError(null);
 
         await clerkAuth.initialize();
-        const globalAuthState = clerkAuth.getCurrentAuthState();
-
-        if (globalAuthState.isSignedIn && globalAuthState.user) {
-          setAuthState(globalAuthState);
-
-          const token = await clerkAuth.getSupabaseToken();
-          if (token) initSupabaseClient(token);
-
-          try {
-            const userEmail = globalAuthState.user.emailAddresses?.[0]?.emailAddress;
-            if (!userEmail) {
-              onAuthError('No email address found for this user');
-              return;
-            }
-
-            const dbUserData = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail);
-            
-            if (dbUserData) {
-              // console.log('✅ Database user data loaded from cache:', dbUserData);
-              onAuthSuccess({
-                id: globalAuthState.user.id,
-                dbId: dbUserData.id,
-                name: dbUserData.name,
-                email: dbUserData.email,
-                accessLevel: dbUserData.accessLevel,
-                canEditAccessLevel: dbUserData.canEditAccessLevel,
-              });
-            } else {
-              // console.warn('⚠️ User not found in database, using Clerk defaults from cache');
-              // 🔐 USE CACHED DATA: Get user info from cached state directly
-              const firstName = globalAuthState.user.firstName || '';
-              const lastName = globalAuthState.user.lastName || '';
-              const displayName = `${firstName} ${lastName}`.trim() || userEmail.split('@')[0];
-              const accessLevel = (globalAuthState.user.publicMetadata as { accessLevel?: number })?.accessLevel || 1;
-              
-              onAuthSuccess({
-                id: globalAuthState.user.id,
-                name: displayName,
-                email: userEmail,
-                accessLevel: accessLevel,
-                canEditAccessLevel: false,
-                avatar: globalAuthState.user.imageUrl
-              });
-            }
-          } catch (error) {
-            // console.error('❌ Error processing cached user data:', error);
-            // 🔐 FALLBACK WITH CACHED DATA: Use cached user data directly as fallback
-            const userEmail = globalAuthState.user.emailAddresses?.[0]?.emailAddress || 'unknown@example.com';
-            const firstName = globalAuthState.user.firstName || '';
-            const lastName = globalAuthState.user.lastName || '';
-            const displayName = `${firstName} ${lastName}`.trim() || userEmail.split('@')[0];
-            const accessLevel = (globalAuthState.user.publicMetadata as { accessLevel?: number })?.accessLevel || 1;
-            
-            onAuthSuccess({
-              id: globalAuthState.user.id,
-              name: displayName,
-              email: userEmail,
-              accessLevel: accessLevel,
-              canEditAccessLevel: false,
-              avatar: globalAuthState.user.imageUrl
-            });
-          }
-          
-          setIsInitializing(false);
-          return; // Exit early - no need to initialize
-        }
-
-        // No existing auth - set up listener and refresh state
-        clerkAuth.onAuthStateChange(async (state) => {
-          setAuthState(state);
-
-          if (state.isSignedIn && state.user) {
-            const token = await clerkAuth.getSupabaseToken();
-            if (token) initSupabaseClient(token);
-            try {
-              const userEmail = clerkAuth.getUserEmail();
-              if (!userEmail) {
-                onAuthError('No email address found for this user');
-                return;
-              }
-
-              const dbUserData = await SecureBrowserDatabaseService.getUserWithPermissions(userEmail);
-
-              if (dbUserData) {
-                onAuthSuccess({
-                  id: state.user.id,
-                  dbId: dbUserData.id,
-                  name: dbUserData.name,
-                  email: dbUserData.email,
-                  accessLevel: dbUserData.accessLevel,
-                  canEditAccessLevel: dbUserData.canEditAccessLevel,
-                });
-              } else {
-                console.warn('⚠️ User not found in database, using Clerk defaults');
-                onAuthSuccess({
-                  id: state.user.id,
-                  name: clerkAuth.getUserDisplayName(),
-                  email: clerkAuth.getUserEmail(),
-                  accessLevel: clerkAuth.getUserAccessLevel(),
-                  canEditAccessLevel: false,
-                  avatar: state.user.imageUrl
-                });
-              }
-            } catch (error) {
-              console.error('❌ Error fetching user data from database:', error);
-              onAuthSuccess({
-                id: state.user.id,
-                name: clerkAuth.getUserDisplayName(),
-                email: clerkAuth.getUserEmail(),
-                accessLevel: clerkAuth.getUserAccessLevel(),
-                canEditAccessLevel: false,
-                avatar: state.user.imageUrl
-              });
-            }
-          }
-        });
-
+        clerkAuth.onAuthStateChange(handleAuthState);
         await clerkAuth.refreshAuthenticationState();
-        setIsInitializing(false);
       } catch (error) {
         console.error('Failed to initialize Clerk auth:', error);
         setInitError(error instanceof Error ? error.message : 'Authentication initialization failed');
-        setIsInitializing(false);
         onAuthError('Authentication service unavailable');
+      } finally {
+        setIsInitializing(false);
       }
     };
 
     initializeClerk();
 
     return () => {
-      // Cleanup listeners
-      clerkAuth.removeAuthStateListener(() => {});
+      clerkAuth.removeAuthStateListener(handleAuthState);
     };
   }, [onAuthSuccess, onAuthError]);
 

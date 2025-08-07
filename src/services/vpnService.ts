@@ -25,35 +25,12 @@ export class VPNService {
   private statusCheckInterval: NodeJS.Timeout | null = null;
   private connectionCallbacks: ((status: VPNStatus) => void)[] = [];
 
-  constructor() {
-    this.loadConfiguration();
-  }
-
-  private async loadConfiguration(): Promise<void> {
-    try {
-      // Get configuration from Electron main process
-      if (typeof window !== 'undefined' && window.secureBrowser) {
-        const envConfig = await window.secureBrowser.system.getEnvironment();
-        const env = JSON.parse(envConfig);
-        
-        this.config = {
-          provider: env.VPN_PROVIDER || 'wireguard',
-          endpoint: env.WIREGUARD_ENDPOINT || '',
-          configPath: env.WIREGUARD_CONFIG_PATH || './config/wireguard-australia.conf',
-          autoConnect: env.VPN_AUTO_CONNECT === 'true',
-          failClosed: env.VPN_FAIL_CLOSED === 'true'
-        };
-      }
-    } catch (error) {
-      console.error('❌ Failed to load VPN configuration:', error);
-      throw new Error('VPN configuration not available');
-    }
-  }
+  constructor() {}
 
   // Allow configuration to be set after login when environment is loaded from Supabase
   setConfiguration(env: Record<string, string | undefined>) {
     this.config = {
-      provider: env.VPN_PROVIDER || 'wireguard',
+      provider: (env.VPN_PROVIDER as 'wireguard' | 'nordlayer' | 'expressvpn' | undefined) || 'wireguard',
       endpoint: env.WIREGUARD_ENDPOINT || '',
       configPath: env.WIREGUARD_CONFIG_PATH || './config/wireguard-australia.conf',
       autoConnect: env.VPN_AUTO_CONNECT === 'true',
@@ -67,9 +44,8 @@ export class VPNService {
     }
 
     try {
-      const platformInfo = getPlatformInfo();
-      // console.log(`🌐 Attempting VPN connection with ${this.config.provider} on ${platformInfo.displayName} ${platformInfo.emoji}...`);
-      
+      // getPlatformInfo() can be used for platform-specific logging if needed
+      getPlatformInfo();
       let connected = false;
       switch (this.config.provider) {
         case 'wireguard':
