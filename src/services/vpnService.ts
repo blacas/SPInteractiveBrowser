@@ -25,6 +25,7 @@ export class VPNService {
   private config: VPNConfig | null = null;
   private statusCheckInterval: NodeJS.Timeout | null = null;
   private connectionCallbacks: ((status: VPNStatus) => void)[] = [];
+  private lastStatus: VPNStatus | null = null;
 
   constructor() {}
 
@@ -187,16 +188,23 @@ export class VPNService {
   }
 
   private notifyStatusChange(status: VPNStatus): void {
+    if (this.lastStatus &&
+        this.lastStatus.connected === status.connected &&
+        this.lastStatus.endpoint === status.endpoint) {
+      return
+    }
+
+    this.lastStatus = status
+
     this.connectionCallbacks.forEach(callback => {
       try {
-        callback(status);
+        callback(status)
       } catch (error) {
         // console.error('❌ Error in VPN status callback:', error);
       }
-    });
+    })
 
-    // Update database when status changes
-    this.updateDatabaseStatus(status);
+    this.updateDatabaseStatus(status)
   }
 
   private async updateDatabaseStatus(status: VPNStatus): Promise<void> {
@@ -295,9 +303,8 @@ export class VPNService {
 
     this.statusCheckInterval = setInterval(async () => {
       const status = await this.getStatus();
-      
-      // Check for unexpected disconnections
-      if (!status.connected) {
+
+      if (!status.connected && this.lastStatus?.connected) {
         console.warn('⚠️ VPN disconnection detected during monitoring');
         await SecureBrowserDatabaseService.logSecurityEvent(
           'vpn_disconnected',
@@ -305,13 +312,12 @@ export class VPNService {
           'high',
           supabase
         );
-        
-        await SecureBrowserDatabaseService.updateVPNStatus(false);
+
         await SecureBrowserDatabaseService.endVPNConnection();
       }
-      
+
       this.notifyStatusChange(status);
-    }, 5000); // Check every 5 seconds
+    }, 60000); // Check every 60 seconds
   }
 
   private stopStatusMonitoring(): void {

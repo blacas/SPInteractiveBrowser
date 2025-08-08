@@ -100,26 +100,26 @@ let mainWindow: BrowserWindow | null = null
 let vpnConnected = false
 let wireguardProcess: ChildProcess | null = null
 
+// Cache for VPN status checks to prevent rapid polling
+let lastVPNStatus = 'disconnected'
+let lastStatusCheckTime = 0
+const STATUS_CHECK_COOLDOWN = 5000 // 5 seconds
+
 // Store pending downloads for choice processing
 const pendingDownloads = new Map<string, { item: any, resolve: Function, reject: Function }>();
 
 // VPN status tracking
 const updateVPNStatus = (connected: boolean): void => {
-  const wasConnected = vpnConnected;
-  vpnConnected = connected;
-  
+  const wasConnected = vpnConnected
+  vpnConnected = connected
+
   if (wasConnected !== connected) {
-    // console.log(`🔄 VPN status changed: ${wasConnected ? 'Connected' : 'Disconnected'} → ${connected ? 'Connected' : 'Disconnected'}`);
+    windows.forEach(window => {
+      if (window && !window.isDestroyed()) {
+        window.webContents.send('vpn-status-changed', connected)
+      }
+    })
   }
-  
-  // console.log(`📡 VPN Status Updated: ${connected ? '✅ Connected - Allowing all HTTPS requests' : '❌ Disconnected - Blocking external requests'}`);
-  
-  // Send VPN status to all windows
-  windows.forEach(window => {
-    if (window && !window.isDestroyed()) {
-      window.webContents.send('vpn-status-changed', connected)
-    }
-  })
 }
 
 // Real WireGuard VPN functions
@@ -1711,41 +1711,56 @@ ipcMain.handle('system-get-environment', () => {
 
 // Real VPN handlers
 ipcMain.handle('vpn-get-status', async () => {
-  console.log('🔍 VPN status requested - running comprehensive check...');
+  const now = Date.now()
+  if (now - lastStatusCheckTime < STATUS_CHECK_COOLDOWN) {
+    return lastVPNStatus
+  }
+
+  console.log('🔍 VPN status requested - running comprehensive check...')
   try {
-    const isConnected = await checkWireGuardConnection();
-    const status = isConnected ? 'connected' : 'disconnected';
-    console.log(`📊 VPN status check result: ${status}`);
-    updateVPNStatus(isConnected);
-    return status;
+    const isConnected = await checkWireGuardConnection()
+    const status = isConnected ? 'connected' : 'disconnected'
+    console.log(`📊 VPN status check result: ${status}`)
+    lastVPNStatus = status
+    lastStatusCheckTime = now
+    updateVPNStatus(isConnected)
+    return status
   } catch (error) {
-    console.log('❌ VPN status check error:', error);
-    return 'disconnected';
+    console.log('❌ VPN status check error:', error)
+    lastVPNStatus = 'disconnected'
+    lastStatusCheckTime = now
+    return 'disconnected'
   }
 })
 
 ipcMain.handle('vpn-connect', async (_event, _provider: string) => {
   console.log(`🌐 VPN connect requested: ${_provider}`)
   try {
-    const success = await connectVPN();
-    updateVPNStatus(success);
-    return success;
+    const success = await connectVPN()
+    updateVPNStatus(success)
+    lastVPNStatus = success ? 'connected' : 'disconnected'
+    lastStatusCheckTime = Date.now()
+    return success
   } catch (_error) {
     console.log('❌ VPN connection error:', _error);
-    updateVPNStatus(false);
-    return false;
+    updateVPNStatus(false)
+    lastVPNStatus = 'disconnected'
+    lastStatusCheckTime = Date.now()
+    return false
   }
 })
 
 ipcMain.handle('vpn-disconnect', async () => {
   // console.log('🌐 VPN disconnect requested')
   try {
-    const success = await disconnectVPN();
-    updateVPNStatus(false);
-    return success;
+    const success = await disconnectVPN()
+    updateVPNStatus(false)
+    lastVPNStatus = 'disconnected'
+    lastStatusCheckTime = Date.now()
+    return success
   } catch (_error) {
     // console.error('❌ VPN disconnection error:', _error);
-    return false;
+    return false
   }
 })
 
